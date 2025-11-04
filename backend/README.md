@@ -43,4 +43,4 @@ source .venv/bin/activate (macos/linux)
 .venv\Scripts\activate (windows)
 
 # Rodar o fastapi
-uvicorn main:app --reload
+uvicorn app.main:app --reload
