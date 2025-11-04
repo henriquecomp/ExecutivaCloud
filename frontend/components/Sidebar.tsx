@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { View, User } from '../types';
-import { DashboardIcon, ExecutivesIcon, CalendarIcon, ContactsIcon, ExpensesIcon, OrganizationsIcon, SettingsIcon, LogoIcon, TasksIcon, SecretariesIcon, ReportsIcon, DocumentsIcon } from './Icons';
+import { DashboardIcon, ExecutivesIcon, CalendarIcon, ContactsIcon, ExpensesIcon, OrganizationsIcon, SettingsIcon, LogoIcon, TasksIcon, SecretariesIcon, ReportsIcon, DocumentsIcon, BriefcaseIcon } from './Icons';
 
 interface SidebarProps {
   currentView: View;
@@ -15,7 +15,8 @@ const Sidebar: React.FC<SidebarProps> = ({ currentUser, currentView, setCurrentV
 
   const allNavItems: { view: View; label: string; icon: React.ReactNode }[] = useMemo(() => [
     { view: 'dashboard', label: 'Painel', icon: <DashboardIcon className="w-6 h-6" /> },
-    { view: 'organizations', label: 'Organizações', icon: <OrganizationsIcon className="w-6 h-6" /> },
+    { view: 'legalOrganizations', label: 'Organizações', icon: <BriefcaseIcon className="w-6 h-6" /> },
+    { view: 'organizations', label: 'Empresas', icon: <OrganizationsIcon className="w-6 h-6" /> },
     { view: 'executives', label: 'Executivos', icon: <ExecutivesIcon className="w-6 h-6" /> },
     { view: 'secretaries', label: 'Secretárias', icon: <SecretariesIcon className="w-6 h-6" /> },
     { view: 'agenda', label: 'Agenda', icon: <CalendarIcon className="w-6 h-6" /> },
@@ -34,9 +35,14 @@ const Sidebar: React.FC<SidebarProps> = ({ currentUser, currentView, setCurrentV
         const executiveViews: View[] = ['dashboard', 'agenda', 'documents', 'contacts', 'finances', 'tasks', 'reports', 'settings'];
         return allNavItems.filter(item => executiveViews.includes(item.view));
       case 'secretary':
-        const secretaryHiddenViews: View[] = ['organizations'];
+        const secretaryHiddenViews: View[] = ['organizations', 'legalOrganizations'];
         return allNavItems.filter(item => !secretaryHiddenViews.includes(item.view));
       case 'admin':
+        if (currentUser.organizationId) { // Admin for a specific company
+          const adminHiddenViews: View[] = ['legalOrganizations'];
+          return allNavItems.filter(item => !adminHiddenViews.includes(item.view));
+        }
+        return allNavItems; // Admin for legal org
       case 'master':
       default:
         return allNavItems;

@@ -51,7 +51,7 @@ const Dashboard: React.FC<DashboardProps> = ({ events, expenses, selectedExecuti
     if (!selectedExecutive) return '';
     const org = organizations.find(o => o.id === selectedExecutive.organizationId);
     const dept = departments.find(d => d.id === selectedExecutive.departmentId);
-    return org ? `${org.name}${dept ? ` / ${dept.name}` : ''}` : 'Organização não definida';
+    return org ? `${org.name}${dept ? ` / ${dept.name}` : ''}` : 'Empresa não definida';
   }, [selectedExecutive, organizations, departments]);
 
   return (

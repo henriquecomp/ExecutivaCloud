@@ -1,8 +1,29 @@
 // types.ts
 
+// NEW type for Legal Organizations
+export interface LegalOrganization {
+  id: string;
+  name: string;
+  cnpj?: string;
+  street?: string;
+  number?: string;
+  neighborhood?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+}
+
 export interface Organization {
   id: string; // UUID
   name: string;
+  legalOrganizationId?: string; // Link to the new LegalOrganization
+  cnpj?: string;
+  street?: string;
+  number?: string;
+  neighborhood?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
 }
 
 export interface Department {
@@ -68,8 +89,55 @@ export interface Executive {
 export interface Secretary {
   id: string; // UUID
   fullName: string;
-  email?: string;
   executiveIds: string[]; // Array of executive IDs
+
+  // Bloco 1: Identificação Pessoal
+  cpf?: string;
+  rg?: string;
+  rgIssuer?: string; // Órgão emissor
+  rgIssueDate?: string; // Data de expedição
+  birthDate?: string;
+  nationality?: string;
+  placeOfBirth?: string; // Naturalidade
+  motherName?: string;
+  fatherName?: string;
+  civilStatus?: string;
+
+  // Bloco 2: Informações de Contato
+  workEmail?: string;
+  workPhone?: string;
+  extension?: string;
+  personalEmail?: string;
+  personalPhone?: string;
+  address?: string; // Endereço Residencial Completo
+  linkedinProfileUrl?: string;
+
+  // Bloco 3: Dados Profissionais e Corporativos
+  jobTitle?: string;
+  organizationId?: string;
+  departmentId?: string;
+  costCenter?: string; // Centro de Custo
+  employeeId?: string;
+  reportsToExecutiveId?: string;
+  hireDate?: string;
+  workLocation?: string;
+  systemAccessLevels?: string;
+  
+  // Bloco 4: Perfil Público
+  photoUrl?: string;
+  bio?: string;
+  education?: string;
+  languages?: string;
+
+  // Bloco 5: Dados de Emergência e Dependentes
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  emergencyContactRelation?: string;
+  dependentsInfo?: string;
+
+  // Bloco 6: Dados Financeiros e de Acesso
+  bankInfo?: string;
+  compensationInfo?: string;
 }
 
 export type UserRole = 'master' | 'admin' | 'secretary' | 'executive';
@@ -78,7 +146,8 @@ export interface User {
   id: string;
   fullName: string;
   role: UserRole;
-  organizationId?: string; // for admin
+  organizationId?: string; // for admin of a specific company
+  legalOrganizationId?: string; // for admin of a legal organization
   executiveId?: string;    // for executive
   secretaryId?: string;    // for secretary
 }
@@ -160,7 +229,7 @@ export interface Expense {
 }
 
 // Views correspond to navigation items in the sidebar
-export type View = 'dashboard' | 'executives' | 'agenda' | 'contacts' | 'finances' | 'organizations' | 'settings' | 'tasks' | 'secretaries' | 'reports' | 'documents';
+export type View = 'dashboard' | 'executives' | 'agenda' | 'contacts' | 'finances' | 'legalOrganizations' | 'organizations' | 'settings' | 'tasks' | 'secretaries' | 'reports' | 'documents';
 
 export enum Priority {
   High = 'Alta',
@@ -202,6 +271,7 @@ export interface Document {
 
 export interface AllDataBackup {
   version: string;
+  legalOrganizations: LegalOrganization[];
   organizations: Organization[];
   departments: Department[];
   executives: Executive[];
