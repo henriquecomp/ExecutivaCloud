@@ -289,3 +289,19 @@ export interface AllDataBackup {
 }
 
 export type LayoutView = 'card' | 'list' | 'table';
+
+export type LegalOrganizationCreate = Omit<LegalOrganization, 'id'>;
+export type LegalOrganizationUpdate = Partial<LegalOrganizationCreate>;
+
+// Para Organization
+// Nota: O backend schema 'OrganizationBase' exige 'legalOrganizationId'
+// O frontend 'types.ts' o tem como opcional.
+// Para consistência com o backend, tornamos obrigatório na criação.
+export type OrganizationCreate = Omit<Organization, 'id'> & {
+  legalOrganizationId: string;
+};
+export type OrganizationUpdate = Partial<OrganizationCreate>;
+
+// Para Department
+export type DepartmentCreate = Omit<Department, 'id'>;
+export type DepartmentUpdate = Partial<DepartmentCreate>;

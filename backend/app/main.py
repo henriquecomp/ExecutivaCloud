@@ -1,12 +1,25 @@
 # main.py
 from fastapi import FastAPI
-# Importa o roteador de usuários que acabamos de criar
+from fastapi.middleware.cors import CORSMiddleware
 from app.routers import user 
 from app.routers import legal_organization, organization, department
 
 app = FastAPI(
     title="Executiva Cloud API",
     description="Executiva Cloud API"
+)
+
+origins = [
+    "http://localhost:3000",
+]
+
+# 3. Adicione o Middleware de CORS na sua aplicação
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,         # Permite as origens da lista
+    allow_credentials=True,      # Permite cookies (importante para autenticação)
+    allow_methods=["*"],         # Permite todos os métodos (GET, POST, PUT, DELETE)
+    allow_headers=["*"],         # Permite todos os cabeçalhos
 )
 
 # Inclui as rotas do módulo 'user' na aplicação principal

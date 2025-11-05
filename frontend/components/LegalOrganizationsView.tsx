@@ -1,8 +1,9 @@
 import React, { useState, useRef, useMemo } from 'react';
-import { LegalOrganization, Organization, Department, Executive, Secretary, Event, Contact, Expense, Task, Document, User } from '../types';
+import { LegalOrganization, Organization, Department, Executive, Secretary, Event, Contact, Expense, Task, Document, User, LegalOrganizationCreate, LegalOrganizationUpdate, OrganizationUpdate, OrganizationCreate } from '../types';
 import Modal from './Modal';
 import ConfirmationModal from './ConfirmationModal';
 import { EditIcon, DeleteIcon, PlusIcon } from './Icons';
+import { apiService } from '../services/apiService'; // Importe o serviço de API
 
 // --- Helper Functions ---
 
@@ -94,7 +95,11 @@ interface LegalOrganizationsViewProps {
   setUsers: React.Dispatch<React.SetStateAction<User[]>>;
 }
 
-const LegalOrganizationForm: React.FC<{ legalOrganization: Partial<LegalOrganization>, onSave: (legalOrganization: LegalOrganization) => void, onCancel: () => void }> = ({ legalOrganization, onSave, onCancel }) => {
+const LegalOrganizationForm: React.FC<{ 
+    legalOrganization: Partial<LegalOrganization>, 
+    onSave: (legalOrganization: LegalOrganizationCreate | LegalOrganization) => void, 
+    onCancel: () => void 
+}> = ({ legalOrganization, onSave, onCancel }) => {
     const [name, setName] = useState(legalOrganization.name || '');
     const [cnpj, setCnpj] = useState(legalOrganization.cnpj || '');
     const [street, setStreet] = useState(legalOrganization.street || '');
@@ -118,8 +123,9 @@ const LegalOrganizationForm: React.FC<{ legalOrganization: Partial<LegalOrganiza
     const handleCnpjBlur = () => {
         if (cnpj && !validateCNPJ(cnpj)) {
             setCnpjError('CNPJ inválido. Verifique o número e tente novamente.');
-            setCnpj('');
-            cnpjInputRef.current?.focus();
+            // Não limpe, apenas mostre o erro. O usuário pode querer corrigir.
+        } else {
+            setCnpjError('');
         }
     };
 
@@ -133,8 +139,6 @@ const LegalOrganizationForm: React.FC<{ legalOrganization: Partial<LegalOrganiza
         if (cepClean.length !== 8) {
             if (cepClean.length > 0) {
                  setCepError('CEP incompleto ou inválido.');
-                 setZipCode('');
-                 cepInputRef.current?.focus();
             }
             return;
         }
@@ -149,7 +153,7 @@ const LegalOrganizationForm: React.FC<{ legalOrganization: Partial<LegalOrganiza
                 throw new Error('CEP não encontrado ou inválido.');
             }
 
-            setStreet(data.logradouro || '');
+            setStreet(data.logouro || '');
             setNeighborhood(data.bairro || '');
             setCity(data.localidade || '');
             setState(data.uf || '');
@@ -160,8 +164,6 @@ const LegalOrganizationForm: React.FC<{ legalOrganization: Partial<LegalOrganiza
             setNeighborhood('');
             setCity('');
             setState('');
-            setZipCode('');
-            cepInputRef.current?.focus();
         } finally {
             setIsCepLoading(false);
         }
@@ -170,12 +172,15 @@ const LegalOrganizationForm: React.FC<{ legalOrganization: Partial<LegalOrganiza
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!name || (cnpj && !validateCNPJ(cnpj))) {
-            if (cnpj && !validateCNPJ(cnpj)) handleCnpjBlur();
+        if (!name) return;
+        if (cnpj && !validateCNPJ(cnpj)) {
+            handleCnpjBlur();
+            cnpjInputRef.current?.focus();
             return;
         };
-        onSave({
-            id: legalOrganization.id || `legal_org_${new Date().getTime()}`,
+        
+        const dataToSave: LegalOrganizationCreate | LegalOrganization = {
+            ...legalOrganization, // Mantém o ID se estiver editando
             name,
             cnpj,
             street,
@@ -184,7 +189,14 @@ const LegalOrganizationForm: React.FC<{ legalOrganization: Partial<LegalOrganiza
             city,
             state,
             zipCode,
-        });
+        };
+        
+        // Remove o ID se for uma criação (id 'undefined')
+        if (!legalOrganization.id) {
+            delete (dataToSave as Partial<LegalOrganization>).id;
+        }
+
+        onSave(dataToSave);
     };
 
     return (
@@ -270,7 +282,7 @@ const LegalOrganizationForm: React.FC<{ legalOrganization: Partial<LegalOrganiza
 
 const OrganizationForm: React.FC<{
     organization: Partial<Organization>, 
-    onSave: (organization: Organization) => void, 
+    onSave: (organization: OrganizationUpdate | Organization) => void, 
     onCancel: () => void, 
     legalOrganizations: LegalOrganization[],
     currentUser: User;
@@ -328,7 +340,7 @@ const OrganizationForm: React.FC<{
             if (!response.ok) throw new Error('Erro ao buscar CEP.');
             const data = await response.json();
             if (data.erro) throw new Error('CEP não encontrado ou inválido.');
-            setStreet(data.logradouro || '');
+            setStreet(data.logouro || '');
             setNeighborhood(data.bairro || '');
             setCity(data.localidade || '');
             setState(data.uf || '');
@@ -381,17 +393,30 @@ const OrganizationForm: React.FC<{
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!name || !legalOrganizationId || (cnpj && !validateCNPJ(cnpj))) {
-            if (cnpj && !validateCNPJ(cnpj)) {
-                handleCnpjBlur();
-                cnpjInputRef.current?.focus();
-            }
+        if (!name || !legalOrganizationId) return;
+        if (cnpj && !validateCNPJ(cnpj)) {
+            handleCnpjBlur();
+            cnpjInputRef.current?.focus();
             return;
         };
-        onSave({
-            id: organization.id || `org_${new Date().getTime()}`,
-            name, legalOrganizationId, cnpj, street, number, neighborhood, city, state, zipCode,
-        });
+
+        // Este formulário (dentro desta View) só atualiza.
+        // O tipo de 'onSave' espera OrganizationUpdate | Organization
+        const dataToSave: OrganizationUpdate = {
+            //id: organization.id, // ID não faz parte do schema de update
+            name, 
+            legalOrganizationId, 
+            cnpj, 
+            street, 
+            number, 
+            neighborhood, 
+            city, 
+            state, 
+            zipCode,
+        };
+        
+        // Passa o ID original (que está em 'organization') junto com os dados de update
+        onSave({ ...organization, ...dataToSave });
     };
 
     return (
@@ -486,6 +511,9 @@ const LegalOrganizationsView: React.FC<LegalOrganizationsViewProps> = ({
     const [editingCompany, setEditingCompany] = useState<Partial<Organization> | null>(null);
     const [companyToDelete, setCompanyToDelete] = useState<Organization | null>(null);
     
+    // Estado para feedback de erro da API
+    const [apiError, setApiError] = useState<string | null>(null);
+    
     const isAdminForLegalOrg = currentUser.role === 'admin' && !!currentUser.legalOrganizationId;
 
     const visibleLegalOrgs = useMemo(() => {
@@ -495,115 +523,152 @@ const LegalOrganizationsView: React.FC<LegalOrganizationsViewProps> = ({
         return legalOrganizations;
     }, [legalOrganizations, currentUser, isAdminForLegalOrg]);
 
+    
+    // --- Funções de LegalOrganization (Matriz) ---
 
     const handleAdd = () => {
         setEditingLegalOrg({});
+        setApiError(null);
         setModalOpen(true);
     };
 
     const handleEdit = (legalOrg: LegalOrganization) => {
         setEditingLegalOrg(legalOrg);
+        setApiError(null);
         setModalOpen(true);
     };
 
     const handleDelete = (legalOrg: LegalOrganization) => {
         setLegalOrgToDelete(legalOrg);
+        setApiError(null);
     };
 
-    const confirmDelete = () => {
-        if (!legalOrgToDelete) return;
-
-        const legalOrgId = legalOrgToDelete.id;
-        const organizationsToDelete = organizations.filter(o => o.legalOrganizationId === legalOrgId);
-        const organizationIdsToDelete = organizationsToDelete.map(o => o.id);
-        const executivesToDelete = executives.filter(e => organizationIdsToDelete.includes(e.organizationId || ''));
-        const executiveIdsToDelete = executivesToDelete.map(e => e.id);
-
-        setLegalOrganizations(prev => prev.filter(lo => lo.id !== legalOrgId));
-        setOrganizations(prev => prev.filter(o => o.legalOrganizationId !== legalOrgId));
-        setDepartments(prev => prev.filter(d => !organizationIdsToDelete.includes(d.organizationId)));
-        setExecutives(prev => prev.filter(e => !organizationIdsToDelete.includes(e.organizationId || '')));
-        setEvents(prev => prev.filter(item => !executiveIdsToDelete.includes(item.executiveId)));
-        setContacts(prev => prev.filter(item => !executiveIdsToDelete.includes(item.executiveId)));
-        setExpenses(prev => prev.filter(item => !executiveIdsToDelete.includes(item.executiveId)));
-        setTasks(prev => prev.filter(item => !executiveIdsToDelete.includes(item.executiveId)));
-        setDocuments(prev => prev.filter(item => !executiveIdsToDelete.includes(item.executiveId)));
-        setSecretaries(secs => secs.map(sec => ({
-            ...sec,
-            executiveIds: sec.executiveIds.filter(execId => !executiveIdsToDelete.includes(execId))
-        })));
-        setUsers(users => users.filter(u => {
-            if (u.legalOrganizationId === legalOrgId) return false;
-            if (u.organizationId && organizationIdsToDelete.includes(u.organizationId)) return false;
-            if (u.executiveId && executiveIdsToDelete.includes(u.executiveId)) return false;
-            return true;
-        }));
-        setLegalOrgToDelete(null);
-    };
-
-    const handleSave = (legalOrg: LegalOrganization) => {
-        if (editingLegalOrg && editingLegalOrg.id) {
-            setLegalOrganizations(prev => prev.map(lo => lo.id === legalOrg.id ? legalOrg : lo));
-            setUsers(users => users.map(u => u.legalOrganizationId === legalOrg.id ? { ...u, fullName: `Admin ${legalOrg.name}` } : u));
-        } else {
-            setLegalOrganizations(prev => [...prev, legalOrg]);
-            setUsers(users => [...users, {
-                id: `user_admin_legal_${legalOrg.id}`,
-                fullName: `Admin ${legalOrg.name}`,
-                role: 'admin',
-                legalOrganizationId: legalOrg.id,
-            }]);
+    const handleSave = async (legalOrgData: LegalOrganizationCreate | LegalOrganization) => {
+        try {
+            setApiError(null);
+            if ('id' in legalOrgData && legalOrgData.id) {
+                // --- ATUALIZAR (UPDATE) ---
+                const updatedOrg = await apiService.legalOrganizations.update(legalOrgData.id, legalOrgData as LegalOrganizationUpdate);
+                setLegalOrganizations(prev => prev.map(lo => lo.id === updatedOrg.data.id ? updatedOrg.data : lo));
+                // Atualiza usuário admin associado
+                setUsers(users => users.map(u => u.legalOrganizationId === updatedOrg.data.id ? { ...u, fullName: `Admin ${updatedOrg.data.name}` } : u));
+            } else {
+                // --- CRIAR (CREATE) ---
+                const newOrg = await apiService.legalOrganizations.create(legalOrgData as LegalOrganizationCreate);
+                setLegalOrganizations(prev => [...prev, newOrg.data]);
+                // Cria usuário admin associado
+                // NOTA: O 'id' do newOrg.data virá do backend (provavelmente um número)
+                // O frontend espera strings. Isso pode precisar de ajuste.
+                setUsers(users => [...users, {
+                    id: `user_admin_legal_${newOrg.data.id}`,
+                    fullName: `Admin ${newOrg.data.name}`,
+                    role: 'admin',
+                    legalOrganizationId: newOrg.data.id as any, // Ajuste 'any' p/ compatibilidade
+                }]);
+            }
+            setModalOpen(false);
+            setEditingLegalOrg(null);
+        } catch (error: any) {
+            console.error("Erro ao salvar LegalOrganization:", error);
+            setApiError(error.response?.data?.detail || "Erro ao salvar. Verifique se o CNPJ já existe.");
         }
-        setModalOpen(false);
-        setEditingLegalOrg(null);
     };
+
+    const confirmDelete = async () => {
+        if (!legalOrgToDelete) return;
+        try {
+            setApiError(null);
+            await apiService.legalOrganizations.delete(legalOrgToDelete.id);
+            
+            // Sucesso na API, agora atualize o estado local
+            // (A lógica de cascata que estava aqui foi removida,
+            // pois o backend irá impedi-la se houver empresas filhas)
+            setLegalOrganizations(prev => prev.filter(lo => lo.id !== legalOrgToDelete.id));
+            setUsers(users => users.filter(u => u.legalOrganizationId !== legalOrgToDelete.id));
+            
+            setLegalOrgToDelete(null);
+        } catch (error: any) {
+            console.error("Erro ao deletar LegalOrganization:", error);
+            // Mostra o erro do backend (ex: "Não é possível excluir. Esta organização possui empresas vinculadas.")
+            setApiError(error.response?.data?.detail || "Não foi possível excluir.");
+            setLegalOrgToDelete(null); // Fecha o modal de confirmação
+        }
+    };
+
+
+    // --- Funções de Organization (Empresa/Filial) ---
 
     const handleEditCompany = (company: Organization) => {
         setEditingCompany(company);
+        setApiError(null);
         setCompanyModalOpen(true);
     };
 
     const handleDeleteCompany = (company: Organization) => {
         setCompanyToDelete(company);
+        setApiError(null);
     };
 
-    const handleSaveCompany = (company: Organization) => {
-        setOrganizations(orgs => orgs.map(o => o.id === company.id ? company : o));
-        setUsers(users => users.map(u => {
-            if (u.organizationId === company.id) {
-                return { ...u, fullName: `Admin ${company.name}` };
+    const handleSaveCompany = async (companyData: OrganizationUpdate | Organization) => {
+        try {
+            setApiError(null);
+            // O formulário só edita. A criação é em OrganizationsView
+            if ('id' in companyData && companyData.id) {
+                const updatedOrg = await apiService.organizations.update(companyData.id, companyData as OrganizationUpdate);
+                setOrganizations(orgs => orgs.map(o => o.id === updatedOrg.data.id ? updatedOrg.data : o));
+                setUsers(users => users.map(u => u.organizationId === updatedOrg.data.id ? { ...u, fullName: `Admin ${updatedOrg.data.name}` } : u));
             }
-            return u;
-        }));
-        setCompanyModalOpen(false);
-        setEditingCompany(null);
+
+            setCompanyModalOpen(false);
+            setEditingCompany(null);
+        } catch (error: any) {
+             console.error("Erro ao salvar Organization:", error);
+            setApiError(error.response?.data?.detail || "Erro ao salvar. Verifique se o CNPJ já existe.");
+        }
     };
 
-    const confirmDeleteCompany = () => {
+    const confirmDeleteCompany = async () => {
         if (!companyToDelete) return;
 
-        const orgId = companyToDelete.id;
-        const executivesToDelete = executives.filter(e => e.organizationId === orgId);
-        const executivesToDeleteIds = executivesToDelete.map(e => e.id);
+        try {
+            setApiError(null);
+            await apiService.organizations.delete(companyToDelete.id);
+            
+            // Sucesso na API, agora atualize o estado local em cascata
+            // NOTA: Esta lógica de cascata no frontend é PERIGOSA se o backend não a espelhar.
+            // O backend (organization_service.py) impede a exclusão se houver departamentos.
+            // O ideal é o backend fazer a cascata, ou o frontend refazer o fetch dos dados.
+            // Vou manter sua lógica de cascata original por enquanto.
+            
+            const orgId = companyToDelete.id;
+            const executivesToDelete = executives.filter(e => e.organizationId === orgId);
+            const executivesToDeleteIds = executivesToDelete.map(e => e.id);
 
-        setOrganizations(orgs => orgs.filter(o => o.id !== orgId));
-        setDepartments(depts => depts.filter(d => d.organizationId !== orgId));
-        setExecutives(execs => execs.filter(e => e.organizationId !== orgId));
-        setEvents(prev => prev.filter(item => !executivesToDeleteIds.includes(item.executiveId)));
-        setContacts(prev => prev.filter(item => !executivesToDeleteIds.includes(item.executiveId)));
-        setExpenses(prev => prev.filter(item => !executivesToDeleteIds.includes(item.executiveId)));
-        setTasks(prev => prev.filter(item => !executivesToDeleteIds.includes(item.executiveId)));
-        setDocuments(prev => prev.filter(item => !executivesToDeleteIds.includes(item.executiveId)));
-        setSecretaries(secs => secs.map(sec => ({
-            ...sec,
-            executiveIds: sec.executiveIds.filter(execId => !executivesToDeleteIds.includes(execId))
-        })));
-        setUsers(users => users.filter(u => {
-            if (u.organizationId === orgId) return false;
-            if (u.executiveId && executivesToDeleteIds.includes(u.executiveId)) return false;
-            return true;
-        }));
-        setCompanyToDelete(null);
+            setOrganizations(orgs => orgs.filter(o => o.id !== orgId));
+            setDepartments(depts => depts.filter(d => d.organizationId !== orgId));
+            setExecutives(execs => execs.filter(e => e.organizationId !== orgId));
+            setEvents(prev => prev.filter(item => !executivesToDeleteIds.includes(item.executiveId)));
+            setContacts(prev => prev.filter(item => !executivesToDeleteIds.includes(item.executiveId)));
+            setExpenses(prev => prev.filter(item => !executivesToDeleteIds.includes(item.executiveId)));
+            setTasks(prev => prev.filter(item => !executivesToDeleteIds.includes(item.executiveId)));
+            setDocuments(prev => prev.filter(item => !executivesToDeleteIds.includes(item.executiveId)));
+            setSecretaries(secs => secs.map(sec => ({
+                ...sec,
+                executiveIds: sec.executiveIds.filter(execId => !executivesToDeleteIds.includes(execId))
+            })));
+            setUsers(users => users.filter(u => {
+                if (u.organizationId === orgId) return false;
+                if (u.executiveId && executivesToDeleteIds.includes(u.executiveId)) return false;
+                return true;
+            }));
+
+            setCompanyToDelete(null);
+
+        } catch (error: any) {
+            console.error("Erro ao deletar Organization:", error);
+            setApiError(error.response?.data?.detail || "Não foi possível excluir.");
+            setCompanyToDelete(null);
+        }
     };
 
     return (
@@ -622,6 +687,14 @@ const LegalOrganizationsView: React.FC<LegalOrganizationsViewProps> = ({
                     Nova Organização
                 </button>
             </div>
+
+            {/* --- EXIBIÇÃO DE ERRO DA API --- */}
+            {apiError && (
+                <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-md" role="alert">
+                    <p className="font-bold">Erro</p>
+                    <p>{apiError}</p>
+                </div>
+            )}
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {visibleLegalOrgs.map(lo => {
@@ -696,6 +769,8 @@ const LegalOrganizationsView: React.FC<LegalOrganizationsViewProps> = ({
                         onSave={handleSave}
                         onCancel={() => { setModalOpen(false); setEditingLegalOrg(null); }}
                     />
+                    {/* Exibe o erro dentro do modal */}
+                    {apiError && <p className="text-red-600 mt-4">{apiError}</p>}
                 </Modal>
             )}
 
@@ -705,7 +780,7 @@ const LegalOrganizationsView: React.FC<LegalOrganizationsViewProps> = ({
                     onClose={() => setLegalOrgToDelete(null)}
                     onConfirm={confirmDelete}
                     title="Confirmar Exclusão"
-                    message={`Tem certeza que deseja excluir a organização ${legalOrgToDelete.name}? TODAS as empresas, departamentos, executivos e dados associados serão permanentemente removidos.`}
+                    message={`Tem certeza que deseja excluir a organização ${legalOrgToDelete.name}? O backend impedirá a exclusão se houver empresas vinculadas.`}
                 />
             )}
             
@@ -718,6 +793,8 @@ const LegalOrganizationsView: React.FC<LegalOrganizationsViewProps> = ({
                         legalOrganizations={legalOrganizations}
                         currentUser={currentUser}
                     />
+                     {/* Exibe o erro dentro do modal */}
+                    {apiError && <p className="text-red-600 mt-4">{apiError}</p>}
                 </Modal>
             )}
 
@@ -727,7 +804,7 @@ const LegalOrganizationsView: React.FC<LegalOrganizationsViewProps> = ({
                     onClose={() => setCompanyToDelete(null)}
                     onConfirm={confirmDeleteCompany}
                     title="Confirmar Exclusão"
-                    message={`Tem certeza que deseja excluir a empresa ${companyToDelete.name}? TODOS os seus dados (departamentos, executivos, atividades, etc) e usuários associados serão permanentemente removidos.`}
+                    message={`Tem certeza que deseja excluir a empresa ${companyToDelete.name}? O backend impedirá a exclusão se houver departamentos vinculados.`}
                 />
             )}
         </div>

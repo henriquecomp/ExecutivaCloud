@@ -114,7 +114,7 @@ const App: React.FC = () => {
       role: 'secretary' as UserRole,
       secretaryId: s.id,
     })),
-  ], [initialLegalOrganizations, initialOrganizations, initialExecutives, initialSecretaries]);
+  ], [initialOrganizations, initialExecutives, initialSecretaries]);
 
   const initialEventTypes: EventType[] = useMemo(() => [
       { id: 'et1', name: 'Reunião Diretoria', color: '#ef4444' }, // red-500
