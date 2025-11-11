@@ -1,5 +1,7 @@
 
-import { useState, useEffect } from 'react';
+
+// FIX: Import Dispatch and SetStateAction to provide types for the hook's return value without needing the full React namespace.
+import { useState, useEffect, Dispatch, SetStateAction } from 'react';
 
 function getValue<T,>(key: string, initialValue: T | (() => T)): T {
   const savedValue = localStorage.getItem(key);
@@ -18,7 +20,8 @@ function getValue<T,>(key: string, initialValue: T | (() => T)): T {
   return initialValue;
 }
 
-export function useLocalStorage<T,>(key: string, initialValue: T | (() => T)): [T, React.Dispatch<React.SetStateAction<T>>] {
+// FIX: Use imported Dispatch and SetStateAction types to resolve "Cannot find namespace 'React'" error.
+export function useLocalStorage<T,>(key: string, initialValue: T | (() => T)): [T, Dispatch<SetStateAction<T>>] {
   const [value, setValue] = useState<T>(() => {
     return getValue(key, initialValue);
   });

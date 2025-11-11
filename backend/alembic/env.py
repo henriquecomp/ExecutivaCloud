@@ -33,6 +33,9 @@ except ImportError:
 # esta importação é ESSENCIAL para que os modelos
 # se registrem no 'Base.metadata'.
 from app.models import user_model
+from app.models import legal_organization_model 
+from app.models import organization_model     
+from app.models import department_model     
 # Adicione imports para quaisquer outros modelos que criar no futuro
 
 # 3. Atribua o metadata da sua Base

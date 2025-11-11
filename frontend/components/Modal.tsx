@@ -23,16 +23,9 @@ const Modal: React.FC<ModalProps> = ({ title, onClose, children }) => {
     };
   }, [onClose]);
 
-  const handleBackdropClick = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (modalRef.current && !modalRef.current.contains(event.target as Node)) {
-      onClose();
-    }
-  };
-
   return (
     <div
       className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in-fast"
-      onClick={handleBackdropClick}
     >
       <div
         ref={modalRef}

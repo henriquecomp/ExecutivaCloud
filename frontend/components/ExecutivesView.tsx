@@ -1,11 +1,73 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Executive, Organization, Department, Event, Contact, Expense, Task, User, Secretary, Document } from '../types';
 import Modal from './Modal';
 import ConfirmationModal from './ConfirmationModal';
 import { EditIcon, DeleteIcon, PlusIcon, EmailIcon, PhoneIcon, ChevronDownIcon, ExclamationTriangleIcon } from './Icons';
 
+// --- Helper Functions ---
+/**
+ * Validates a Brazilian CPF number.
+ * @param {string} cpf - The CPF string to validate.
+ * @returns {boolean} - True if the CPF is valid, false otherwise.
+ */
+function validateCPF(cpf: string): boolean {
+    const cpfClean = cpf.replace(/[^\d]+/g, '');
+    if (cpfClean.length !== 11 || /^(\d)\1+$/.test(cpfClean)) return false;
+    let sum = 0;
+    let remainder;
+    for (let i = 1; i <= 9; i++) sum = sum + parseInt(cpfClean.substring(i - 1, i)) * (11 - i);
+    remainder = (sum * 10) % 11;
+    if ((remainder === 10) || (remainder === 11)) remainder = 0;
+    if (remainder !== parseInt(cpfClean.substring(9, 10))) return false;
+    sum = 0;
+    for (let i = 1; i <= 10; i++) sum = sum + parseInt(cpfClean.substring(i - 1, i)) * (12 - i);
+    remainder = (sum * 10) % 11;
+    if ((remainder === 10) || (remainder === 11)) remainder = 0;
+    if (remainder !== parseInt(cpfClean.substring(10, 11))) return false;
+    return true;
+}
+
+/**
+ * Applies a CPF mask (###.###.###-##) to a string.
+ * @param {string} value - The input string.
+ * @returns {string} - The masked string.
+ */
+const maskCPF = (value: string) => {
+    return value
+        .replace(/\D/g, '')
+        .replace(/(\d{3})(\d)/, '$1.$2')
+        .replace(/(\d{3})(\d)/, '$1.$2')
+        .replace(/(\d{3})(\d{1,2})/, '$1-$2')
+        .replace(/(-\d{2})\d+?$/, '$1');
+};
+
+/**
+ * Applies a phone mask (+55 (XX) XXXXX-XXXX) to a string.
+ * @param {string} value - The input string.
+ * @returns {string} - The masked string.
+ */
+const maskPhone = (value: string): string => {
+    if (!value) return "";
+    return value
+        .replace(/\D/g, '')
+        .replace(/^(\d{2})?(\d{2})?(\d{4,5})?(\d{4})?/, (match, p1, p2, p3, p4) => {
+            let result = '';
+            if (p1) result = `+${p1}`;
+            if (p2) result += ` (${p2})`;
+            if (p3) result += ` ${p3}`;
+            if (p4) result += `-${p4}`;
+            return result;
+        })
+        .substring(0, 19);
+};
+
+const civilStatusOptions = ['Solteiro(a)', 'Casado(a)', 'Separado(a)', 'Divorciado(a)', 'Viúvo(a)'];
+
+
 interface ExecutivesViewProps {
-  executives: Executive[];
+  currentUser: User;
+  executives: Executive[]; // This is visibleExecutives
+  allExecutives: Executive[]; // This is the full list
   setExecutives: React.Dispatch<React.SetStateAction<Executive[]>>;
   organizations: Organization[];
   departments: Department[];
@@ -46,9 +108,17 @@ const SensitiveDataWarning: React.FC<{ message?: string }> = ({ message }) => (
 );
 
 
-const ExecutiveForm: React.FC<{ executive: Partial<Executive>, onSave: (executive: Executive) => void, onCancel: () => void, organizations: Organization[], departments: Department[], executives: Executive[] }> = ({ executive, onSave, onCancel, organizations, departments, executives }) => {
+const ExecutiveForm: React.FC<{ 
+    executive: Partial<Executive>, 
+    onSave: (executive: Executive) => void, 
+    onCancel: () => void, 
+    organizations: Organization[], 
+    departments: Department[], 
+    executives: Executive[],
+    currentUser: User;
+}> = ({ executive, onSave, onCancel, organizations, departments, executives, currentUser }) => {
     // Component State
-    const [openSections, setOpenSections] = useState<string[]>(['principal']);
+    const [openSections, setOpenSections] = useState<string[]>(['principal', 'org']);
     const toggleSection = (section: string) => {
         setOpenSections(prev => 
             prev.includes(section) ? prev.filter(s => s !== section) : [...prev, section]
@@ -62,6 +132,7 @@ const ExecutiveForm: React.FC<{ executive: Partial<Executive>, onSave: (executiv
 
     // Bloco 1
     const [cpf, setCpf] = useState(executive.cpf || '');
+    const [cpfError, setCpfError] = useState('');
     const [rg, setRg] = useState(executive.rg || '');
     const [rgIssuer, setRgIssuer] = useState(executive.rgIssuer || '');
     const [rgIssueDate, setRgIssueDate] = useState(executive.rgIssueDate || '');
@@ -105,25 +176,98 @@ const ExecutiveForm: React.FC<{ executive: Partial<Executive>, onSave: (executiv
     // Bloco 6
     const [bankInfo, setBankInfo] = useState(executive.bankInfo || '');
     const [compensationInfo, setCompensationInfo] = useState(executive.compensationInfo || '');
+    
+    // Errors and Refs
+    const cpfInputRef = useRef<HTMLInputElement>(null);
+    const birthDateRef = useRef<HTMLInputElement>(null);
+    const rgIssueDateRef = useRef<HTMLInputElement>(null);
+    const hireDateRef = useRef<HTMLInputElement>(null);
+    const [birthDateError, setBirthDateError] = useState('');
+    const [rgIssueDateError, setRgIssueDateError] = useState('');
+    const [hireDateError, setHireDateError] = useState('');
 
+    const isSecretaryUser = currentUser.role === 'secretary';
+
+    const visibleOrganizations = useMemo(() => {
+        const isAdminForLegalOrg = currentUser.role === 'admin' && !!currentUser.legalOrganizationId;
+        const isOrgAdmin = currentUser.role === 'admin' && !!currentUser.organizationId;
+
+        if (isAdminForLegalOrg) {
+            return organizations.filter(o => o.legalOrganizationId === currentUser.legalOrganizationId);
+        }
+        if (isOrgAdmin) {
+            return organizations.filter(o => o.id === currentUser.organizationId);
+        }
+        return organizations;
+    }, [organizations, currentUser]);
 
     const filteredDepartments = useMemo(() => {
         if (!organizationId) return [];
         return departments.filter(d => d.organizationId === organizationId);
     }, [organizationId, departments]);
+
+    const availableManagers = useMemo(() => {
+        if (!organizationId) return [];
+        return executives.filter(e => 
+            e.organizationId === organizationId && e.id !== executive.id
+        );
+    }, [executives, organizationId, executive.id]);
     
     useEffect(() => {
-        if (organizationId && departmentId) {
-            const isValid = filteredDepartments.some(d => d.id === departmentId);
-            if (!isValid) {
-                setDepartmentId('');
-            }
+        const orgIsValid = visibleOrganizations.some(o => o.id === organizationId);
+        if (!orgIsValid) {
+            setOrganizationId('');
         }
-    }, [organizationId, departmentId, filteredDepartments]);
+    }, [organizationId, visibleOrganizations]);
+    
+    useEffect(() => {
+        const deptIsValid = filteredDepartments.some(d => d.id === departmentId);
+        if (!deptIsValid) {
+            setDepartmentId('');
+        }
+    }, [departmentId, filteredDepartments]);
 
+    useEffect(() => {
+        if (reportsToExecutiveId && !availableManagers.some(m => m.id === reportsToExecutiveId)) {
+            setReportsToExecutiveId('');
+        }
+    }, [organizationId, availableManagers, reportsToExecutiveId]);
+
+    const handleCpfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (cpfError) setCpfError('');
+        setCpf(maskCPF(e.target.value));
+    };
+
+    const handleCpfBlur = () => {
+        if (cpf && !validateCPF(cpf)) {
+            setCpfError('CPF inválido. Verifique o número e tente novamente.');
+            cpfInputRef.current?.focus();
+        } else {
+            setCpfError('');
+        }
+    };
+
+    const handleDateBlur = (e: React.FocusEvent<HTMLInputElement>, setter: React.Dispatch<React.SetStateAction<string>>, errorSetter: React.Dispatch<React.SetStateAction<string>>) => {
+        const { value, validity } = e.target;
+        if (value && !validity.valid) {
+            errorSetter('Data inválida. Verifique o dia, mês e ano.');
+            setter('');
+            e.target.value = '';
+            e.target.focus();
+        } else {
+            errorSetter('');
+        }
+    };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        if (birthDateError || rgIssueDateError || hireDateError) {
+            return;
+        }
+        if (cpf && !validateCPF(cpf)) {
+            handleCpfBlur();
+            return;
+        }
         if (!fullName) return;
         onSave({
             id: executive.id || `exec_${new Date().getTime()}`,
@@ -161,11 +305,15 @@ const ExecutiveForm: React.FC<{ executive: Partial<Executive>, onSave: (executiv
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label htmlFor="birthDate" className="block text-sm font-medium text-slate-700">Data de Nascimento</label>
-                        <input type="date" id="birthDate" value={birthDate} onChange={e => setBirthDate(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                        <input ref={birthDateRef} type="date" id="birthDate" value={birthDate} onChange={e => setBirthDate(e.target.value)} onBlur={e => handleDateBlur(e, setBirthDate, setBirthDateError)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                        {birthDateError && <p className="mt-1 text-xs text-red-600">{birthDateError}</p>}
                     </div>
                     <div>
                         <label htmlFor="civilStatus" className="block text-sm font-medium text-slate-700">Estado Civil</label>
-                        <input type="text" id="civilStatus" value={civilStatus} onChange={e => setCivilStatus(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                        <select id="civilStatus" value={civilStatus} onChange={e => setCivilStatus(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                            <option value="">Selecione...</option>
+                            {civilStatusOptions.map(o => <option key={o} value={o}>{o}</option>)}
+                        </select>
                     </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -181,7 +329,16 @@ const ExecutiveForm: React.FC<{ executive: Partial<Executive>, onSave: (executiv
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                      <div>
                         <label htmlFor="cpf" className="block text-sm font-medium text-slate-700">CPF</label>
-                        <input type="text" id="cpf" value={cpf} onChange={e => setCpf(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                        <input
+                            ref={cpfInputRef}
+                            type="text"
+                            id="cpf"
+                            value={cpf}
+                            onChange={handleCpfChange}
+                            onBlur={handleCpfBlur}
+                            className={`mt-1 block w-full px-3 py-2 bg-white border ${cpfError ? 'border-red-500' : 'border-slate-300'} rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
+                        />
+                        {cpfError && <p className="mt-1 text-xs text-red-600">{cpfError}</p>}
                     </div>
                     <div>
                         <label htmlFor="rg" className="block text-sm font-medium text-slate-700">RG</label>
@@ -195,7 +352,8 @@ const ExecutiveForm: React.FC<{ executive: Partial<Executive>, onSave: (executiv
                     </div>
                     <div>
                         <label htmlFor="rgIssueDate" className="block text-sm font-medium text-slate-700">Data de Expedição RG</label>
-                        <input type="date" id="rgIssueDate" value={rgIssueDate} onChange={e => setRgIssueDate(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                        <input ref={rgIssueDateRef} type="date" id="rgIssueDate" value={rgIssueDate} onChange={e => setRgIssueDate(e.target.value)} onBlur={e => handleDateBlur(e, setRgIssueDate, setRgIssueDateError)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                        {rgIssueDateError && <p className="mt-1 text-xs text-red-600">{rgIssueDateError}</p>}
                     </div>
                 </div>
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -213,15 +371,27 @@ const ExecutiveForm: React.FC<{ executive: Partial<Executive>, onSave: (executiv
             <CollapsibleSection title="Detalhes Organizacionais" isOpen={openSections.includes('org')} onToggle={() => toggleSection('org')}>
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label htmlFor="organizationId" className="block text-sm font-medium text-slate-700">Organização</label>
-                        <select id="organizationId" value={organizationId} onChange={e => {setOrganizationId(e.target.value); setDepartmentId('');}} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-                            <option value="">Sem Organização</option>
-                            {organizations.map(org => <option key={org.id} value={org.id}>{org.name}</option>)}
+                        <label htmlFor="organizationId" className="block text-sm font-medium text-slate-700">Empresa</label>
+                        <select 
+                            id="organizationId" 
+                            value={organizationId} 
+                            onChange={e => {setOrganizationId(e.target.value); setDepartmentId('');}} 
+                            disabled={isSecretaryUser}
+                            className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm disabled:bg-slate-100 disabled:cursor-not-allowed"
+                        >
+                            <option value="">Sem Empresa</option>
+                            {visibleOrganizations.map(org => <option key={org.id} value={org.id}>{org.name}</option>)}
                         </select>
                     </div>
                      <div>
                         <label htmlFor="departmentId" className="block text-sm font-medium text-slate-700">Departamento</label>
-                        <select id="departmentId" value={departmentId} onChange={e => setDepartmentId(e.target.value)} disabled={!organizationId || filteredDepartments.length === 0} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm disabled:bg-slate-50 disabled:cursor-not-allowed">
+                        <select 
+                            id="departmentId" 
+                            value={departmentId} 
+                            onChange={e => setDepartmentId(e.target.value)} 
+                            disabled={isSecretaryUser || !organizationId || filteredDepartments.length === 0} 
+                            className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm disabled:bg-slate-100 disabled:cursor-not-allowed"
+                        >
                             <option value="">Sem Departamento</option>
                             {filteredDepartments.map(dept => <option key={dept.id} value={dept.id}>{dept.name}</option>)}
                         </select>
@@ -230,23 +400,53 @@ const ExecutiveForm: React.FC<{ executive: Partial<Executive>, onSave: (executiv
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label htmlFor="employeeId" className="block text-sm font-medium text-slate-700">Matrícula / ID</label>
-                        <input type="text" id="employeeId" value={employeeId} onChange={e => setEmployeeId(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                        <input 
+                            type="text" 
+                            id="employeeId" 
+                            value={employeeId} 
+                            onChange={e => setEmployeeId(e.target.value)} 
+                            disabled={isSecretaryUser}
+                            className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm disabled:bg-slate-100 disabled:cursor-not-allowed" 
+                        />
                     </div>
                     <div>
                         <label htmlFor="hireDate" className="block text-sm font-medium text-slate-700">Data de Admissão</label>
-                        <input type="date" id="hireDate" value={hireDate} onChange={e => setHireDate(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                        <input 
+                            ref={hireDateRef}
+                            type="date" 
+                            id="hireDate" 
+                            value={hireDate} 
+                            onChange={e => setHireDate(e.target.value)} 
+                            onBlur={e => handleDateBlur(e, setHireDate, setHireDateError)}
+                            disabled={isSecretaryUser}
+                            className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm disabled:bg-slate-100 disabled:cursor-not-allowed" 
+                        />
+                         {hireDateError && <p className="mt-1 text-xs text-red-600">{hireDateError}</p>}
                     </div>
                 </div>
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label htmlFor="workLocation" className="block text-sm font-medium text-slate-700">Local de Trabalho</label>
-                        <input type="text" id="workLocation" value={workLocation} onChange={e => setWorkLocation(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                        <input 
+                            type="text" 
+                            id="workLocation" 
+                            value={workLocation} 
+                            onChange={e => setWorkLocation(e.target.value)} 
+                            disabled={isSecretaryUser}
+                            className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm disabled:bg-slate-100 disabled:cursor-not-allowed" 
+                        />
                     </div>
                     <div>
                         <label htmlFor="reportsToExecutiveId" className="block text-sm font-medium text-slate-700">Gestor Direto</label>
-                        <select id="reportsToExecutiveId" value={reportsToExecutiveId} onChange={e => setReportsToExecutiveId(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        <select 
+                            id="reportsToExecutiveId" 
+                            value={reportsToExecutiveId} 
+                            onChange={e => setReportsToExecutiveId(e.target.value)} 
+                            disabled={isSecretaryUser || !organizationId}
+                            className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm disabled:bg-slate-100 disabled:cursor-not-allowed"
+                        >
                             <option value="">Ninguém (nível mais alto)</option>
-                            {executives.filter(e => e.id !== executive.id).map(e => (
+                            {availableManagers.map(e => (
                                 <option key={e.id} value={e.id}>{e.fullName}</option>
                             ))}
                         </select>
@@ -255,11 +455,25 @@ const ExecutiveForm: React.FC<{ executive: Partial<Executive>, onSave: (executiv
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label htmlFor="costCenter" className="block text-sm font-medium text-slate-700">Centro de Custo</label>
-                        <input type="text" id="costCenter" value={costCenter} onChange={e => setCostCenter(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                        <input 
+                            type="text" 
+                            id="costCenter" 
+                            value={costCenter} 
+                            onChange={e => setCostCenter(e.target.value)} 
+                            disabled={isSecretaryUser}
+                            className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm disabled:bg-slate-100 disabled:cursor-not-allowed" 
+                        />
                     </div>
                     <div>
                         <label htmlFor="systemAccessLevels" className="block text-sm font-medium text-slate-700">Níveis de Acesso</label>
-                        <input type="text" id="systemAccessLevels" value={systemAccessLevels} onChange={e => setSystemAccessLevels(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                        <input 
+                            type="text" 
+                            id="systemAccessLevels" 
+                            value={systemAccessLevels} 
+                            onChange={e => setSystemAccessLevels(e.target.value)} 
+                            disabled={isSecretaryUser}
+                            className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm disabled:bg-slate-100 disabled:cursor-not-allowed" 
+                        />
                     </div>
                 </div>
             </CollapsibleSection>
@@ -275,7 +489,7 @@ const ExecutiveForm: React.FC<{ executive: Partial<Executive>, onSave: (executiv
                             </div>
                             <div>
                                 <label htmlFor="workPhone" className="block text-sm font-medium text-slate-700">Telefone</label>
-                                <input type="tel" id="workPhone" value={workPhone} onChange={e => setWorkPhone(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                                <input type="tel" id="workPhone" value={workPhone} onChange={e => setWorkPhone(maskPhone(e.target.value))} placeholder="+55 (XX) XXXXX-XXXX" className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
                             </div>
                          </div>
                          <div>
@@ -294,7 +508,7 @@ const ExecutiveForm: React.FC<{ executive: Partial<Executive>, onSave: (executiv
                             </div>
                             <div>
                                 <label htmlFor="personalPhone" className="block text-sm font-medium text-slate-700">Telefone Pessoal</label>
-                                <input type="tel" id="personalPhone" value={personalPhone} onChange={e => setPersonalPhone(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                                <input type="tel" id="personalPhone" value={personalPhone} onChange={e => setPersonalPhone(maskPhone(e.target.value))} placeholder="+55 (XX) XXXXX-XXXX" className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
                             </div>
                         </div>
                          <div>
@@ -338,7 +552,7 @@ const ExecutiveForm: React.FC<{ executive: Partial<Executive>, onSave: (executiv
                             </div>
                             <div>
                                 <label htmlFor="emergencyContactPhone" className="block text-sm font-medium text-slate-700">Telefone</label>
-                                <input type="tel" id="emergencyContactPhone" value={emergencyContactPhone} onChange={e => setEmergencyContactPhone(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                                <input type="tel" id="emergencyContactPhone" value={emergencyContactPhone} onChange={e => setEmergencyContactPhone(maskPhone(e.target.value))} placeholder="+55 (XX) XXXXX-XXXX" className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
                             </div>
                         </div>
                         <div>
@@ -376,10 +590,12 @@ const ExecutiveForm: React.FC<{ executive: Partial<Executive>, onSave: (executiv
     );
 };
 
-const ExecutivesView: React.FC<ExecutivesViewProps> = ({ executives, setExecutives, organizations, departments, secretaries, setSecretaries, setEvents, setContacts, setExpenses, setTasks, setDocuments, setUsers }) => {
+const ExecutivesView: React.FC<ExecutivesViewProps> = ({ currentUser, executives, allExecutives, setExecutives, organizations, departments, secretaries, setSecretaries, setEvents, setContacts, setExpenses, setTasks, setDocuments, setUsers }) => {
     const [isModalOpen, setModalOpen] = useState(false);
     const [editingExecutive, setEditingExecutive] = useState<Partial<Executive> | null>(null);
     const [executiveToDelete, setExecutiveToDelete] = useState<Executive | null>(null);
+
+    const isSecretaryUser = currentUser.role === 'secretary';
 
     const handleAddExecutive = () => {
         setEditingExecutive({});
@@ -447,7 +663,11 @@ const ExecutivesView: React.FC<ExecutivesViewProps> = ({ executives, setExecutiv
                     <h2 className="text-3xl font-bold text-slate-800">Gerenciar Executivos</h2>
                     <p className="text-slate-500 mt-1">Adicione, edite e visualize os executivos que você gerencia.</p>
                 </div>
-                <button onClick={handleAddExecutive} className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-md shadow-sm hover:bg-indigo-700 transition duration-150">
+                <button 
+                    onClick={handleAddExecutive} 
+                    className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-md shadow-sm hover:bg-indigo-700 transition duration-150 disabled:bg-slate-300 disabled:cursor-not-allowed"
+                    disabled={isSecretaryUser}
+                >
                     <PlusIcon />
                     Novo Executivo
                 </button>
@@ -459,7 +679,7 @@ const ExecutivesView: React.FC<ExecutivesViewProps> = ({ executives, setExecutiv
                         <thead className="border-b-2 border-slate-200 text-sm text-slate-500">
                             <tr>
                                 <th className="p-3">Nome</th>
-                                <th className="p-3 hidden md:table-cell">Organização / Departamento</th>
+                                <th className="p-3 hidden md:table-cell">Empresa / Departamento</th>
                                 <th className="p-3 hidden lg:table-cell">Contato</th>
                                 <th className="p-3 text-right">Ações</th>
                             </tr>
@@ -481,7 +701,12 @@ const ExecutivesView: React.FC<ExecutivesViewProps> = ({ executives, setExecutiv
                                             <button onClick={() => handleEditExecutive(exec)} className="p-2 text-slate-500 hover:text-indigo-600 rounded-full hover:bg-slate-200 transition" aria-label="Editar executivo">
                                                 <EditIcon />
                                             </button>
-                                            <button onClick={() => handleDeleteClick(exec)} className="p-2 text-slate-500 hover:text-red-600 rounded-full hover:bg-slate-200 transition" aria-label="Excluir executivo">
+                                            <button 
+                                                onClick={() => handleDeleteClick(exec)} 
+                                                className="p-2 text-slate-500 hover:text-red-600 rounded-full hover:bg-slate-200 transition disabled:text-slate-300 disabled:hover:text-slate-300 disabled:cursor-not-allowed" 
+                                                aria-label="Excluir executivo"
+                                                disabled={isSecretaryUser}
+                                            >
                                                 <DeleteIcon />
                                             </button>
                                         </div>
@@ -502,7 +727,8 @@ const ExecutivesView: React.FC<ExecutivesViewProps> = ({ executives, setExecutiv
                         onCancel={() => { setModalOpen(false); setEditingExecutive(null); }}
                         organizations={organizations}
                         departments={departments}
-                        executives={executives}
+                        executives={allExecutives}
+                        currentUser={currentUser}
                     />
                 </Modal>
             )}
