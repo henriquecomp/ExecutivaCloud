@@ -5,7 +5,7 @@ from app.repositories.user_repository import UserRepository
 from app.schemas import user_schema as schemas
 from app.models import user_model as models
 from app.core.database import get_db
-from typing import Optional
+from typing import Optional, List
 
 # Contexto para hash de senha (Mantido como utilidade fora da classe)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -35,6 +35,10 @@ class UserService:
     def get_user_by_id(self, user_id: int) -> Optional[models.Usuario]:
         """ Busca um usuário, delegando ao Repository. """
         return self.repository.get_by_id(user_id)
+    
+    def get_users(self) -> List[models.Usuario]:
+        """ Busca um usuário, delegando ao Repository. """
+        return self.repository.get_all()
     
     # --- Métodos de CRUD ---
 

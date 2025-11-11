@@ -1,9 +1,6 @@
-# app/schemas/usuario_schema.py
-
-from pydantic import BaseModel, EmailStr, Field, model_validator
+from pydantic import BaseModel, EmailStr, Field, model_validator, AliasChoices
 from typing import Optional
 
-# Base: Campos comuns
 class UsuarioBase(BaseModel):
     name: str = Field(..., min_length=2, max_length=100)
     email: EmailStr
@@ -31,6 +28,13 @@ class UsuarioUpdate(UsuarioBase):
 class Usuario(UsuarioBase):
     id: int # O id é gerado pelo banco
     is_active: bool
+    name: str = Field(
+        alias='fullName', 
+        validation_alias=AliasChoices('name'), 
+        min_length=2, 
+        max_length=100
+    )
+
 
     # Configuração crucial para ler dados de objetos ORM (SQLAlchemy)
     class Config:

@@ -28,9 +28,19 @@ def create_user_route(
 @router.get("/{user_id}", response_model=schemas.Usuario)
 def get_user_route(
     user_id: int, 
-    service: UserService = Depends(UserService) # <--- MUDANÇA AQUI
+    service: UserService = Depends(UserService)
 ):
     db_user = service.get_user_by_id(user_id) 
+    if db_user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado")
+    return db_user
+
+
+@router.get("/", response_model=List[schemas.Usuario])
+def get_user_route( 
+    service: UserService = Depends(UserService) 
+):
+    db_user = service.get_users() 
     if db_user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado")
     return db_user
