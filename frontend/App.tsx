@@ -22,10 +22,7 @@ const App: React.FC = () => {
   const [isSidebarOpen, setSidebarOpen] = useState(false);
 
   // --- DUMMY DATA INITIALIZATION ---
-  const initialLegalOrganizations: LegalOrganization[] = useMemo(() => [
-    { id: 'legal_org1', name: 'Grupo Tech Global Holding', cnpj: '11.222.333/0001-44', street: 'Avenida Principal', number: '100', neighborhood: 'Centro', city: 'São Paulo', state: 'SP', zipCode: '01000-000' },
-    { id: 'legal_org2', name: 'Inova Corp Participações', cnpj: '55.666.777/0001-88', street: 'Rua da Inovação', number: '200', neighborhood: 'Botafogo', city: 'Rio de Janeiro', state: 'RJ', zipCode: '22270-000' },
-  ], []);
+  // Nota: Dados de LegalOrganization removidos daqui, pois agora são gerenciados pela view.
 
   const initialOrganizations: Organization[] = useMemo(() => [
     { id: 'org1', name: 'Tech Solutions Inc.', legalOrganizationId: 'legal_org1' },
@@ -39,15 +36,15 @@ const App: React.FC = () => {
   ], []);
 
   const initialExecutives: Executive[] = useMemo(() => [
-    { 
-      id: 'exec1', 
-      fullName: 'Carlos Silva', 
-      workEmail: 'carlos.silva@techsolutions.com', 
-      organizationId: 'org1', 
-      workPhone: '(11) 98888-1111', 
-      departmentId: 'dept1', 
-      jobTitle: 'Diretor de Engenharia', 
-      hireDate: '2018-05-10', 
+    {
+      id: 'exec1',
+      fullName: 'Carlos Silva',
+      workEmail: 'carlos.silva@techsolutions.com',
+      organizationId: 'org1',
+      workPhone: '(11) 98888-1111',
+      departmentId: 'dept1',
+      jobTitle: 'Diretor de Engenharia',
+      hireDate: '2018-05-10',
       birthDate: '1980-11-23',
       cpf: '111.222.333-44',
       rg: '12.345.678-9',
@@ -55,44 +52,37 @@ const App: React.FC = () => {
       bankInfo: 'Banco Digital S.A.\nAgência: 0001\nConta Corrente: 12345-6',
       compensationInfo: 'Salário Base + Bônus Anual + Stock Options',
     },
-    { 
-      id: 'exec2', 
-      fullName: 'Beatriz Costa', 
-      workEmail: 'bia.costa@inovacorp.com', 
-      organizationId: 'org2', 
-      workPhone: '(21) 97777-2222', 
-      departmentId: 'dept3', 
-      jobTitle: 'CEO', 
-      linkedinProfileUrl: 'https://linkedin.com/in/beatrizcosta', 
-      bio: 'Beatriz é uma líder visionária com mais de 20 anos de experiência no setor de tecnologia.' 
+    {
+      id: 'exec2',
+      fullName: 'Beatriz Costa',
+      workEmail: 'bia.costa@inovacorp.com',
+      organizationId: 'org2',
+      workPhone: '(21) 97777-2222',
+      departmentId: 'dept3',
+      jobTitle: 'CEO',
+      linkedinProfileUrl: 'https://linkedin.com/in/beatrizcosta',
+      bio: 'Beatriz é uma líder visionária com mais de 20 anos de experiência no setor de tecnologia.'
     },
-    { 
-      id: 'exec3', 
-      fullName: 'Roberto Almeida', 
-      workEmail: 'roberto.a@techsolutions.com', 
-      organizationId: 'org1', 
-      workPhone: '(11) 96666-3333', 
-      departmentId: 'dept2', 
-      jobTitle: 'Diretor de Vendas', 
-      reportsToExecutiveId: 'exec1' 
+    {
+      id: 'exec3',
+      fullName: 'Roberto Almeida',
+      workEmail: 'roberto.a@techsolutions.com',
+      organizationId: 'org1',
+      workPhone: '(11) 96666-3333',
+      departmentId: 'dept2',
+      jobTitle: 'Diretor de Vendas',
+      reportsToExecutiveId: 'exec1'
     },
   ], []);
-  
+
   const initialSecretaries: Secretary[] = useMemo(() => [
     { id: 'sec1', fullName: 'Sofia Ribeiro', workEmail: 'sofia.r@techsolutions.com', executiveIds: ['exec1', 'exec3'] },
     { id: 'sec2', fullName: 'Laura Mendes', workEmail: 'laura.m@inovacorp.com', executiveIds: ['exec2'] },
   ], []);
-  
+
   const initialUsers: User[] = useMemo(() => [
     // Static master user
     { id: 'user_master', fullName: 'Usuário Master', role: 'master' },
-    // Admins for Legal Organizations
-    ...initialLegalOrganizations.map(lo => ({
-      id: `user_admin_legal_${lo.id}`,
-      fullName: `Admin ${lo.name}`,
-      role: 'admin' as UserRole,
-      legalOrganizationId: lo.id,
-    })),
     // Admins for specific Organizations (Empresas)
     ...initialOrganizations.map(org => ({
       id: `user_admin_${org.id}`,
@@ -117,9 +107,9 @@ const App: React.FC = () => {
   ], [initialOrganizations, initialExecutives, initialSecretaries]);
 
   const initialEventTypes: EventType[] = useMemo(() => [
-      { id: 'et1', name: 'Reunião Diretoria', color: '#ef4444' }, // red-500
-      { id: 'et2', name: 'Pessoal', color: '#22c55e' }, // green-500
-      { id: 'et3', name: 'Viagem', color: '#3b82f6' }, // blue-500
+    { id: 'et1', name: 'Reunião Diretoria', color: '#ef4444' },
+    { id: 'et2', name: 'Pessoal', color: '#22c55e' },
+    { id: 'et3', name: 'Viagem', color: '#3b82f6' },
   ], []);
 
   const initialEvents: Event[] = useMemo(() => {
@@ -132,9 +122,9 @@ const App: React.FC = () => {
   }, []);
 
   const initialContactTypes: ContactType[] = useMemo(() => [
-      { id: 'ct1', name: 'Cliente' },
-      { id: 'ct2', name: 'Fornecedor' },
-      { id: 'ct3', name: 'Networking' },
+    { id: 'ct1', name: 'Cliente' },
+    { id: 'ct2', name: 'Fornecedor' },
+    { id: 'ct3', name: 'Networking' },
   ], []);
 
   const initialContacts: Contact[] = useMemo(() => [
@@ -153,39 +143,38 @@ const App: React.FC = () => {
   const initialExpenses: Expense[] = useMemo(() => {
     const today = new Date();
     const createDateString = (daysAgo: number): string => {
-        const date = new Date(today);
-        date.setDate(date.getDate() - daysAgo);
-        return date.toISOString().split('T')[0];
+      const date = new Date(today);
+      date.setDate(date.getDate() - daysAgo);
+      return date.toISOString().split('T')[0];
     };
 
-     return [
+    return [
       { id: 'ex1', executiveId: 'exec1', description: 'Almoço com cliente', amount: 150.75, expenseDate: createDateString(1), type: 'A pagar', entityType: 'Pessoa Jurídica', categoryId: 'ec1', status: 'Pago' as ExpenseStatus, receiptUrl: 'http://example.com/recibo1.jpg' },
       { id: 'ex2', executiveId: 'exec1', description: 'Transporte para reunião', amount: 45.50, expenseDate: createDateString(0), type: 'A pagar', entityType: 'Pessoa Jurídica', categoryId: 'ec2', status: 'Pendente' as ExpenseStatus },
       { id: 'ex3', executiveId: 'exec2', description: 'Assinatura Software', amount: 89.90, expenseDate: createDateString(5), type: 'A pagar', entityType: 'Pessoa Jurídica', categoryId: 'ec3', status: 'Pago' as ExpenseStatus },
       { id: 'ex4', executiveId: 'exec1', description: 'Pagamento de Consultoria', amount: 2500, expenseDate: createDateString(10), type: 'A receber', entityType: 'Pessoa Física', categoryId: 'ec4', status: 'Recebida' as ExpenseStatus },
-     ]
+    ]
   }, []);
 
   const initialTasks: Task[] = useMemo(() => {
     const today = new Date();
     return [
-        { id: 't1', executiveId: 'exec1', title: 'Preparar apresentação Q4', dueDate: new Date(new Date(today).setDate(today.getDate() + 3)).toISOString().split('T')[0], priority: Priority.High, status: Status.InProgress },
-        { id: 't2', executiveId: 'exec1', title: 'Revisar contrato com Fast Logistics', dueDate: new Date(new Date(today).setDate(today.getDate() + 5)).toISOString().split('T')[0], priority: Priority.Medium, status: Status.Todo },
-        { id: 't3', executiveId: 'exec2', title: 'Agendar reunião com time de marketing', dueDate: new Date(new Date(today).setDate(today.getDate() + 1)).toISOString().split('T')[0], priority: Priority.High, status: Status.Todo },
-        { id: 't4', executiveId: 'exec1', title: 'Enviar relatório semanal', dueDate: new Date(new Date(today).setDate(today.getDate() - 1)).toISOString().split('T')[0], priority: Priority.Medium, status: Status.Done },
+      { id: 't1', executiveId: 'exec1', title: 'Preparar apresentação Q4', dueDate: new Date(new Date(today).setDate(today.getDate() + 3)).toISOString().split('T')[0], priority: Priority.High, status: Status.InProgress },
+      { id: 't2', executiveId: 'exec1', title: 'Revisar contrato com Fast Logistics', dueDate: new Date(new Date(today).setDate(today.getDate() + 5)).toISOString().split('T')[0], priority: Priority.Medium, status: Status.Todo },
+      { id: 't3', executiveId: 'exec2', title: 'Agendar reunião com time de marketing', dueDate: new Date(new Date(today).setDate(today.getDate() + 1)).toISOString().split('T')[0], priority: Priority.High, status: Status.Todo },
+      { id: 't4', executiveId: 'exec1', title: 'Enviar relatório semanal', dueDate: new Date(new Date(today).setDate(today.getDate() - 1)).toISOString().split('T')[0], priority: Priority.Medium, status: Status.Done },
     ]
   }, []);
-  
+
   const initialDocumentCategories: DocumentCategory[] = useMemo(() => [
-      { id: 'dc1', name: 'Viagem' },
-      { id: 'dc2', name: 'Identificação' },
+    { id: 'dc1', name: 'Viagem' },
+    { id: 'dc2', name: 'Identificação' },
   ], []);
 
   const initialDocuments: Document[] = useMemo(() => [], []);
 
 
   // --- LOCAL STORAGE STATE MANAGEMENT ---
-  const [legalOrganizations, setLegalOrganizations] = useLocalStorage<LegalOrganization[]>('legalOrganizations', initialLegalOrganizations);
   const [organizations, setOrganizations] = useLocalStorage<Organization[]>('organizations', initialOrganizations);
   const [departments, setDepartments] = useLocalStorage<Department[]>('departments', initialDepartments);
   const [executives, setExecutives] = useLocalStorage<Executive[]>('executives', initialExecutives);
@@ -241,7 +230,7 @@ const App: React.FC = () => {
         return [];
     }
   }, [currentUser, executives, secretaries, organizations]);
-  
+
   // Effect to manage selected executive based on current user
   useEffect(() => {
     if (currentUser?.role === 'executive') {
@@ -259,41 +248,41 @@ const App: React.FC = () => {
   // --- REMINDER NOTIFICATIONS LOGIC ---
   useEffect(() => {
     if ("Notification" in window && Notification.permission === 'default') {
-        Notification.requestPermission();
+      Notification.requestPermission();
     }
   }, []);
 
   useEffect(() => {
-      const checkReminders = () => {
-          if (!("Notification" in window) || Notification.permission !== 'granted') {
-              return;
+    const checkReminders = () => {
+      if (!("Notification" in window) || Notification.permission !== 'granted') {
+        return;
+      }
+
+      const now = new Date();
+      events.forEach(event => {
+        if (event.reminderMinutes && !notifiedEventIds.has(event.id)) {
+          const eventStartTime = new Date(event.startTime);
+          const reminderTime = new Date(eventStartTime.getTime() - event.reminderMinutes * 60 * 1000);
+
+          if (now >= reminderTime && now < eventStartTime) {
+            const executive = executives.find(e => e.id === event.executiveId);
+            const title = `Lembrete: ${event.title}`;
+            const options = {
+              body: `O evento de ${executive?.fullName || 'um executivo'} começa às ${eventStartTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}.`,
+              icon: '/vite.svg',
+            };
+
+            new Notification(title, options);
+            setNotifiedEventIds(prev => new Set(prev).add(event.id));
           }
+        }
+      });
+    };
 
-          const now = new Date();
-          events.forEach(event => {
-              if (event.reminderMinutes && !notifiedEventIds.has(event.id)) {
-                  const eventStartTime = new Date(event.startTime);
-                  const reminderTime = new Date(eventStartTime.getTime() - event.reminderMinutes * 60 * 1000);
+    const intervalId = setInterval(checkReminders, 60000); // Check every minute
+    checkReminders(); // Initial check
 
-                  if (now >= reminderTime && now < eventStartTime) {
-                      const executive = executives.find(e => e.id === event.executiveId);
-                      const title = `Lembrete: ${event.title}`;
-                      const options = {
-                          body: `O evento de ${executive?.fullName || 'um executivo'} começa às ${eventStartTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}.`,
-                          icon: '/vite.svg',
-                      };
-
-                      new Notification(title, options);
-                      setNotifiedEventIds(prev => new Set(prev).add(event.id));
-                  }
-              }
-          });
-      };
-
-      const intervalId = setInterval(checkReminders, 60000); // Check every minute
-      checkReminders(); // Initial check
-
-      return () => clearInterval(intervalId);
+    return () => clearInterval(intervalId);
   }, [events, executives, notifiedEventIds]);
 
 
@@ -327,81 +316,81 @@ const App: React.FC = () => {
     // Check if an executive is selected for views that require it
     if (['agenda', 'contacts', 'finances', 'tasks', 'documents'].includes(currentView) && !selectedExecutiveId && currentUser.role !== 'executive') {
       return (
-          <div className="text-center p-10 bg-white rounded-lg shadow-md max-w-lg mx-auto">
-             <h3 className="text-xl font-semibold text-slate-800">Selecione um Executivo</h3>
-             <p className="text-slate-500 mt-2">Por favor, selecione um executivo no menu superior para visualizar os dados correspondentes.</p>
-          </div>
+        <div className="text-center p-10 bg-white rounded-lg shadow-md max-w-lg mx-auto">
+          <h3 className="text-xl font-semibold text-slate-800">Selecione um Executivo</h3>
+          <p className="text-slate-500 mt-2">Por favor, selecione um executivo no menu superior para visualizar os dados correspondentes.</p>
+        </div>
       );
     }
 
     switch (currentView) {
       case 'dashboard':
-        return <Dashboard 
-                  executives={visibleExecutives} 
-                  events={events} 
-                  expenses={expenses} 
-                  selectedExecutive={selectedExecutive}
-                  organizations={organizations}
-                  departments={departments} 
-                  expenseCategories={expenseCategories}
-                />;
+        return <Dashboard
+          executives={visibleExecutives}
+          events={events}
+          expenses={expenses}
+          selectedExecutive={selectedExecutive}
+          organizations={organizations}
+          departments={departments}
+          expenseCategories={expenseCategories}
+        />;
       case 'legalOrganizations':
         return <LegalOrganizationsView
-            currentUser={currentUser}
-            legalOrganizations={legalOrganizations} setLegalOrganizations={setLegalOrganizations}
-            organizations={organizations} setOrganizations={setOrganizations}
-            departments={departments} setDepartments={setDepartments}
-            executives={executives} setExecutives={setExecutives}
-            secretaries={secretaries} setSecretaries={setSecretaries}
-            setEvents={setEvents}
-            setContacts={setContacts}
-            setExpenses={setExpenses}
-            setTasks={setTasks}
-            setDocuments={setDocuments}
-            setUsers={setUsers}
+          currentUser={currentUser}
+          // REMOVIDO: legalOrganizations e setLegalOrganizations
+          organizations={organizations} setOrganizations={setOrganizations}
+          departments={departments} setDepartments={setDepartments}
+          executives={executives} setExecutives={setExecutives}
+          secretaries={secretaries} setSecretaries={setSecretaries}
+          setEvents={setEvents}
+          setContacts={setContacts}
+          setExpenses={setExpenses}
+          setTasks={setTasks}
+          setDocuments={setDocuments}
+          setUsers={setUsers}
         />;
       case 'executives':
-        return <ExecutivesView 
-                  currentUser={currentUser}
-                  executives={visibleExecutives}
-                  allExecutives={executives} 
-                  setExecutives={setExecutives} 
-                  organizations={organizations} 
-                  departments={departments}
-                  secretaries={secretaries}
-                  setSecretaries={setSecretaries}
-                  setEvents={setEvents}
-                  setContacts={setContacts}
-                  setExpenses={setExpenses}
-                  setTasks={setTasks}
-                  setDocuments={setDocuments}
-                  setUsers={setUsers}
-                />;
+        return <ExecutivesView
+          currentUser={currentUser}
+          executives={visibleExecutives}
+          allExecutives={executives}
+          setExecutives={setExecutives}
+          organizations={organizations}
+          departments={departments}
+          secretaries={secretaries}
+          setSecretaries={setSecretaries}
+          setEvents={setEvents}
+          setContacts={setContacts}
+          setExpenses={setExpenses}
+          setTasks={setTasks}
+          setDocuments={setDocuments}
+          setUsers={setUsers}
+        />;
       case 'organizations':
-        return <OrganizationsView 
-                  currentUser={currentUser}
-                  organizations={organizations} setOrganizations={setOrganizations} 
-                  departments={departments} setDepartments={setDepartments} 
-                  executives={executives} setExecutives={setExecutives} 
-                  secretaries={secretaries} setSecretaries={setSecretaries}
-                  setEvents={setEvents}
-                  setContacts={setContacts}
-                  setExpenses={setExpenses}
-                  setTasks={setTasks}
-                  setDocuments={setDocuments}
-                  setUsers={setUsers} 
-                  legalOrganizations={legalOrganizations}
-                />;
+        return <OrganizationsView
+          currentUser={currentUser}
+          organizations={organizations} setOrganizations={setOrganizations}
+          departments={departments} setDepartments={setDepartments}
+          executives={executives} setExecutives={setExecutives}
+          secretaries={secretaries} setSecretaries={setSecretaries}
+          setEvents={setEvents}
+          setContacts={setContacts}
+          setExpenses={setExpenses}
+          setTasks={setTasks}
+          setDocuments={setDocuments}
+          setUsers={setUsers}
+          legalOrganizations={[]} // Passando array vazio temporariamente
+        />;
       case 'secretaries':
-        return <SecretariesView 
-                  secretaries={secretaries} 
-                  setSecretaries={setSecretaries} 
-                  executives={executives} 
-                  setUsers={setUsers} 
-                  currentUser={currentUser}
-                  organizations={organizations}
-                  departments={departments} 
-                />;
+        return <SecretariesView
+          secretaries={secretaries}
+          setSecretaries={setSecretaries}
+          executives={executives}
+          setUsers={setUsers}
+          currentUser={currentUser}
+          organizations={organizations}
+          departments={departments}
+        />;
       case 'agenda':
         return <AgendaView events={filteredEvents} setEvents={setEvents} eventTypes={eventTypes} setEventTypes={setEventTypes} executiveId={selectedExecutiveId!} />;
       case 'contacts':
@@ -415,20 +404,20 @@ const App: React.FC = () => {
       case 'reports':
         return <ReportsView executives={executives} events={events} expenses={expenses} tasks={tasks} contacts={contacts} />;
       case 'settings':
-        return <SettingsView 
-          allData={{ legalOrganizations, organizations, departments, executives, secretaries, users, eventTypes, events, contactTypes, contacts, expenses, expenseCategories, tasks, documentCategories, documents }}
-          setAllData={{ setLegalOrganizations, setOrganizations, setDepartments, setExecutives, setSecretaries, setUsers, setEventTypes, setEvents, setContactTypes, setContacts, setExpenses, setExpenseCategories, setTasks, setDocumentCategories, setDocuments }}
+        return <SettingsView
+          allData={{ legalOrganizations: [], organizations, departments, executives, secretaries, users, eventTypes, events, contactTypes, contacts, expenses, expenseCategories, tasks, documentCategories, documents }}
+          setAllData={{ setLegalOrganizations: () => { }, setOrganizations, setDepartments, setExecutives, setSecretaries, setUsers, setEventTypes, setEvents, setContactTypes, setContacts, setExpenses, setExpenseCategories, setTasks, setDocumentCategories, setDocuments }}
         />;
       default:
-        return <Dashboard 
-                  executives={visibleExecutives} 
-                  events={events} 
-                  expenses={expenses} 
-                  selectedExecutive={selectedExecutive}
-                  organizations={organizations}
-                  departments={departments}
-                  expenseCategories={expenseCategories}
-                />;
+        return <Dashboard
+          executives={visibleExecutives}
+          events={events}
+          expenses={expenses}
+          selectedExecutive={selectedExecutive}
+          organizations={organizations}
+          departments={departments}
+          expenseCategories={expenseCategories}
+        />;
     }
   };
 
@@ -447,40 +436,40 @@ const App: React.FC = () => {
       <Sidebar currentUser={currentUser} currentView={currentView} setCurrentView={setCurrentView} isOpen={isSidebarOpen} setOpen={setSidebarOpen} />
       <main className="flex-1 flex flex-col overflow-hidden">
         <header className="bg-white/60 backdrop-blur-md border-b border-slate-200 p-4 flex items-center justify-between shadow-sm z-10 gap-4">
-           <div className="flex items-center gap-4">
-             <button onClick={() => setSidebarOpen(!isSidebarOpen)} className="lg:hidden text-slate-600 hover:text-slate-900" aria-label="Abrir menu">
-               <BurgerIcon />
-             </button>
-             <h1 className="text-xl font-bold text-slate-700 capitalize hidden sm:block">
-               {viewTitles[currentView]}
-             </h1>
-           </div>
-           
-           <div className="flex items-center gap-4">
-             <div className="w-full sm:max-w-xs md:max-w-sm">
-                <select
-                  aria-label="Selecionar Executivo"
-                  value={selectedExecutiveId || ''}
-                  onChange={e => setSelectedExecutiveId(e.target.value || null)}
-                  disabled={currentUser?.role === 'executive'}
-                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition disabled:bg-slate-100 disabled:cursor-not-allowed"
-                >
-                  <option value="">-- Selecione um Executivo --</option>
-                  {visibleExecutives.map(exec => {
-                     const org = organizations.find(o => o.id === exec.organizationId);
-                     const dept = departments.find(d => d.id === exec.departmentId);
-                     const orgDeptString = org ? `${org.name}${dept ? ` / ${dept.name}` : ''}` : '';
-                     return (
-                       <option key={exec.id} value={exec.id}>
-                         {exec.fullName} {orgDeptString && `(${orgDeptString})`}
-                       </option>
-                     )
-                  })}
-                </select>
-             </div>
+          <div className="flex items-center gap-4">
+            <button onClick={() => setSidebarOpen(!isSidebarOpen)} className="lg:hidden text-slate-600 hover:text-slate-900" aria-label="Abrir menu">
+              <BurgerIcon />
+            </button>
+            <h1 className="text-xl font-bold text-slate-700 capitalize hidden sm:block">
+              {viewTitles[currentView]}
+            </h1>
+          </div>
 
-             <UserMenu user={currentUser} onLogout={() => setCurrentUser(null)} />
-           </div>
+          <div className="flex items-center gap-4">
+            <div className="w-full sm:max-w-xs md:max-w-sm">
+              <select
+                aria-label="Selecionar Executivo"
+                value={selectedExecutiveId || ''}
+                onChange={e => setSelectedExecutiveId(e.target.value || null)}
+                disabled={currentUser?.role === 'executive'}
+                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition disabled:bg-slate-100 disabled:cursor-not-allowed"
+              >
+                <option value="">-- Selecione um Executivo --</option>
+                {visibleExecutives.map(exec => {
+                  const org = organizations.find(o => o.id === exec.organizationId);
+                  const dept = departments.find(d => d.id === exec.departmentId);
+                  const orgDeptString = org ? `${org.name}${dept ? ` / ${dept.name}` : ''}` : '';
+                  return (
+                    <option key={exec.id} value={exec.id}>
+                      {exec.fullName} {orgDeptString && `(${orgDeptString})`}
+                    </option>
+                  )
+                })}
+              </select>
+            </div>
+
+            <UserMenu user={currentUser} onLogout={() => setCurrentUser(null)} />
+          </div>
         </header>
         <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
           {renderView()}
