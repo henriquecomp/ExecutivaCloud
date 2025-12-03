@@ -76,7 +76,7 @@ interface OrganizationsViewProps {
   setDocuments: React.Dispatch<React.SetStateAction<Document[]>>;
   setUsers: React.Dispatch<React.SetStateAction<User[]>>;
   legalOrganizations: LegalOrganization[];
-  onRefresh: () => void; // Função para recarregar dados do backend
+  onRefresh: () => Promise<void>; // Atualizado para Promise para suportar await
 }
 
 const OrganizationForm: React.FC<{
@@ -375,13 +375,14 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
     setEvents, setContacts, setExpenses, setTasks,
     setDocuments, setUsers, 
     legalOrganizations,
-    onRefresh // Recebendo a função de refresh
+    onRefresh // Recebendo a função de refresh (Promise)
 }) => {
     const [isOrgModalOpen, setOrgModalOpen] = useState(false);
     const [editingOrganization, setEditingOrganization] = useState<Partial<Organization> | null>(null);
     const [isDeptModalOpen, setDeptModalOpen] = useState(false);
     const [editingDepartment, setEditingDepartment] = useState<Partial<Department> | null>(null);
     const [apiError, setApiError] = useState<string | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
 
     const [orgToDelete, setOrgToDelete] = useState<Organization | null>(null);
     const [deptToDelete, setDeptToDelete] = useState<Department | null>(null);
@@ -417,12 +418,12 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
     
     const confirmDeleteOrganization = async () => {
         if (!orgToDelete) return;
-
+        setIsLoading(true);
         try {
             setApiError(null);
             await apiService.organizations.delete(orgToDelete.id);
             
-            // Recarrega dados do backend (incluindo exclusão em cascata real no banco)
+            // ATUALIZAR TUDO (CRUD REQUER REFRESH NO BACKEND)
             if (onRefresh) {
                 await onRefresh();
             }
@@ -431,10 +432,13 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
         } catch (error: any) {
             setApiError(error.response?.data?.detail || "Erro ao excluir empresa.");
             setOrgToDelete(null);
+        } finally {
+            setIsLoading(false);
         }
     };
 
     const handleSaveOrganization = async (orgData: OrganizationCreate | OrganizationUpdate) => {
+        setIsLoading(true);
         try {
             setApiError(null);
 
@@ -446,7 +450,7 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
                 await apiService.organizations.create(orgData as OrganizationCreate);
             }
             
-            // Recarrega todos os dados do backend
+            // ATUALIZAR TUDO (CRUD REQUER REFRESH NO BACKEND)
             if (onRefresh) {
                 await onRefresh();
             }
@@ -456,6 +460,8 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
         } catch (error: any) {
             console.error(error);
             setApiError(error.response?.data?.detail || "Erro ao salvar empresa.");
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -475,11 +481,12 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
     };
     const confirmDeleteDepartment = async () => {
         if (!deptToDelete) return;
+        setIsLoading(true);
         try {
             setApiError(null);
             await apiService.departments.delete(deptToDelete.id);
             
-            // Recarrega dados do backend
+            // ATUALIZAR TUDO (CRUD REQUER REFRESH NO BACKEND)
             if (onRefresh) {
                 await onRefresh();
             }
@@ -488,9 +495,12 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
         } catch (error: any) {
             setApiError(error.response?.data?.detail || "Erro ao excluir departamento.");
             setDeptToDelete(null);
+        } finally {
+            setIsLoading(false);
         }
     };
     const handleSaveDepartment = async (deptData: DepartmentCreate | DepartmentUpdate) => {
+        setIsLoading(true);
         try {
             setApiError(null);
             
@@ -500,7 +510,7 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
                 await apiService.departments.create(deptData as DepartmentCreate);
             }
 
-            // Recarrega dados do backend
+            // ATUALIZAR TUDO (CRUD REQUER REFRESH NO BACKEND)
             if (onRefresh) {
                 await onRefresh();
             }
@@ -509,12 +519,23 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
             setEditingDepartment(null);
         } catch (error: any) {
             setApiError(error.response?.data?.detail || "Erro ao salvar departamento.");
+        } finally {
+            setIsLoading(false);
         }
     };
 
 
     return (
-        <div className="space-y-6 animate-fade-in">
+        <div className="space-y-6 animate-fade-in relative">
+             {isLoading && (
+                <div className="absolute inset-0 bg-white/50 z-50 flex items-center justify-center backdrop-blur-sm rounded-xl">
+                    <div className="flex flex-col items-center">
+                        <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+                        <p className="mt-2 text-indigo-700 font-medium">Atualizando dados...</p>
+                    </div>
+                </div>
+            )}
+
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
                     <h2 className="text-3xl font-bold text-slate-800">Gerenciar Empresas</h2>
@@ -539,7 +560,6 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {visibleOrganizations.map(org => {
-                    // Filtragem local de departamentos (agora vindos frescos do onRefresh)
                     const orgDepartments = departments.filter(d => String(d.organizationId) === String(org.id));
                     const legalOrg = legalOrganizations.find(lo => String(lo.id) === String(org.legalOrganizationId));
                     return (

@@ -1,9 +1,9 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { LegalOrganization, Organization, Department, Executive, Secretary, Event, Contact, Expense, Task, Document, User, LegalOrganizationCreate, LegalOrganizationUpdate, OrganizationUpdate, OrganizationCreate } from '../types';
-import Modal from './Modal';
-import ConfirmationModal from './ConfirmationModal';
-import { EditIcon, DeleteIcon, PlusIcon } from './Icons';
-import { apiService } from '../services/apiService';
+import { LegalOrganization, Organization, Department, Executive, Secretary, Event, Contact, Expense, Task, Document, User, LegalOrganizationCreate, LegalOrganizationUpdate, OrganizationUpdate, OrganizationCreate } from '@/types';
+import Modal from '@/components/Modal';
+import ConfirmationModal from '@/components/ConfirmationModal';
+import { EditIcon, DeleteIcon, PlusIcon } from '@/components/Icons';
+import { apiService } from '@/services/apiService';
 
 // --- Helper Functions ---
 function validateCNPJ(cnpj: string): boolean {
@@ -64,7 +64,7 @@ interface LegalOrganizationsViewProps {
   setDocuments: React.Dispatch<React.SetStateAction<Document[]>>;
   setUsers: React.Dispatch<React.SetStateAction<User[]>>;
   
-  onRefresh: () => void; // Prop obrigatória para atualizar dados globais
+  onRefresh: () => Promise<void>;
 }
 
 const LegalOrganizationForm: React.FC<{ 
@@ -230,7 +230,6 @@ const LegalOrganizationForm: React.FC<{
     );
 };
 
-// ... OrganizationForm mantido igual ao de OrganizationsView ...
 const OrganizationForm: React.FC<{
     organization: Partial<Organization>, 
     onSave: (organization: OrganizationUpdate | Organization) => void, 
@@ -238,7 +237,6 @@ const OrganizationForm: React.FC<{
     legalOrganizations: LegalOrganization[],
     currentUser: User;
 }> = ({ organization, onSave, onCancel, legalOrganizations, currentUser }) => {
-    // ... (Lógica do OrganizationForm replicada ou importada se possível, mas aqui repetirei para ser "completo" no arquivo)
     const [name, setName] = useState(organization.name || '');
     const [cnpj, setCnpj] = useState(organization.cnpj || '');
     const [street, setStreet] = useState(organization.street || '');
@@ -321,13 +319,12 @@ const OrganizationForm: React.FC<{
     );
 };
 
-
 const LegalOrganizationsView: React.FC<LegalOrganizationsViewProps> = ({
     currentUser,
     legalOrganizations, setLegalOrganizations,
     organizations,
     setOrganizations, setUsers,
-    onRefresh // Prop obrigatória
+    onRefresh
 }) => {
     const [isModalOpen, setModalOpen] = useState(false);
     const [editingLegalOrg, setEditingLegalOrg] = useState<Partial<LegalOrganization> | null>(null);
@@ -338,6 +335,7 @@ const LegalOrganizationsView: React.FC<LegalOrganizationsViewProps> = ({
     const [companyToDelete, setCompanyToDelete] = useState<Organization | null>(null);
 
     const [apiError, setApiError] = useState<string | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
     
     const isAdminForLegalOrg = currentUser.role === 'admin' && !!currentUser.legalOrganizationId;
 
@@ -369,6 +367,7 @@ const LegalOrganizationsView: React.FC<LegalOrganizationsViewProps> = ({
     };
 
     const handleSave = async (legalOrgData: LegalOrganizationCreate | LegalOrganization) => {
+        setIsLoading(true);
         try {
             setApiError(null);
             if ('id' in legalOrgData && legalOrgData.id) {
@@ -379,7 +378,7 @@ const LegalOrganizationsView: React.FC<LegalOrganizationsViewProps> = ({
                 await apiService.legalOrganizations.create(legalOrgData as LegalOrganizationCreate);
             }
             
-            // ATUALIZAR TUDO (incluindo dropdowns em outras telas)
+            // ATUALIZAR TUDO (CRUD REQUER REFRESH NO BACKEND)
             if (onRefresh) {
                 await onRefresh();
             }
@@ -389,16 +388,19 @@ const LegalOrganizationsView: React.FC<LegalOrganizationsViewProps> = ({
         } catch (error: any) {
             console.error("Erro ao salvar LegalOrganization:", error);
             setApiError(error.response?.data?.detail || "Erro ao salvar. Verifique se o CNPJ já existe.");
+        } finally {
+            setIsLoading(false);
         }
     };
 
     const confirmDelete = async () => {
         if (!legalOrgToDelete) return;
+        setIsLoading(true);
         try {
             setApiError(null);
             await apiService.legalOrganizations.delete(legalOrgToDelete.id);
             
-            // ATUALIZAR TUDO
+            // ATUALIZAR TUDO (CRUD REQUER REFRESH NO BACKEND)
             if (onRefresh) {
                 await onRefresh();
             }
@@ -408,6 +410,8 @@ const LegalOrganizationsView: React.FC<LegalOrganizationsViewProps> = ({
             console.error("Erro ao deletar LegalOrganization:", error);
             setApiError(error.response?.data?.detail || "Não foi possível excluir.");
             setLegalOrgToDelete(null); 
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -425,12 +429,14 @@ const LegalOrganizationsView: React.FC<LegalOrganizationsViewProps> = ({
     };
 
     const handleSaveCompany = async (companyData: OrganizationUpdate | Organization) => {
+        setIsLoading(true);
         try {
             setApiError(null);
             if ('id' in companyData && companyData.id) {
                 await apiService.organizations.update(String(companyData.id), companyData as OrganizationUpdate);
             }
             
+            // ATUALIZAR TUDO (CRUD REQUER REFRESH NO BACKEND)
             if (onRefresh) {
                 await onRefresh();
             }
@@ -440,15 +446,19 @@ const LegalOrganizationsView: React.FC<LegalOrganizationsViewProps> = ({
         } catch (error: any) {
              console.error("Erro ao salvar Organization:", error);
             setApiError(error.response?.data?.detail || "Erro ao salvar empresa.");
+        } finally {
+            setIsLoading(false);
         }
     };
 
     const confirmDeleteCompany = async () => {
         if (!companyToDelete) return;
+        setIsLoading(true);
         try {
             setApiError(null);
             await apiService.organizations.delete(companyToDelete.id);
             
+            // ATUALIZAR TUDO (CRUD REQUER REFRESH NO BACKEND)
             if (onRefresh) {
                 await onRefresh();
             }
@@ -458,11 +468,22 @@ const LegalOrganizationsView: React.FC<LegalOrganizationsViewProps> = ({
             console.error("Erro ao deletar Organization:", error);
             setApiError(error.response?.data?.detail || "Não foi possível excluir.");
             setCompanyToDelete(null);
+        } finally {
+            setIsLoading(false);
         }
     };
 
     return (
-        <div className="space-y-6 animate-fade-in">
+        <div className="space-y-6 animate-fade-in relative">
+            {isLoading && (
+                <div className="absolute inset-0 bg-white/50 z-50 flex items-center justify-center backdrop-blur-sm rounded-xl">
+                    <div className="flex flex-col items-center">
+                        <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+                        <p className="mt-2 text-indigo-700 font-medium">Atualizando dados...</p>
+                    </div>
+                </div>
+            )}
+
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
                     <h2 className="text-3xl font-bold text-slate-800">Gerenciar Organizações</h2>
