@@ -1,15 +1,11 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { Organization, Department, Executive, User, Secretary, Event, Contact, Expense, Task, Document, LegalOrganization } from '../types';
+import { Organization, Department, Executive, User, Secretary, Event, Contact, Expense, Task, Document, LegalOrganization, OrganizationCreate, OrganizationUpdate, DepartmentCreate, DepartmentUpdate } from '../types';
 import Modal from './Modal';
 import ConfirmationModal from './ConfirmationModal';
 import { EditIcon, DeleteIcon, PlusIcon } from './Icons';
+import { apiService } from '../services/apiService';
 
 // --- Helper Functions ---
-/**
- * Validates a Brazilian CNPJ number.
- * @param {string} cnpj - The CNPJ string to validate.
- * @returns {boolean} - True if the CNPJ is valid, false otherwise.
- */
 function validateCNPJ(cnpj: string): boolean {
     const cnpjClean = cnpj.replace(/[^\d]+/g, '');
 
@@ -43,11 +39,6 @@ function validateCNPJ(cnpj: string): boolean {
     return true;
 }
 
-/**
- * Applies a CNPJ mask (00.000.000/0000-00) to a string.
- * @param {string} value - The input string.
- * @returns {string} - The masked string.
- */
 const maskCNPJ = (value: string) => {
     if (!value) return "";
     return value
@@ -59,11 +50,6 @@ const maskCNPJ = (value: string) => {
         .replace(/(-\d{2})\d+?$/, '$1');
 };
 
-/**
- * Applies a CEP mask (00000-000) to a string.
- * @param {string} value - The input string.
- * @returns {string} - The masked string.
- */
 const maskCEP = (value: string) => {
     if (!value) return "";
     return value
@@ -90,11 +76,12 @@ interface OrganizationsViewProps {
   setDocuments: React.Dispatch<React.SetStateAction<Document[]>>;
   setUsers: React.Dispatch<React.SetStateAction<User[]>>;
   legalOrganizations: LegalOrganization[];
+  onRefresh: () => void; // Função para recarregar dados do backend
 }
 
 const OrganizationForm: React.FC<{
     organization: Partial<Organization>, 
-    onSave: (organization: Organization) => void, 
+    onSave: (organization: OrganizationCreate | OrganizationUpdate) => void, 
     onCancel: () => void, 
     legalOrganizations: LegalOrganization[],
     currentUser: User;
@@ -127,7 +114,7 @@ const OrganizationForm: React.FC<{
 
     const visibleLegalOrgs = useMemo(() => {
         if (isAdminForLegalOrg) {
-            return legalOrganizations.filter(lo => lo.id === currentUser.legalOrganizationId);
+            return legalOrganizations.filter(lo => String(lo.id) === String(currentUser.legalOrganizationId));
         }
         return legalOrganizations;
     }, [legalOrganizations, currentUser, isAdminForLegalOrg]);
@@ -186,14 +173,13 @@ const OrganizationForm: React.FC<{
     };
     
     const handleCompanyNameBlur = () => {
-        // Trigger only if name is filled, a legal org is selected, and cnpj/zip are empty.
         if (!name || !legalOrganizationId || cnpj || zipCode) {
             return;
         }
     
-        const selectedLegalOrg = legalOrganizations.find(lo => lo.id === legalOrganizationId);
+        const selectedLegalOrg = legalOrganizations.find(lo => String(lo.id) === String(legalOrganizationId));
         if (selectedLegalOrg && (selectedLegalOrg.cnpj || selectedLegalOrg.zipCode || selectedLegalOrg.street)) {
-            copyConfirmedRef.current = false; // Reset ref
+            copyConfirmedRef.current = false;
             setDataToCopy(selectedLegalOrg);
             setCopyDataConfirmOpen(true);
         }
@@ -224,19 +210,23 @@ const OrganizationForm: React.FC<{
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!name || !legalOrganizationId || (cnpj && !validateCNPJ(cnpj))) {
-            if (cnpj && !validateCNPJ(cnpj)) {
-                handleCnpjBlur();
-                cnpjInputRef.current?.focus();
-            }
+        if (!name || !legalOrganizationId) return;
+        if (cnpj && !validateCNPJ(cnpj)) {
+            handleCnpjBlur();
+            cnpjInputRef.current?.focus();
             return;
         };
-        onSave({
-            id: organization.id || `org_${new Date().getTime()}`,
+        
+        const data: any = {
             name,
             legalOrganizationId,
             cnpj, street, number, neighborhood, city, state, zipCode,
-        });
+        };
+        if (organization.id) {
+            data.id = organization.id;
+        }
+
+        onSave(data);
     };
 
     return (
@@ -384,12 +374,14 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
     secretaries, setSecretaries,
     setEvents, setContacts, setExpenses, setTasks,
     setDocuments, setUsers, 
-    legalOrganizations
+    legalOrganizations,
+    onRefresh // Recebendo a função de refresh
 }) => {
     const [isOrgModalOpen, setOrgModalOpen] = useState(false);
     const [editingOrganization, setEditingOrganization] = useState<Partial<Organization> | null>(null);
     const [isDeptModalOpen, setDeptModalOpen] = useState(false);
     const [editingDepartment, setEditingDepartment] = useState<Partial<Department> | null>(null);
+    const [apiError, setApiError] = useState<string | null>(null);
 
     const [orgToDelete, setOrgToDelete] = useState<Organization | null>(null);
     const [deptToDelete, setDeptToDelete] = useState<Department | null>(null);
@@ -400,10 +392,10 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
         const isAdminForLegalOrg = currentUser.role === 'admin' && !!currentUser.legalOrganizationId;
         
         if (isAdminForLegalOrg) {
-            return organizations.filter(o => o.legalOrganizationId === currentUser.legalOrganizationId);
+            return organizations.filter(o => String(o.legalOrganizationId) === String(currentUser.legalOrganizationId));
         }
         if (isOrgAdmin) {
-            return organizations.filter(o => o.id === currentUser.organizationId);
+            return organizations.filter(o => String(o.id) === String(currentUser.organizationId));
         }
         return organizations;
     }, [organizations, currentUser, isOrgAdmin]);
@@ -411,100 +403,113 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
     // Organization Handlers
     const handleAddOrganization = () => {
         setEditingOrganization({});
+        setApiError(null);
         setOrgModalOpen(true);
     };
     const handleEditOrganization = (organization: Organization) => {
         setEditingOrganization(organization);
+        setApiError(null);
         setOrgModalOpen(true);
     };
     const handleDeleteOrganization = (org: Organization) => {
         setOrgToDelete(org);
     };
-    const confirmDeleteOrganization = () => {
+    
+    const confirmDeleteOrganization = async () => {
         if (!orgToDelete) return;
 
-        const orgId = orgToDelete.id;
+        try {
+            setApiError(null);
+            await apiService.organizations.delete(orgToDelete.id);
+            
+            // Recarrega dados do backend (incluindo exclusão em cascata real no banco)
+            if (onRefresh) {
+                await onRefresh();
+            }
 
-        // 1. Find all executives belonging to this organization to cascade their deletion
-        const executivesToDelete = executives.filter(e => e.organizationId === orgId);
-        const executivesToDeleteIds = executivesToDelete.map(e => e.id);
-
-        // 2. Delete the organization
-        setOrganizations(orgs => orgs.filter(o => o.id !== orgId));
-
-        // 3. Delete all departments of the organization
-        setDepartments(depts => depts.filter(d => d.organizationId !== orgId));
-
-        // 4. Delete all related executives
-        setExecutives(execs => execs.filter(e => e.organizationId !== orgId));
-
-        // 5. Delete all data related to the deleted executives
-        setEvents(prev => prev.filter(item => !executivesToDeleteIds.includes(item.executiveId)));
-        setContacts(prev => prev.filter(item => !executivesToDeleteIds.includes(item.executiveId)));
-        setExpenses(prev => prev.filter(item => !executivesToDeleteIds.includes(item.executiveId)));
-        setTasks(prev => prev.filter(item => !executivesToDeleteIds.includes(item.executiveId)));
-        setDocuments(prev => prev.filter(item => !executivesToDeleteIds.includes(item.executiveId)));
-
-        // 6. Unlink deleted executives from any secretaries
-        setSecretaries(secs => secs.map(sec => ({
-            ...sec,
-            executiveIds: sec.executiveIds.filter(execId => !executivesToDeleteIds.includes(execId))
-        })));
-
-        // 7. Delete all users (admin for the org, and users for all deleted executives)
-        setUsers(users => users.filter(u => {
-            if (u.organizationId === orgId) return false; // Remove org admin
-            if (u.executiveId && executivesToDeleteIds.includes(u.executiveId)) return false; // Remove executive users
-            return true;
-        }));
-
-        setOrgToDelete(null);
-    };
-    const handleSaveOrganization = (organization: Organization) => {
-        if (editingOrganization && editingOrganization.id) {
-            setOrganizations(orgs => orgs.map(o => o.id === organization.id ? organization : o));
-            setUsers(users => users.map(u => u.organizationId === organization.id ? { ...u, fullName: `Admin ${organization.name}` } : u));
-        } else {
-            setOrganizations(orgs => [...orgs, organization]);
-            setUsers(users => [...users, {
-                id: `user_admin_${organization.id}`,
-                fullName: `Admin ${organization.name}`,
-                role: 'admin',
-                organizationId: organization.id
-            }]);
+            setOrgToDelete(null);
+        } catch (error: any) {
+            setApiError(error.response?.data?.detail || "Erro ao excluir empresa.");
+            setOrgToDelete(null);
         }
-        setOrgModalOpen(false);
-        setEditingOrganization(null);
+    };
+
+    const handleSaveOrganization = async (orgData: OrganizationCreate | OrganizationUpdate) => {
+        try {
+            setApiError(null);
+
+            if ('id' in orgData && orgData.id) {
+                // Update
+                await apiService.organizations.update(String(orgData.id), orgData);
+            } else {
+                // Create
+                await apiService.organizations.create(orgData as OrganizationCreate);
+            }
+            
+            // Recarrega todos os dados do backend
+            if (onRefresh) {
+                await onRefresh();
+            }
+
+            setOrgModalOpen(false);
+            setEditingOrganization(null);
+        } catch (error: any) {
+            console.error(error);
+            setApiError(error.response?.data?.detail || "Erro ao salvar empresa.");
+        }
     };
 
     // Department Handlers
     const handleAddDepartment = (organizationId: string) => {
         setEditingDepartment({ organizationId });
+        setApiError(null);
         setDeptModalOpen(true);
     };
     const handleEditDepartment = (department: Department) => {
         setEditingDepartment(department);
+        setApiError(null);
         setDeptModalOpen(true);
     };
     const handleDeleteDepartment = (dept: Department) => {
         setDeptToDelete(dept);
     };
-    const confirmDeleteDepartment = () => {
+    const confirmDeleteDepartment = async () => {
         if (!deptToDelete) return;
-        const id = deptToDelete.id;
-        setDepartments(depts => depts.filter(d => d.id !== id));
-        setExecutives(execs => execs.map(e => e.departmentId === id ? { ...e, departmentId: undefined } : e));
-        setDeptToDelete(null);
-    };
-    const handleSaveDepartment = (department: Department) => {
-        setDepartments(depts => {
-            if (editingDepartment && editingDepartment.id) {
-                return depts.map(d => d.id === department.id ? department : d);
+        try {
+            setApiError(null);
+            await apiService.departments.delete(deptToDelete.id);
+            
+            // Recarrega dados do backend
+            if (onRefresh) {
+                await onRefresh();
             }
-            return [...depts, department];
-        });
-        setDeptModalOpen(false);
-        setEditingDepartment(null);
+            
+            setDeptToDelete(null);
+        } catch (error: any) {
+            setApiError(error.response?.data?.detail || "Erro ao excluir departamento.");
+            setDeptToDelete(null);
+        }
+    };
+    const handleSaveDepartment = async (deptData: DepartmentCreate | DepartmentUpdate) => {
+        try {
+            setApiError(null);
+            
+            if ('id' in deptData && deptData.id) {
+                await apiService.departments.update(String(deptData.id), deptData);
+            } else {
+                await apiService.departments.create(deptData as DepartmentCreate);
+            }
+
+            // Recarrega dados do backend
+            if (onRefresh) {
+                await onRefresh();
+            }
+
+            setDeptModalOpen(false);
+            setEditingDepartment(null);
+        } catch (error: any) {
+            setApiError(error.response?.data?.detail || "Erro ao salvar departamento.");
+        }
     };
 
 
@@ -525,10 +530,18 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
                 </button>
             </div>
 
+            {apiError && (
+                <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-md">
+                    <p className="font-bold">Erro</p>
+                    <p>{apiError}</p>
+                </div>
+            )}
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {visibleOrganizations.map(org => {
-                    const orgDepartments = departments.filter(d => d.organizationId === org.id);
-                    const legalOrg = legalOrganizations.find(lo => lo.id === org.legalOrganizationId);
+                    // Filtragem local de departamentos (agora vindos frescos do onRefresh)
+                    const orgDepartments = departments.filter(d => String(d.organizationId) === String(org.id));
+                    const legalOrg = legalOrganizations.find(lo => String(lo.id) === String(org.legalOrganizationId));
                     return (
                         <div key={org.id} className="bg-white rounded-xl shadow-md flex flex-col">
                             <header className="flex items-center justify-between p-4 border-b border-slate-200">
@@ -553,7 +566,6 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
                             <div className="p-4 flex-1">
                                 {(org.street || org.city) && (
                                     <div className="mb-4 text-sm text-slate-600 border-b border-slate-200 pb-4">
-                                        <h4 className="text-sm font-semibold text-slate-600 mb-2">Endereço</h4>
                                         <address className="not-italic">
                                             {org.street}{org.number && `, ${org.number}`}<br />
                                             {org.neighborhood && `${org.neighborhood} - `}{org.city}/{org.state}<br />

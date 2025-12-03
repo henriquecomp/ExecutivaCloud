@@ -1,6 +1,28 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { Executive, Organization, Event, EventType, Contact, ContactType, Expense, View, ExpenseStatus, Task, Priority, Status, Department, Secretary, User, UserRole, Document, DocumentCategory, ExpenseCategory, LegalOrganization } from './types';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { 
+  Executive, 
+  Organization, 
+  Event, 
+  EventType, 
+  Contact, 
+  ContactType, 
+  Expense, 
+  View, 
+  ExpenseStatus, 
+  Task, 
+  Priority, 
+  Status, 
+  Department, 
+  Secretary, 
+  User, 
+  UserRole, 
+  Document, 
+  DocumentCategory, 
+  ExpenseCategory, 
+  LegalOrganization 
+} from './types';
 import { useLocalStorage } from './hooks/useLocalStorage';
+import { apiService } from './services/apiService';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import ExecutivesView from './components/ExecutivesView';
@@ -21,26 +43,24 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [isSidebarOpen, setSidebarOpen] = useState(false);
 
-  // --- DUMMY DATA INITIALIZATION ---
-  // Nota: Dados de LegalOrganization removidos daqui, pois agora são gerenciados pela view.
+  // --- STATE MANAGEMENT (Backend Integrated) ---
+  // Dados que vêm do backend via API.
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [legalOrganizations, setLegalOrganizations] = useState<LegalOrganization[]>([]);
 
-  const initialOrganizations: Organization[] = useMemo(() => [
-    { id: 'org1', name: 'Tech Solutions Inc.', legalOrganizationId: 'legal_org1' },
-    { id: 'org2', name: 'Inova Corp Global', legalOrganizationId: 'legal_org2' },
-  ], []);
+  // --- STATE MANAGEMENT (LocalStorage / Mock) ---
+  // Dados que ainda não possuem backend completo ou são específicos de sessão/mock.
+  const [currentUser, setCurrentUser] = useLocalStorage<User | null>('currentUser', null);
+  const [selectedExecutiveId, setSelectedExecutiveId] = useLocalStorage<string | null>('selectedExecutiveId', null);
 
-  const initialDepartments: Department[] = useMemo(() => [
-    { id: 'dept1', name: 'Engenharia', organizationId: 'org1' },
-    { id: 'dept2', name: 'Vendas', organizationId: 'org1' },
-    { id: 'dept3', name: 'Marketing', organizationId: 'org2' },
-  ], []);
-
+  // Dummies inicias para dados que ainda não tem backend
   const initialExecutives: Executive[] = useMemo(() => [
     {
       id: 'exec1',
       fullName: 'Carlos Silva',
       workEmail: 'carlos.silva@techsolutions.com',
-      organizationId: 'org1',
+      organizationId: 'org1', 
       workPhone: '(11) 98888-1111',
       departmentId: 'dept1',
       jobTitle: 'Diretor de Engenharia',
@@ -52,148 +72,127 @@ const App: React.FC = () => {
       bankInfo: 'Banco Digital S.A.\nAgência: 0001\nConta Corrente: 12345-6',
       compensationInfo: 'Salário Base + Bônus Anual + Stock Options',
     },
-    {
-      id: 'exec2',
-      fullName: 'Beatriz Costa',
-      workEmail: 'bia.costa@inovacorp.com',
-      organizationId: 'org2',
-      workPhone: '(21) 97777-2222',
-      departmentId: 'dept3',
-      jobTitle: 'CEO',
-      linkedinProfileUrl: 'https://linkedin.com/in/beatrizcosta',
-      bio: 'Beatriz é uma líder visionária com mais de 20 anos de experiência no setor de tecnologia.'
-    },
-    {
-      id: 'exec3',
-      fullName: 'Roberto Almeida',
-      workEmail: 'roberto.a@techsolutions.com',
-      organizationId: 'org1',
-      workPhone: '(11) 96666-3333',
-      departmentId: 'dept2',
-      jobTitle: 'Diretor de Vendas',
-      reportsToExecutiveId: 'exec1'
-    },
   ], []);
 
-  const initialSecretaries: Secretary[] = useMemo(() => [
-    { id: 'sec1', fullName: 'Sofia Ribeiro', workEmail: 'sofia.r@techsolutions.com', executiveIds: ['exec1', 'exec3'] },
-    { id: 'sec2', fullName: 'Laura Mendes', workEmail: 'laura.m@inovacorp.com', executiveIds: ['exec2'] },
-  ], []);
-
-  const initialUsers: User[] = useMemo(() => [
-    // Static master user
-    { id: 'user_master', fullName: 'Usuário Master', role: 'master' },
-    // Admins for specific Organizations (Empresas)
-    ...initialOrganizations.map(org => ({
-      id: `user_admin_${org.id}`,
-      fullName: `Admin ${org.name}`,
-      role: 'admin' as UserRole,
-      organizationId: org.id,
-    })),
-    // Users for Executives
-    ...initialExecutives.map(e => ({
-      id: `user_exec_${e.id}`,
-      fullName: e.fullName,
-      role: 'executive' as UserRole,
-      executiveId: e.id,
-    })),
-    // Users for Secretaries
-    ...initialSecretaries.map(s => ({
-      id: `user_sec_${s.id}`,
-      fullName: s.fullName,
-      role: 'secretary' as UserRole,
-      secretaryId: s.id,
-    })),
-  ], [initialOrganizations, initialExecutives, initialSecretaries]);
-
-  const initialEventTypes: EventType[] = useMemo(() => [
+  const initialSecretaries: Secretary[] = [];
+  const initialEventTypes: EventType[] = [
     { id: 'et1', name: 'Reunião Diretoria', color: '#ef4444' },
     { id: 'et2', name: 'Pessoal', color: '#22c55e' },
     { id: 'et3', name: 'Viagem', color: '#3b82f6' },
-  ], []);
-
-  const initialEvents: Event[] = useMemo(() => {
-    const today = new Date();
-    return [
-      { id: 'ev1', executiveId: 'exec1', title: 'Reunião de Vendas Q3', startTime: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 10, 0).toISOString(), endTime: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 11, 0).toISOString(), location: 'Sala de Conferência 1', eventTypeId: 'et1' },
-      { id: 'ev2', executiveId: 'exec2', title: 'Almoço com Fornecedor', startTime: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12, 30).toISOString(), endTime: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 13, 30).toISOString(), location: 'Restaurante Central', eventTypeId: 'et1', reminderMinutes: 15 },
-      { id: 'ev3', executiveId: 'exec1', title: 'Consulta Médica', startTime: new Date(today.getFullYear(), today.getMonth(), today.getDate() + 2, 15, 0).toISOString(), endTime: new Date(today.getFullYear(), today.getMonth(), today.getDate() + 2, 16, 0).toISOString(), location: 'Clínica Bem-Estar', eventTypeId: 'et2' },
-    ]
-  }, []);
-
-  const initialContactTypes: ContactType[] = useMemo(() => [
+  ];
+  const initialContactTypes: ContactType[] = [
     { id: 'ct1', name: 'Cliente' },
     { id: 'ct2', name: 'Fornecedor' },
-    { id: 'ct3', name: 'Networking' },
-  ], []);
-
-  const initialContacts: Contact[] = useMemo(() => [
-    { id: 'c1', executiveId: 'exec1', fullName: 'Ana Pereira', company: 'Global Tech', email: 'ana.p@globaltech.com', phone: '(11) 95555-1234', contactTypeId: 'ct1', role: 'Gerente de Contas' },
-    { id: 'c2', executiveId: 'exec2', fullName: 'Julio Marques', company: 'Fast Logistics', email: 'julio@fastlog.com', phone: '(21) 94444-5678', contactTypeId: 'ct2', role: 'Diretor de Operações' },
-  ], []);
-
-  const initialExpenseCategories: ExpenseCategory[] = useMemo(() => [
+  ];
+  const initialExpenseCategories: ExpenseCategory[] = [
     { id: 'ec1', name: 'Alimentação' },
     { id: 'ec2', name: 'Transporte' },
-    { id: 'ec3', name: 'Software' },
-    { id: 'ec4', name: 'Consultoria' },
-    { id: 'ec5', name: 'Reembolso' },
-  ], []);
-
-  const initialExpenses: Expense[] = useMemo(() => {
-    const today = new Date();
-    const createDateString = (daysAgo: number): string => {
-      const date = new Date(today);
-      date.setDate(date.getDate() - daysAgo);
-      return date.toISOString().split('T')[0];
-    };
-
-    return [
-      { id: 'ex1', executiveId: 'exec1', description: 'Almoço com cliente', amount: 150.75, expenseDate: createDateString(1), type: 'A pagar', entityType: 'Pessoa Jurídica', categoryId: 'ec1', status: 'Pago' as ExpenseStatus, receiptUrl: 'http://example.com/recibo1.jpg' },
-      { id: 'ex2', executiveId: 'exec1', description: 'Transporte para reunião', amount: 45.50, expenseDate: createDateString(0), type: 'A pagar', entityType: 'Pessoa Jurídica', categoryId: 'ec2', status: 'Pendente' as ExpenseStatus },
-      { id: 'ex3', executiveId: 'exec2', description: 'Assinatura Software', amount: 89.90, expenseDate: createDateString(5), type: 'A pagar', entityType: 'Pessoa Jurídica', categoryId: 'ec3', status: 'Pago' as ExpenseStatus },
-      { id: 'ex4', executiveId: 'exec1', description: 'Pagamento de Consultoria', amount: 2500, expenseDate: createDateString(10), type: 'A receber', entityType: 'Pessoa Física', categoryId: 'ec4', status: 'Recebida' as ExpenseStatus },
-    ]
-  }, []);
-
-  const initialTasks: Task[] = useMemo(() => {
-    const today = new Date();
-    return [
-      { id: 't1', executiveId: 'exec1', title: 'Preparar apresentação Q4', dueDate: new Date(new Date(today).setDate(today.getDate() + 3)).toISOString().split('T')[0], priority: Priority.High, status: Status.InProgress },
-      { id: 't2', executiveId: 'exec1', title: 'Revisar contrato com Fast Logistics', dueDate: new Date(new Date(today).setDate(today.getDate() + 5)).toISOString().split('T')[0], priority: Priority.Medium, status: Status.Todo },
-      { id: 't3', executiveId: 'exec2', title: 'Agendar reunião com time de marketing', dueDate: new Date(new Date(today).setDate(today.getDate() + 1)).toISOString().split('T')[0], priority: Priority.High, status: Status.Todo },
-      { id: 't4', executiveId: 'exec1', title: 'Enviar relatório semanal', dueDate: new Date(new Date(today).setDate(today.getDate() - 1)).toISOString().split('T')[0], priority: Priority.Medium, status: Status.Done },
-    ]
-  }, []);
-
-  const initialDocumentCategories: DocumentCategory[] = useMemo(() => [
+  ];
+  const initialDocumentCategories: DocumentCategory[] = [
     { id: 'dc1', name: 'Viagem' },
     { id: 'dc2', name: 'Identificação' },
-  ], []);
+  ];
 
-  const initialDocuments: Document[] = useMemo(() => [], []);
-
-
-  // --- LOCAL STORAGE STATE MANAGEMENT ---
-  const [organizations, setOrganizations] = useLocalStorage<Organization[]>('organizations', initialOrganizations);
-  const [departments, setDepartments] = useLocalStorage<Department[]>('departments', initialDepartments);
+  // States com LocalStorage
   const [executives, setExecutives] = useLocalStorage<Executive[]>('executives', initialExecutives);
   const [secretaries, setSecretaries] = useLocalStorage<Secretary[]>('secretaries', initialSecretaries);
-  const [users, setUsers] = useLocalStorage<User[]>('users', initialUsers);
+  const [users, setUsers] = useLocalStorage<User[]>('users', []); 
   const [eventTypes, setEventTypes] = useLocalStorage<EventType[]>('eventTypes', initialEventTypes);
-  const [events, setEvents] = useLocalStorage<Event[]>('events', initialEvents);
+  const [events, setEvents] = useLocalStorage<Event[]>('events', []);
   const [contactTypes, setContactTypes] = useLocalStorage<ContactType[]>('contactTypes', initialContactTypes);
-  const [contacts, setContacts] = useLocalStorage<Contact[]>('contacts', initialContacts);
-  const [expenses, setExpenses] = useLocalStorage<Expense[]>('expenses', initialExpenses);
+  const [contacts, setContacts] = useLocalStorage<Contact[]>('contacts', []);
+  const [expenses, setExpenses] = useLocalStorage<Expense[]>('expenses', []);
   const [expenseCategories, setExpenseCategories] = useLocalStorage<ExpenseCategory[]>('expenseCategories', initialExpenseCategories);
-  const [tasks, setTasks] = useLocalStorage<Task[]>('tasks', initialTasks);
+  const [tasks, setTasks] = useLocalStorage<Task[]>('tasks', []);
   const [documentCategories, setDocumentCategories] = useLocalStorage<DocumentCategory[]>('documentCategories', initialDocumentCategories);
-  const [documents, setDocuments] = useLocalStorage<Document[]>('documents', initialDocuments);
+  const [documents, setDocuments] = useLocalStorage<Document[]>('documents', []);
   const [notifiedEventIds, setNotifiedEventIds] = useState<Set<string>>(new Set());
 
-  const [currentUser, setCurrentUser] = useLocalStorage<User | null>('currentUser', null);
-  const [selectedExecutiveId, setSelectedExecutiveId] = useLocalStorage<string | null>('selectedExecutiveId', null);
+  // --- CARREGAR DADOS DO BACKEND ---
+  const loadBackendData = useCallback(async () => {
+    try {
+      // 1. Carregar Legal Organizations
+      // O backend retorna IDs inteiros, convertemos para string para manter compatibilidade com o frontend
+      const legalOrgsRes = await apiService.legalOrganizations.getAll();
+      const legalOrgsData = legalOrgsRes.data.map((item: any) => ({
+        ...item,
+        id: String(item.id)
+      }));
+      setLegalOrganizations(legalOrgsData);
 
+      // 2. Carregar Organizations (Empresas)
+      const orgsRes = await apiService.organizations.getAll();
+      const orgsData = orgsRes.data.map((item: any) => ({
+        ...item,
+        id: String(item.id),
+        legalOrganizationId: String(item.legalOrganizationId)
+      }));
+      setOrganizations(orgsData);
+
+      // 3. Carregar Departamentos
+      // Como o backend atualmente busca por organização, iteramos sobre as organizações carregadas
+      let allDepts: Department[] = [];
+      if (orgsData.length > 0) {
+        const deptPromises = orgsData.map(org => apiService.departments.getByOrg(org.id));
+        const deptResponses = await Promise.all(deptPromises);
+        
+        deptResponses.forEach(res => {
+          const mappedDepts = res.data.map((item: any) => ({
+            ...item,
+            id: String(item.id),
+            organizationId: String(item.organizationId)
+          }));
+          allDepts = [...allDepts, ...mappedDepts];
+        });
+      }
+      setDepartments(allDepts);
+
+      // Atualizar lista de usuários mockados para incluir admins das novas organizações
+      const masterUser: User = { id: 'user_master', fullName: 'Usuário Master', role: 'master' };
+      
+      const orgAdmins = orgsData.map(org => ({
+        id: `user_admin_${org.id}`,
+        fullName: `Admin ${org.name}`,
+        role: 'admin' as UserRole,
+        organizationId: org.id,
+      }));
+
+      const legalOrgAdmins = legalOrgsData.map(lo => ({
+        id: `user_admin_legal_${lo.id}`,
+        fullName: `Admin ${lo.name}`,
+        role: 'admin' as UserRole,
+        legalOrganizationId: lo.id
+      }));
+
+      const execUsers = executives.map(e => ({
+        id: `user_exec_${e.id}`,
+        fullName: e.fullName,
+        role: 'executive' as UserRole,
+        executiveId: e.id,
+      }));
+
+      const secUsers = secretaries.map(s => ({
+        id: `user_sec_${s.id}`,
+        fullName: s.fullName,
+        role: 'secretary' as UserRole,
+        secretaryId: s.id,
+      }));
+
+      // Mescla usuários gerados dinamicamente com usuários persistidos
+      setUsers([masterUser, ...legalOrgAdmins, ...orgAdmins, ...execUsers, ...secUsers]);
+
+    } catch (error) {
+      console.error("Erro ao carregar dados do backend:", error);
+    }
+  }, [executives, secretaries, setUsers]);
+
+  // Efeito inicial
+  useEffect(() => {
+    loadBackendData();
+  }, [loadBackendData]);
+
+
+  // --- LOGIN & AUTH ---
   const handleLogin = (user: User) => {
     setCurrentUser(user);
     if (user.role === 'secretary') {
@@ -231,12 +230,10 @@ const App: React.FC = () => {
     }
   }, [currentUser, executives, secretaries, organizations]);
 
-  // Effect to manage selected executive based on current user
   useEffect(() => {
     if (currentUser?.role === 'executive') {
       setSelectedExecutiveId(currentUser.executiveId || null);
     } else if (currentUser) {
-      // If the current selection is no longer valid, reset it
       const isSelectionValid = visibleExecutives.some(e => e.id === selectedExecutiveId);
       if (!isSelectionValid) {
         setSelectedExecutiveId(visibleExecutives.length > 0 ? visibleExecutives[0].id : null);
@@ -279,8 +276,8 @@ const App: React.FC = () => {
       });
     };
 
-    const intervalId = setInterval(checkReminders, 60000); // Check every minute
-    checkReminders(); // Initial check
+    const intervalId = setInterval(checkReminders, 60000); 
+    checkReminders(); 
 
     return () => clearInterval(intervalId);
   }, [events, executives, notifiedEventIds]);
@@ -313,7 +310,6 @@ const App: React.FC = () => {
 
   const renderView = () => {
     if (!currentUser) return null;
-    // Check if an executive is selected for views that require it
     if (['agenda', 'contacts', 'finances', 'tasks', 'documents'].includes(currentView) && !selectedExecutiveId && currentUser.role !== 'executive') {
       return (
         <div className="text-center p-10 bg-white rounded-lg shadow-md max-w-lg mx-auto">
@@ -337,7 +333,8 @@ const App: React.FC = () => {
       case 'legalOrganizations':
         return <LegalOrganizationsView
           currentUser={currentUser}
-          // REMOVIDO: legalOrganizations e setLegalOrganizations
+          legalOrganizations={legalOrganizations} // Passando estado do pai
+          setLegalOrganizations={setLegalOrganizations} // Passando setter do pai
           organizations={organizations} setOrganizations={setOrganizations}
           departments={departments} setDepartments={setDepartments}
           executives={executives} setExecutives={setExecutives}
@@ -379,7 +376,8 @@ const App: React.FC = () => {
           setTasks={setTasks}
           setDocuments={setDocuments}
           setUsers={setUsers}
-          legalOrganizations={[]} // Passando array vazio temporariamente
+          legalOrganizations={legalOrganizations} // Passando a lista atualizada
+          onRefresh={loadBackendData} // Passando função de refresh
         />;
       case 'secretaries':
         return <SecretariesView
@@ -405,8 +403,8 @@ const App: React.FC = () => {
         return <ReportsView executives={executives} events={events} expenses={expenses} tasks={tasks} contacts={contacts} />;
       case 'settings':
         return <SettingsView
-          allData={{ legalOrganizations: [], organizations, departments, executives, secretaries, users, eventTypes, events, contactTypes, contacts, expenses, expenseCategories, tasks, documentCategories, documents }}
-          setAllData={{ setLegalOrganizations: () => { }, setOrganizations, setDepartments, setExecutives, setSecretaries, setUsers, setEventTypes, setEvents, setContactTypes, setContacts, setExpenses, setExpenseCategories, setTasks, setDocumentCategories, setDocuments }}
+          allData={{ legalOrganizations, organizations, departments, executives, secretaries, users, eventTypes, events, contactTypes, contacts, expenses, expenseCategories, tasks, documentCategories, documents }}
+          setAllData={{ setLegalOrganizations, setOrganizations, setDepartments, setExecutives, setSecretaries, setUsers, setEventTypes, setEvents, setContactTypes, setContacts, setExpenses, setExpenseCategories, setTasks, setDocumentCategories, setDocuments }}
         />;
       default:
         return <Dashboard
