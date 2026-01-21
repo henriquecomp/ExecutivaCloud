@@ -10,7 +10,6 @@ function validateCNPJ(cnpj: string): boolean {
     const cnpjClean = cnpj.replace(/[^\d]+/g, '');
 
     if (cnpjClean.length !== 14) return false;
-    // Elimina CNPJs invalidos conhecidos
     if (/^(\d)\1+$/.test(cnpjClean)) return false;
 
     let size = cnpjClean.length - 2;
@@ -76,7 +75,7 @@ interface OrganizationsViewProps {
   setDocuments: React.Dispatch<React.SetStateAction<Document[]>>;
   setUsers: React.Dispatch<React.SetStateAction<User[]>>;
   legalOrganizations: LegalOrganization[];
-  onRefresh: () => Promise<void>; // Atualizado para Promise para suportar await
+  onRefresh: () => Promise<void>; 
 }
 
 const OrganizationForm: React.FC<{
@@ -163,10 +162,7 @@ const OrganizationForm: React.FC<{
             setCepError('');
         } catch (error) {
             setCepError('CEP inválido. Verifique e tente novamente.');
-            setStreet('');
-            setNeighborhood('');
-            setCity('');
-            setState('');
+            setStreet(''); setNeighborhood(''); setCity(''); setState('');
         } finally {
             setIsCepLoading(false);
         }
@@ -338,17 +334,28 @@ const OrganizationForm: React.FC<{
     );
 };
 
-const DepartmentForm: React.FC<{ department: Partial<Department>, onSave: (department: Department) => void, onCancel: () => void }> = ({ department, onSave, onCancel }) => {
+const DepartmentForm: React.FC<{ 
+    department: Partial<Department>, 
+    onSave: (department: DepartmentCreate | DepartmentUpdate) => void, 
+    onCancel: () => void 
+}> = ({ department, onSave, onCancel }) => {
     const [name, setName] = useState(department.name || '');
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!name || !department.organizationId) return;
-        onSave({
-            id: department.id || `dept_${new Date().getTime()}`,
+        
+        const data: any = {
             name,
             organizationId: department.organizationId,
-        });
+        };
+        
+        // Se tiver ID, adiciona para que o handler saiba que é update
+        if (department.id) {
+            data.id = department.id;
+        }
+
+        onSave(data);
     };
 
     return (
@@ -375,7 +382,7 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
     setEvents, setContacts, setExpenses, setTasks,
     setDocuments, setUsers, 
     legalOrganizations,
-    onRefresh // Recebendo a função de refresh (Promise)
+    onRefresh
 }) => {
     const [isOrgModalOpen, setOrgModalOpen] = useState(false);
     const [editingOrganization, setEditingOrganization] = useState<Partial<Organization> | null>(null);
@@ -413,6 +420,7 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
         setOrgModalOpen(true);
     };
     const handleDeleteOrganization = (org: Organization) => {
+        setApiError(null);
         setOrgToDelete(org);
     };
     
@@ -422,16 +430,12 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
         try {
             setApiError(null);
             await apiService.organizations.delete(orgToDelete.id);
-            
-            // ATUALIZAR TUDO (CRUD REQUER REFRESH NO BACKEND)
             if (onRefresh) {
                 await onRefresh();
             }
-
             setOrgToDelete(null);
         } catch (error: any) {
             setApiError(error.response?.data?.detail || "Erro ao excluir empresa.");
-            setOrgToDelete(null);
         } finally {
             setIsLoading(false);
         }
@@ -441,20 +445,14 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
         setIsLoading(true);
         try {
             setApiError(null);
-
             if ('id' in orgData && orgData.id) {
-                // Update
                 await apiService.organizations.update(String(orgData.id), orgData);
             } else {
-                // Create
                 await apiService.organizations.create(orgData as OrganizationCreate);
             }
-            
-            // ATUALIZAR TUDO (CRUD REQUER REFRESH NO BACKEND)
             if (onRefresh) {
                 await onRefresh();
             }
-
             setOrgModalOpen(false);
             setEditingOrganization(null);
         } catch (error: any) {
@@ -477,6 +475,7 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
         setDeptModalOpen(true);
     };
     const handleDeleteDepartment = (dept: Department) => {
+        setApiError(null);
         setDeptToDelete(dept);
     };
     const confirmDeleteDepartment = async () => {
@@ -485,16 +484,12 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
         try {
             setApiError(null);
             await apiService.departments.delete(deptToDelete.id);
-            
-            // ATUALIZAR TUDO (CRUD REQUER REFRESH NO BACKEND)
             if (onRefresh) {
                 await onRefresh();
             }
-            
             setDeptToDelete(null);
         } catch (error: any) {
             setApiError(error.response?.data?.detail || "Erro ao excluir departamento.");
-            setDeptToDelete(null);
         } finally {
             setIsLoading(false);
         }
@@ -503,22 +498,20 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
         setIsLoading(true);
         try {
             setApiError(null);
-            
+            // Verifica se é update (tem ID) ou create (sem ID)
             if ('id' in deptData && deptData.id) {
                 await apiService.departments.update(String(deptData.id), deptData);
             } else {
                 await apiService.departments.create(deptData as DepartmentCreate);
             }
-
-            // ATUALIZAR TUDO (CRUD REQUER REFRESH NO BACKEND)
             if (onRefresh) {
                 await onRefresh();
             }
-
             setDeptModalOpen(false);
             setEditingDepartment(null);
         } catch (error: any) {
             setApiError(error.response?.data?.detail || "Erro ao salvar departamento.");
+            // Mantém o modal aberto para mostrar o erro
         } finally {
             setIsLoading(false);
         }
@@ -550,13 +543,6 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
                     Nova Empresa
                 </button>
             </div>
-
-            {apiError && (
-                <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-md">
-                    <p className="font-bold">Erro</p>
-                    <p>{apiError}</p>
-                </div>
-            )}
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {visibleOrganizations.map(org => {
@@ -628,6 +614,12 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
 
             {isOrgModalOpen && (
                 <Modal title={editingOrganization?.id ? 'Editar Empresa' : 'Nova Empresa'} onClose={() => {setOrgModalOpen(false); setEditingOrganization(null)}}>
+                    {apiError && (
+                        <div className="mb-4 bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded" role="alert">
+                            <p className="font-bold">Atenção</p>
+                            <p>{apiError}</p>
+                        </div>
+                    )}
                     <OrganizationForm 
                         organization={editingOrganization || {}} 
                         onSave={handleSaveOrganization} 
@@ -640,6 +632,12 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
 
             {isDeptModalOpen && (
                  <Modal title={editingDepartment?.id ? 'Editar Departamento' : 'Novo Departamento'} onClose={() => {setDeptModalOpen(false); setEditingDepartment(null)}}>
+                    {apiError && (
+                        <div className="mb-4 bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded" role="alert">
+                            <p className="font-bold">Atenção</p>
+                            <p>{apiError}</p>
+                        </div>
+                    )}
                     <DepartmentForm department={editingDepartment || {}} onSave={handleSaveDepartment} onCancel={() => { setDeptModalOpen(false); setEditingDepartment(null); }} />
                 </Modal>
             )}
@@ -650,7 +648,7 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
                     onClose={() => setOrgToDelete(null)}
                     onConfirm={confirmDeleteOrganization}
                     title="Confirmar Exclusão"
-                    message={`Tem certeza que deseja excluir a empresa ${orgToDelete.name}? TODOS os seus dados (departamentos, executivos, atividades, etc) e usuários associados serão permanentemente removidos.`}
+                    message={apiError ? `ERRO: ${apiError}` : `Tem certeza que deseja excluir a empresa ${orgToDelete.name}? TODOS os seus dados (departamentos, executivos, atividades, etc) e usuários associados serão permanentemente removidos.`}
                 />
             )}
             
@@ -660,7 +658,7 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
                     onClose={() => setDeptToDelete(null)}
                     onConfirm={confirmDeleteDepartment}
                     title="Confirmar Exclusão"
-                    message={`Tem certeza que deseja excluir o departamento ${deptToDelete.name}? Os executivos associados serão desvinculados.`}
+                    message={apiError ? `ERRO: ${apiError}` : `Tem certeza que deseja excluir o departamento ${deptToDelete.name}? Os executivos associados serão desvinculados.`}
                 />
             )}
         </div>

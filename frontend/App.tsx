@@ -113,16 +113,18 @@ const App: React.FC = () => {
     try {
       // 1. Carregar Legal Organizations
       // O backend retorna IDs inteiros, convertemos para string para manter compatibilidade com o frontend
+      // CORREÇÃO: O apiService agora retorna o array diretamente, não precisa de .data
       const legalOrgsRes = await apiService.legalOrganizations.getAll();
-      const legalOrgsData = legalOrgsRes.data.map((item: any) => ({
+      const legalOrgsData = legalOrgsRes.map((item: any) => ({
         ...item,
         id: String(item.id)
       }));
       setLegalOrganizations(legalOrgsData);
 
       // 2. Carregar Organizations (Empresas)
+      // CORREÇÃO: O apiService agora retorna o array diretamente
       const orgsRes = await apiService.organizations.getAll();
-      const orgsData = orgsRes.data.map((item: any) => ({
+      const orgsData = orgsRes.map((item: any) => ({
         ...item,
         id: String(item.id),
         legalOrganizationId: String(item.legalOrganizationId)
@@ -136,8 +138,9 @@ const App: React.FC = () => {
         const deptPromises = orgsData.map(org => apiService.departments.getByOrg(org.id));
         const deptResponses = await Promise.all(deptPromises);
         
+        // CORREÇÃO: deptResponses agora é um array de arrays de departamentos
         deptResponses.forEach(res => {
-          const mappedDepts = res.data.map((item: any) => ({
+          const mappedDepts = res.map((item: any) => ({
             ...item,
             id: String(item.id),
             organizationId: String(item.organizationId)
@@ -345,6 +348,7 @@ const App: React.FC = () => {
           setTasks={setTasks}
           setDocuments={setDocuments}
           setUsers={setUsers}
+          onRefresh={loadBackendData} // Função de refresh
         />;
       case 'executives':
         return <ExecutivesView

@@ -13,36 +13,35 @@ import {
 
 // --- Serviço de LegalOrganization ---
 const legalOrgService = {
-  getAll: () => api.get<LegalOrganization[]>('/legal-organizations/'),
-  getOne: (id: string) => api.get<LegalOrganization>(`/legal-organizations/${id}`),
-  create: (data: LegalOrganizationCreate) => api.post<LegalOrganization>('/legal-organizations/', data),
-  update: (id: string, data: LegalOrganizationUpdate) => api.put<LegalOrganization>(`/legal-organizations/${id}`, data),
-  delete: (id: string) => api.delete(`/legal-organizations/${id}`),
+  getAll: () => api.get<LegalOrganization[]>('/legal-organizations/').then(res => res.data),
+  getOne: (id: string) => api.get<LegalOrganization>(`/legal-organizations/${id}`).then(res => res.data),
+  create: (data: LegalOrganizationCreate) => api.post<LegalOrganization>('/legal-organizations/', data).then(res => res.data),
+  update: (id: string, data: LegalOrganizationUpdate) => api.put<LegalOrganization>(`/legal-organizations/${id}`, data).then(res => res.data),
+  delete: (id: string) => api.delete(`/legal-organizations/${id}`).then(res => res.data),
 };
 
 // --- Serviço de Organization (Empresas) ---
 const orgService = {
-  getAll: () => api.get<Organization[]>('/organizations/'),
-  getOne: (id: string) => api.get<Organization>(`/organizations/${id}`),
-  create: (data: OrganizationCreate) => api.post<Organization>('/organizations/', data),
-  update: (id: string, data: OrganizationUpdate) => api.put<Organization>(`/organizations/${id}`, data),
-  delete: (id: string) => api.delete(`/organizations/${id}`),
+  getAll: () => api.get<Organization[]>('/organizations/').then(res => res.data),
+  getOne: (id: string) => api.get<Organization>(`/organizations/${id}`).then(res => res.data),
+  create: (data: OrganizationCreate) => api.post<Organization>('/organizations/', data).then(res => res.data),
+  update: (id: string, data: OrganizationUpdate) => api.put<Organization>(`/organizations/${id}`, data).then(res => res.data),
+  delete: (id: string) => api.delete(`/organizations/${id}`).then(res => res.data),
 };
 
 // --- Serviço de Department ---
 const deptService = {
-  // O backend não tem "get all global", então buscamos por organização ou individualmente
-  getByOrg: (orgId: string) => api.get<Department[]>(`/departments/by-organization/${orgId}`),
-  getOne: (id: string) => api.get<Department>(`/departments/${id}`),
-  create: (data: DepartmentCreate) => api.post<Department>('/departments/', data),
-  update: (id: string, data: DepartmentUpdate) => api.put<Department>(`/departments/${id}`, data),
-  delete: (id: string) => api.delete(`/departments/${id}`),
+  getByOrg: (orgId: string) => api.get<Department[]>(`/departments/by-organization/${orgId}`).then(res => res.data),
+  getOne: (id: string) => api.get<Department>(`/departments/${id}`).then(res => res.data),
+  create: (data: DepartmentCreate) => api.post<Department>('/departments/', data).then(res => res.data),
+  update: (id: string, data: DepartmentUpdate) => api.put<Department>(`/departments/${id}`, data).then(res => res.data),
+  delete: (id: string) => api.delete(`/departments/${id}`).then(res => res.data),
 };
 
-// --- Serviço de Usuários (Básico para Auth/Listagem) ---
+// --- Serviço de Usuários ---
 const userService = {
-    getAll: () => api.get('/users/'),
-    create: (data: any) => api.post('/users/', data),
+    getAll: () => api.get('/users/').then(res => res.data),
+    create: (data: any) => api.post('/users/', data).then(res => res.data),
 };
 
 export const apiService = {

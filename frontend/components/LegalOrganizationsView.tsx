@@ -1,9 +1,9 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { LegalOrganization, Organization, Department, Executive, Secretary, Event, Contact, Expense, Task, Document, User, LegalOrganizationCreate, LegalOrganizationUpdate, OrganizationUpdate, OrganizationCreate } from '@/types';
-import Modal from '@/components/Modal';
-import ConfirmationModal from '@/components/ConfirmationModal';
-import { EditIcon, DeleteIcon, PlusIcon } from '@/components/Icons';
-import { apiService } from '@/services/apiService';
+import { LegalOrganization, Organization, Department, Executive, Secretary, Event, Contact, Expense, Task, Document, User, LegalOrganizationCreate, LegalOrganizationUpdate, OrganizationUpdate, OrganizationCreate } from '../types';
+import Modal from './Modal';
+import ConfirmationModal from './ConfirmationModal';
+import { EditIcon, DeleteIcon, PlusIcon } from './Icons';
+import { apiService } from '../services/apiService';
 
 // --- Helper Functions ---
 function validateCNPJ(cnpj: string): boolean {
@@ -48,7 +48,6 @@ interface LegalOrganizationsViewProps {
   currentUser: User;
   legalOrganizations: LegalOrganization[];
   setLegalOrganizations: React.Dispatch<React.SetStateAction<LegalOrganization[]>>;
-  
   organizations: Organization[];
   setOrganizations: React.Dispatch<React.SetStateAction<Organization[]>>;
   departments: Department[];
@@ -63,8 +62,7 @@ interface LegalOrganizationsViewProps {
   setTasks: React.Dispatch<React.SetStateAction<Task[]>>;
   setDocuments: React.Dispatch<React.SetStateAction<Document[]>>;
   setUsers: React.Dispatch<React.SetStateAction<User[]>>;
-  
-  onRefresh: () => Promise<void>;
+  onRefresh: () => void;
 }
 
 const LegalOrganizationForm: React.FC<{ 
@@ -85,7 +83,6 @@ const LegalOrganizationForm: React.FC<{
     const [cepError, setCepError] = useState('');
     const [isCepLoading, setIsCepLoading] = useState(false);
     const cnpjInputRef = useRef<HTMLInputElement>(null);
-    const cepInputRef = useRef<HTMLInputElement>(null);
 
     const handleCnpjChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (cnpjError) setCnpjError('');
@@ -126,10 +123,7 @@ const LegalOrganizationForm: React.FC<{
             setCepError('');
         } catch (error) {
             setCepError('CEP inválido. Verifique e tente novamente.');
-            setStreet('');
-            setNeighborhood('');
-            setCity('');
-            setState('');
+            setStreet(''); setNeighborhood(''); setCity(''); setState('');
         } finally {
             setIsCepLoading(false);
         }
@@ -144,13 +138,8 @@ const LegalOrganizationForm: React.FC<{
             return;
         };
         
-        const dataToSave: any = {
-            name, cnpj, street, number, neighborhood, city, state, zipCode,
-        };
-        if (legalOrganization.id) {
-            dataToSave.id = legalOrganization.id;
-        }
-
+        const dataToSave: any = { name, cnpj, street, number, neighborhood, city, state, zipCode };
+        if (legalOrganization.id) dataToSave.id = legalOrganization.id;
         onSave(dataToSave);
     };
 
@@ -172,28 +161,12 @@ const LegalOrganizationForm: React.FC<{
                 <div className="flex items-start gap-4">
                     <div style={{ width: '190px' }}>
                         <label htmlFor="cnpj" className="block text-sm font-medium text-slate-700">CNPJ</label>
-                        <input
-                            ref={cnpjInputRef}
-                            type="text"
-                            id="cnpj"
-                            value={cnpj}
-                            onChange={handleCnpjChange}
-                            onBlur={handleCnpjBlur}
-                            className={`mt-1 block w-full px-3 py-2 bg-white border ${cnpjError ? 'border-red-500' : 'border-slate-300'} rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
-                        />
+                        <input ref={cnpjInputRef} type="text" id="cnpj" value={cnpj} onChange={handleCnpjChange} onBlur={handleCnpjBlur} className={`mt-1 block w-full px-3 py-2 bg-white border ${cnpjError ? 'border-red-500' : 'border-slate-300'} rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`} />
                         {cnpjError && <p className="mt-1 text-xs text-red-600">{cnpjError}</p>}
                     </div>
                     <div style={{ width: '120px' }}>
                         <label htmlFor="zipCode" className="block text-sm font-medium text-slate-700">CEP</label>
-                        <input
-                            ref={cepInputRef}
-                            type="text"
-                            id="zipCode"
-                            value={zipCode}
-                            onChange={handleCepChange}
-                            onBlur={handleCepBlur}
-                            className={`mt-1 block w-full px-3 py-2 bg-white border ${cepError ? 'border-red-500' : 'border-slate-300'} rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
-                        />
+                        <input type="text" id="zipCode" value={zipCode} onChange={handleCepChange} onBlur={handleCepBlur} className={`mt-1 block w-full px-3 py-2 bg-white border ${cepError ? 'border-red-500' : 'border-slate-300'} rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`} />
                         {cepError && <p className="mt-1 text-xs text-red-600">{cepError}</p>}
                     </div>
                 </div>
@@ -248,8 +221,6 @@ const OrganizationForm: React.FC<{
     const [cnpjError, setCnpjError] = useState('');
     const [cepError, setCepError] = useState('');
     const [isCepLoading, setIsCepLoading] = useState(false);
-    const cnpjInputRef = useRef<HTMLInputElement>(null);
-    const cepInputRef = useRef<HTMLInputElement>(null);
     
     const isAdminForLegalOrg = currentUser.role === 'admin' && !!currentUser.legalOrganizationId;
     const isOrgAdmin = currentUser.role === 'admin' && !!currentUser.organizationId;
@@ -257,7 +228,6 @@ const OrganizationForm: React.FC<{
 
     const [isCopyDataConfirmOpen, setCopyDataConfirmOpen] = useState(false);
     const [dataToCopy, setDataToCopy] = useState<Partial<LegalOrganization> | null>(null);
-    const copyConfirmedRef = useRef(false);
 
     const visibleLegalOrgs = useMemo(() => {
         if (isAdminForLegalOrg) return legalOrganizations.filter(lo => String(lo.id) === String(currentUser.legalOrganizationId));
@@ -270,36 +240,37 @@ const OrganizationForm: React.FC<{
     
     const handleCepBlur = async () => {
         const cepClean = zipCode.replace(/\D/g, '');
-        if (cepClean.length !== 8) { if (cepClean.length > 0) setCepError('CEP incompleto.'); return; }
+        if (cepClean.length !== 8) return;
         setIsCepLoading(true);
         try {
             const response = await fetch(`https://viacep.com.br/ws/${cepClean}/json/`);
-            if (!response.ok) throw new Error('Erro');
             const data = await response.json();
-            if (data.erro) throw new Error('Erro');
-            setStreet(data.logradouro || ''); setNeighborhood(data.bairro || ''); setCity(data.localidade || ''); setState(data.uf || ''); setCepError('');
-        } catch { setCepError('CEP inválido.'); } finally { setIsCepLoading(false); }
+            if (!data.erro) {
+                setStreet(data.logradouro || ''); setNeighborhood(data.bairro || ''); setCity(data.localidade || ''); setState(data.uf || '');
+            }
+        } catch { setCepError('Erro ao buscar CEP.'); } finally { setIsCepLoading(false); }
     };
     
     const handleCompanyNameBlur = () => {
         if (!name || !legalOrganizationId || cnpj || zipCode) return;
         const selectedLegalOrg = legalOrganizations.find(lo => String(lo.id) === String(legalOrganizationId));
-        if (selectedLegalOrg && (selectedLegalOrg.cnpj || selectedLegalOrg.zipCode || selectedLegalOrg.street)) {
-            copyConfirmedRef.current = false; setDataToCopy(selectedLegalOrg); setCopyDataConfirmOpen(true);
+        if (selectedLegalOrg && (selectedLegalOrg.cnpj || selectedLegalOrg.zipCode)) {
+            setDataToCopy(selectedLegalOrg); setCopyDataConfirmOpen(true);
         }
     };
     
     const handleConfirmCopyData = () => {
         if (dataToCopy) {
-            setCnpj(maskCNPJ(dataToCopy.cnpj || '')); setZipCode(maskCEP(dataToCopy.zipCode || '')); setStreet(dataToCopy.street || ''); setNumber(dataToCopy.number || ''); setNeighborhood(dataToCopy.neighborhood || ''); setCity(dataToCopy.city || ''); setState(dataToCopy.state || ''); setCnpjError(''); setCepError('');
+            setCnpj(maskCNPJ(dataToCopy.cnpj || '')); setZipCode(maskCEP(dataToCopy.zipCode || ''));
+            setStreet(dataToCopy.street || ''); setNumber(dataToCopy.number || '');
+            setNeighborhood(dataToCopy.neighborhood || ''); setCity(dataToCopy.city || ''); setState(dataToCopy.state || '');
         }
-        copyConfirmedRef.current = true;
+        setCopyDataConfirmOpen(false);
     };
     
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!name || !legalOrganizationId) return;
-        if (cnpj && !validateCNPJ(cnpj)) { handleCnpjBlur(); return; }
         const data: any = { name, legalOrganizationId, cnpj, street, number, neighborhood, city, state, zipCode };
         if (organization.id) data.id = organization.id;
         onSave(data);
@@ -307,239 +278,138 @@ const OrganizationForm: React.FC<{
 
     return (
         <>
-            {isCepLoading && <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]"><div className="bg-white p-6 rounded-lg shadow-xl text-center"><p>Carregando...</p></div></div>}
+            {isCepLoading && <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]"><div className="bg-white p-6 rounded-lg shadow-xl text-center"><p>Buscando CEP...</p></div></div>}
             <form onSubmit={handleSubmit} className="space-y-4">
-                <div><label className="block text-sm font-medium">Organização Matriz</label><select value={legalOrganizationId} onChange={e => setLegalOrganizationId(e.target.value)} disabled={isAdminForLegalOrg || isOrgAdmin} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md"><option value="" disabled>Selecione</option>{visibleLegalOrgs.map(lo => <option key={lo.id} value={lo.id}>{lo.name}</option>)}</select></div>
-                <div><label className="block text-sm font-medium">Nome da Empresa</label><input type="text" value={name} onChange={e => setName(e.target.value)} onBlur={handleCompanyNameBlur} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md" /></div>
-                <div className="grid grid-cols-2 gap-4"><div><label className="block text-sm font-medium">CNPJ</label><input type="text" value={cnpj} onChange={handleCnpjChange} onBlur={handleCnpjBlur} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md" />{cnpjError && <p className="text-red-600 text-xs">{cnpjError}</p>}</div><div><label className="block text-sm font-medium">CEP</label><input type="text" value={zipCode} onChange={handleCepChange} onBlur={handleCepBlur} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md" />{cepError && <p className="text-red-600 text-xs">{cepError}</p>}</div></div>
+                <div><label className="block text-sm font-medium">Matriz</label><select value={legalOrganizationId} onChange={e => setLegalOrganizationId(e.target.value)} disabled={isAdminForLegalOrg || isOrgAdmin} className="mt-1 block w-full border rounded-md p-2"><option value="">Selecione</option>{visibleLegalOrgs.map(lo => <option key={lo.id} value={lo.id}>{lo.name}</option>)}</select></div>
+                <div><label className="block text-sm font-medium">Nome da Empresa</label><input type="text" value={name} onChange={e => setName(e.target.value)} onBlur={handleCompanyNameBlur} className="mt-1 block w-full border rounded-md p-2" /></div>
+                <div className="grid grid-cols-2 gap-4"><div><label className="block text-sm font-medium">CNPJ</label><input type="text" value={cnpj} onChange={handleCnpjChange} onBlur={handleCnpjBlur} className="mt-1 block w-full border rounded-md p-2" />{cnpjError && <p className="text-red-600 text-xs">{cnpjError}</p>}</div><div><label className="block text-sm font-medium">CEP</label><input type="text" value={zipCode} onChange={handleCepChange} onBlur={handleCepBlur} className="mt-1 block w-full border rounded-md p-2" /></div></div>
                 <div className="flex justify-end space-x-3 pt-4"><button type="button" onClick={onCancel} className="px-4 py-2 bg-slate-200 rounded-md">Cancelar</button><button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-md">Salvar</button></div>
             </form>
-            <ConfirmationModal isOpen={isCopyDataConfirmOpen} onClose={() => setCopyDataConfirmOpen(false)} onConfirm={handleConfirmCopyData} title="Copiar Dados" message="Deseja copiar dados da Matriz?" />
+            <ConfirmationModal isOpen={isCopyDataConfirmOpen} onClose={() => setCopyDataConfirmOpen(false)} onConfirm={handleConfirmCopyData} title="Copiar Dados" message="Deseja copiar os dados de endereço da Matriz?" />
         </>
     );
 };
 
 const LegalOrganizationsView: React.FC<LegalOrganizationsViewProps> = ({
-    currentUser,
-    legalOrganizations, setLegalOrganizations,
-    organizations,
-    setOrganizations, setUsers,
-    onRefresh
+    currentUser, legalOrganizations, setLegalOrganizations, organizations, setOrganizations, onRefresh
 }) => {
     const [isModalOpen, setModalOpen] = useState(false);
     const [editingLegalOrg, setEditingLegalOrg] = useState<Partial<LegalOrganization> | null>(null);
     const [legalOrgToDelete, setLegalOrgToDelete] = useState<LegalOrganization | null>(null);
-    
     const [isCompanyModalOpen, setCompanyModalOpen] = useState(false);
     const [editingCompany, setEditingCompany] = useState<Partial<Organization> | null>(null);
     const [companyToDelete, setCompanyToDelete] = useState<Organization | null>(null);
-
     const [apiError, setApiError] = useState<string | null>(null);
-    const [isLoading, setIsLoading] = useState(false);
     
     const isAdminForLegalOrg = currentUser.role === 'admin' && !!currentUser.legalOrganizationId;
 
     const visibleLegalOrgs = useMemo(() => {
-        if (isAdminForLegalOrg) {
-            return legalOrganizations.filter(lo => String(lo.id) === String(currentUser.legalOrganizationId));
-        }
+        if (isAdminForLegalOrg) return legalOrganizations.filter(lo => String(lo.id) === String(currentUser.legalOrganizationId));
         return legalOrganizations;
     }, [legalOrganizations, currentUser, isAdminForLegalOrg]);
 
-    
-    // --- Funções de LegalOrganization ---
-
-    const handleAdd = () => {
-        setEditingLegalOrg({});
-        setApiError(null);
-        setModalOpen(true);
-    };
-
-    const handleEdit = (legalOrg: LegalOrganization) => {
-        setEditingLegalOrg(legalOrg);
-        setApiError(null);
-        setModalOpen(true);
-    };
-
-    const handleDelete = (legalOrg: LegalOrganization) => {
-        setLegalOrgToDelete(legalOrg);
-        setApiError(null);
-    };
+    // Limpa erro ao abrir modais
+    const openAddModal = () => { setApiError(null); setEditingLegalOrg({}); setModalOpen(true); };
+    const openEditModal = (lo: LegalOrganization) => { setApiError(null); setEditingLegalOrg(lo); setModalOpen(true); };
+    const openDeleteModal = (lo: LegalOrganization) => { setApiError(null); setLegalOrgToDelete(lo); };
 
     const handleSave = async (legalOrgData: LegalOrganizationCreate | LegalOrganization) => {
-        setIsLoading(true);
         try {
             setApiError(null);
             if ('id' in legalOrgData && legalOrgData.id) {
-                // UPDATE
-                await apiService.legalOrganizations.update(String(legalOrgData.id), legalOrgData as LegalOrganizationUpdate);
+                const updated = await apiService.legalOrganizations.update(String(legalOrgData.id), legalOrgData as LegalOrganizationUpdate);
+                setLegalOrganizations(prev => prev.map(lo => String(lo.id) === String(legalOrgData.id) ? updated : lo));
             } else {
-                // CREATE
-                await apiService.legalOrganizations.create(legalOrgData as LegalOrganizationCreate);
+                const created = await apiService.legalOrganizations.create(legalOrgData as LegalOrganizationCreate);
+                setLegalOrganizations(prev => [...prev, created]);
             }
-            
-            // ATUALIZAR TUDO (CRUD REQUER REFRESH NO BACKEND)
-            if (onRefresh) {
-                await onRefresh();
-            }
-            
+            if (onRefresh) onRefresh();
             setModalOpen(false);
             setEditingLegalOrg(null);
         } catch (error: any) {
-            console.error("Erro ao salvar LegalOrganization:", error);
-            setApiError(error.response?.data?.detail || "Erro ao salvar. Verifique se o CNPJ já existe.");
-        } finally {
-            setIsLoading(false);
+            setApiError(error.response?.data?.detail || "Erro ao salvar Matriz.");
+            // NÃO fecha o modal aqui para mostrar o erro
         }
     };
 
     const confirmDelete = async () => {
         if (!legalOrgToDelete) return;
-        setIsLoading(true);
         try {
             setApiError(null);
             await apiService.legalOrganizations.delete(legalOrgToDelete.id);
-            
-            // ATUALIZAR TUDO (CRUD REQUER REFRESH NO BACKEND)
-            if (onRefresh) {
-                await onRefresh();
-            }
-
+            setLegalOrganizations(prev => prev.filter(lo => lo.id !== legalOrgToDelete.id));
+            if (onRefresh) onRefresh();
             setLegalOrgToDelete(null);
         } catch (error: any) {
-            console.error("Erro ao deletar LegalOrganization:", error);
-            setApiError(error.response?.data?.detail || "Não foi possível excluir.");
-            setLegalOrgToDelete(null); 
-        } finally {
-            setIsLoading(false);
+            setApiError(error.response?.data?.detail || "Erro ao excluir. Verifique se há empresas vinculadas.");
+            // NÃO fecha o modal para mostrar o erro
         }
     };
 
-    // --- Funções de Organization (Empresa/Filial) para edição dentro da Matriz ---
-
-    const handleEditCompany = (company: Organization) => {
-        setEditingCompany(company);
-        setApiError(null);
-        setCompanyModalOpen(true);
-    };
-
-    const handleDeleteCompany = (company: Organization) => {
-        setCompanyToDelete(company);
-        setApiError(null);
-    };
+    // --- Organization Functions ---
+    const openAddCompany = () => { setApiError(null); setEditingCompany({}); setCompanyModalOpen(true); } // Se houver botão de add separado
+    const openEditCompany = (org: Organization) => { setApiError(null); setEditingCompany(org); setCompanyModalOpen(true); };
+    const openDeleteCompany = (org: Organization) => { setApiError(null); setCompanyToDelete(org); };
 
     const handleSaveCompany = async (companyData: OrganizationUpdate | Organization) => {
-        setIsLoading(true);
         try {
             setApiError(null);
             if ('id' in companyData && companyData.id) {
-                await apiService.organizations.update(String(companyData.id), companyData as OrganizationUpdate);
+                const updated = await apiService.organizations.update(String(companyData.id), companyData as OrganizationUpdate);
+                setOrganizations(prev => prev.map(org => String(org.id) === String(companyData.id) ? updated : org));
             }
-            
-            // ATUALIZAR TUDO (CRUD REQUER REFRESH NO BACKEND)
-            if (onRefresh) {
-                await onRefresh();
-            }
-
+            if (onRefresh) onRefresh();
             setCompanyModalOpen(false);
             setEditingCompany(null);
         } catch (error: any) {
-             console.error("Erro ao salvar Organization:", error);
             setApiError(error.response?.data?.detail || "Erro ao salvar empresa.");
-        } finally {
-            setIsLoading(false);
+            // NÃO fecha o modal
         }
     };
 
     const confirmDeleteCompany = async () => {
         if (!companyToDelete) return;
-        setIsLoading(true);
         try {
-            setApiError(null);
             await apiService.organizations.delete(companyToDelete.id);
-            
-            // ATUALIZAR TUDO (CRUD REQUER REFRESH NO BACKEND)
-            if (onRefresh) {
-                await onRefresh();
-            }
-
+            setOrganizations(prev => prev.filter(org => org.id !== companyToDelete.id));
+            if (onRefresh) onRefresh();
             setCompanyToDelete(null);
         } catch (error: any) {
-            console.error("Erro ao deletar Organization:", error);
-            setApiError(error.response?.data?.detail || "Não foi possível excluir.");
-            setCompanyToDelete(null);
-        } finally {
-            setIsLoading(false);
+            setApiError(error.response?.data?.detail || "Erro ao excluir empresa.");
+            // NÃO fecha o modal
         }
     };
 
     return (
-        <div className="space-y-6 animate-fade-in relative">
-            {isLoading && (
-                <div className="absolute inset-0 bg-white/50 z-50 flex items-center justify-center backdrop-blur-sm rounded-xl">
-                    <div className="flex flex-col items-center">
-                        <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
-                        <p className="mt-2 text-indigo-700 font-medium">Atualizando dados...</p>
-                    </div>
-                </div>
-            )}
-
+        <div className="space-y-6 animate-fade-in">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
                     <h2 className="text-3xl font-bold text-slate-800">Gerenciar Organizações</h2>
-                    <p className="text-slate-500 mt-1">Adicione, edite e visualize as organizações matriz (pessoas jurídicas).</p>
+                    <p className="text-slate-500 mt-1">Matrizes e empresas filiais do sistema.</p>
                 </div>
-                <button 
-                    onClick={handleAdd} 
-                    disabled={isAdminForLegalOrg}
-                    className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-md shadow-sm hover:bg-indigo-700 transition duration-150 disabled:bg-slate-300 disabled:cursor-not-allowed"
-                >
-                    <PlusIcon />
-                    Nova Organização
+                <button onClick={openAddModal} disabled={isAdminForLegalOrg} className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-md shadow-sm hover:bg-indigo-700 disabled:bg-slate-300">
+                    <PlusIcon /> Nova Organização
                 </button>
             </div>
-
-            {apiError && (
-                <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-md" role="alert">
-                    <p className="font-bold">Erro</p>
-                    <p>{apiError}</p>
-                </div>
-            )}
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {visibleLegalOrgs.map(lo => {
                     const childOrgs = organizations.filter(o => String(o.legalOrganizationId) === String(lo.id));
-                    const canManageCompanies = currentUser.role === 'master' || (currentUser.role === 'admin' && String(currentUser.legalOrganizationId) === String(lo.id));
+                    const canManage = currentUser.role === 'master' || (currentUser.role === 'admin' && String(currentUser.legalOrganizationId) === String(lo.id));
                     return (
                         <div key={lo.id} className="bg-white rounded-xl shadow-md flex flex-col">
-                            <header className="flex items-center justify-between p-4 border-b border-slate-200">
-                                <div>
-                                    <h3 className="text-lg font-bold text-slate-800">{lo.name}</h3>
-                                    {lo.cnpj && <p className="text-sm text-slate-500">CNPJ: {lo.cnpj}</p>}
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <button onClick={() => handleEdit(lo)} className="p-2 text-slate-500 hover:text-indigo-600 rounded-full hover:bg-slate-100 transition" aria-label="Editar organização">
-                                        <EditIcon />
-                                    </button>
-                                    <button 
-                                        onClick={() => handleDelete(lo)} 
-                                        disabled={isAdminForLegalOrg}
-                                        className="p-2 text-slate-500 hover:text-red-600 rounded-full hover:bg-slate-100 transition disabled:text-slate-300 disabled:hover:text-slate-300 disabled:cursor-not-allowed" 
-                                        aria-label="Excluir organização"
-                                    >
-                                        <DeleteIcon />
-                                    </button>
+                            <header className="flex items-center justify-between p-4 border-b">
+                                <div><h3 className="text-lg font-bold text-slate-800">{lo.name}</h3><p className="text-sm text-slate-500">CNPJ: {lo.cnpj}</p></div>
+                                <div className="flex gap-2">
+                                    <button onClick={() => openEditModal(lo)} className="p-2 hover:bg-slate-100 rounded-full text-indigo-600"><EditIcon /></button>
+                                    <button onClick={() => openDeleteModal(lo)} disabled={isAdminForLegalOrg} className="p-2 hover:bg-slate-100 rounded-full text-red-500 disabled:text-slate-300"><DeleteIcon /></button>
                                 </div>
                             </header>
                             <div className="p-4 flex-1">
                                 {(lo.street || lo.city) && (
-                                    <div className="mb-4 text-sm text-slate-600 border-b border-slate-200 pb-4">
-                                        <h4 className="text-sm font-semibold text-slate-600 mb-2">Endereço</h4>
-                                        <address className="not-italic">
-                                            {lo.street}{lo.number && `, ${lo.number}`}<br />
-                                            {lo.neighborhood && `${lo.neighborhood} - `}{lo.city}/{lo.state}<br />
-                                            {lo.zipCode}
-                                        </address>
+                                    <div className="mb-4 text-sm text-slate-600 border-b pb-4">
+                                        <h4 className="font-semibold mb-2">Endereço</h4>
+                                        <address className="not-italic">{lo.street}{lo.number && `, ${lo.number}`}<br />{lo.neighborhood && `${lo.neighborhood} - `}{lo.city}/{lo.state}<br />{lo.zipCode}</address>
                                     </div>
                                 )}
                                 <h4 className="text-sm font-semibold text-slate-600 mb-2">Empresas Vinculadas</h4>
@@ -547,72 +417,64 @@ const LegalOrganizationsView: React.FC<LegalOrganizationsViewProps> = ({
                                     <ul className="space-y-2">
                                         {childOrgs.map(org => (
                                             <li key={org.id} className="flex items-center justify-between p-2 bg-slate-50 rounded-md">
-                                                <p className="text-slate-700">{org.name}</p>
-                                                {canManageCompanies && (
-                                                    <div className="flex items-center gap-1">
-                                                        <button onClick={() => handleEditCompany(org)} className="p-1 text-slate-400 hover:text-indigo-600"><EditIcon /></button>
-                                                        <button onClick={() => handleDeleteCompany(org)} className="p-1 text-slate-400 hover:text-red-600"><DeleteIcon /></button>
+                                                <span className="text-slate-700">{org.name}</span>
+                                                {canManage && (
+                                                    <div className="flex gap-1">
+                                                        <button onClick={() => openEditCompany(org)} className="p-1 text-slate-400 hover:text-indigo-600"><EditIcon /></button>
+                                                        <button onClick={() => openDeleteCompany(org)} className="p-1 text-slate-400 hover:text-red-600"><DeleteIcon /></button>
                                                     </div>
                                                 )}
                                             </li>
                                         ))}
                                     </ul>
-                                ) : (
-                                    <p className="text-sm text-slate-500 text-center py-4">Nenhuma empresa vinculada.</p>
-                                )}
+                                ) : <p className="text-sm text-slate-500 text-center py-4">Nenhuma empresa vinculada.</p>}
                             </div>
                         </div>
                     );
                 })}
-
-                {visibleLegalOrgs.length === 0 && (
-                    <div className="lg:col-span-2 text-center p-6 bg-white rounded-xl shadow-md">
-                        <p className="text-slate-500">Nenhuma organização cadastrada.</p>
-                    </div>
-                )}
             </div>
 
             {isModalOpen && (
-                <Modal title={editingLegalOrg?.id ? 'Editar Organização' : 'Nova Organização'} onClose={() => {setModalOpen(false); setEditingLegalOrg(null)}}>
-                    <LegalOrganizationForm
-                        legalOrganization={editingLegalOrg || {}}
-                        onSave={handleSave}
-                        onCancel={() => { setModalOpen(false); setEditingLegalOrg(null); }}
-                    />
-                    {apiError && <p className="text-red-600 mt-4">{apiError}</p>}
+                <Modal title={editingLegalOrg?.id ? 'Editar Organização' : 'Nova Organização'} onClose={() => setModalOpen(false)}>
+                    {apiError && (
+                        <div className="mb-4 bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded" role="alert">
+                            <p className="font-bold">Atenção</p>
+                            <p>{apiError}</p>
+                        </div>
+                    )}
+                    <LegalOrganizationForm legalOrganization={editingLegalOrg || {}} onSave={handleSave} onCancel={() => setModalOpen(false)} />
                 </Modal>
             )}
 
             {legalOrgToDelete && (
-                <ConfirmationModal
-                    isOpen={!!legalOrgToDelete}
-                    onClose={() => setLegalOrgToDelete(null)}
-                    onConfirm={confirmDelete}
-                    title="Confirmar Exclusão"
-                    message={`Tem certeza que deseja excluir a organização ${legalOrgToDelete.name}? O backend impedirá a exclusão se houver empresas vinculadas.`}
+                <ConfirmationModal 
+                    isOpen={!!legalOrgToDelete} 
+                    onClose={() => setLegalOrgToDelete(null)} 
+                    onConfirm={confirmDelete} 
+                    title="Confirmar Exclusão" 
+                    message={apiError ? `ERRO: ${apiError}` : `Deseja excluir ${legalOrgToDelete.name}?`} 
                 />
             )}
             
             {isCompanyModalOpen && (
-                <Modal title="Editar Empresa" onClose={() => {setCompanyModalOpen(false); setEditingCompany(null)}}>
-                    <OrganizationForm
-                        organization={editingCompany || {}}
-                        onSave={handleSaveCompany}
-                        onCancel={() => { setCompanyModalOpen(false); setEditingCompany(null); }}
-                        legalOrganizations={legalOrganizations}
-                        currentUser={currentUser}
-                    />
-                    {apiError && <p className="text-red-600 mt-4">{apiError}</p>}
+                <Modal title="Editar Empresa" onClose={() => setCompanyModalOpen(false)}>
+                     {apiError && (
+                        <div className="mb-4 bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded" role="alert">
+                            <p className="font-bold">Atenção</p>
+                            <p>{apiError}</p>
+                        </div>
+                    )}
+                    <OrganizationForm organization={editingCompany || {}} onSave={handleSaveCompany} onCancel={() => setCompanyModalOpen(false)} legalOrganizations={legalOrganizations} currentUser={currentUser} />
                 </Modal>
             )}
 
             {companyToDelete && (
-                <ConfirmationModal
-                    isOpen={!!companyToDelete}
-                    onClose={() => setCompanyToDelete(null)}
-                    onConfirm={confirmDeleteCompany}
-                    title="Confirmar Exclusão"
-                    message={`Tem certeza que deseja excluir a empresa ${companyToDelete.name}?`}
+                <ConfirmationModal 
+                    isOpen={!!companyToDelete} 
+                    onClose={() => setCompanyToDelete(null)} 
+                    onConfirm={confirmDeleteCompany} 
+                    title="Confirmar Exclusão" 
+                    message={apiError ? `ERRO: ${apiError}` : `Deseja excluir a empresa ${companyToDelete.name}?`} 
                 />
             )}
         </div>
