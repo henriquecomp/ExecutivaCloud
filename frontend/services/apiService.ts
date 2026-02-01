@@ -8,7 +8,8 @@ import {
     OrganizationCreate, 
     OrganizationUpdate, 
     DepartmentCreate, 
-    DepartmentUpdate 
+    DepartmentUpdate,
+    Executive // Importe a interface Executive
 } from '../types';
 
 // --- Serviço de LegalOrganization ---
@@ -44,9 +45,20 @@ const userService = {
     create: (data: any) => api.post('/users/', data).then(res => res.data),
 };
 
+// --- Serviço de Executivos (NOVO) ---
+// Adicionando endpoints CRUD para executivos
+const executiveService = {
+    getAll: () => api.get<Executive[]>('/users/?role=executive').then(res => res.data), // Ajuste a rota se for /executives/
+    getOne: (id: string) => api.get<Executive>(`/users/${id}`).then(res => res.data),
+    create: (data: any) => api.post<Executive>('/users/', { ...data, role: 'executive' }).then(res => res.data),
+    update: (id: string, data: any) => api.put<Executive>(`/users/${id}`, data).then(res => res.data),
+    delete: (id: string) => api.delete(`/users/${id}`).then(res => res.data),
+};
+
 export const apiService = {
   legalOrganizations: legalOrgService,
   organizations: orgService,
   departments: deptService,
   users: userService,
+  executives: executiveService, // Adicionado aqui
 };

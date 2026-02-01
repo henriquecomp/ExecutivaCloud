@@ -1,37 +1,26 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Executive, Organization, Department, Event, Contact, Expense, Task, User, Secretary, Document } from '../types';
+import React, { useState, useMemo, useEffect } from 'react';
+import { 
+    Executive, 
+    Organization, 
+    Department, 
+    Secretary,
+    User
+} from '../types';
+import { apiService } from '../services/apiService';
+import { 
+    SearchIcon, 
+    PlusIcon, 
+    EditIcon, 
+    DeleteIcon, 
+    UserIcon, 
+    BuildingIcon,
+    ShieldIcon 
+} from './Icons';
 import Modal from './Modal';
 import ConfirmationModal from './ConfirmationModal';
-import { EditIcon, DeleteIcon, PlusIcon, EmailIcon, PhoneIcon, ChevronDownIcon, ExclamationTriangleIcon } from './Icons';
+import Pagination from './Pagination';
 
-// --- Helper Functions ---
-/**
- * Validates a Brazilian CPF number.
- * @param {string} cpf - The CPF string to validate.
- * @returns {boolean} - True if the CPF is valid, false otherwise.
- */
-function validateCPF(cpf: string): boolean {
-    const cpfClean = cpf.replace(/[^\d]+/g, '');
-    if (cpfClean.length !== 11 || /^(\d)\1+$/.test(cpfClean)) return false;
-    let sum = 0;
-    let remainder;
-    for (let i = 1; i <= 9; i++) sum = sum + parseInt(cpfClean.substring(i - 1, i)) * (11 - i);
-    remainder = (sum * 10) % 11;
-    if ((remainder === 10) || (remainder === 11)) remainder = 0;
-    if (remainder !== parseInt(cpfClean.substring(9, 10))) return false;
-    sum = 0;
-    for (let i = 1; i <= 10; i++) sum = sum + parseInt(cpfClean.substring(i - 1, i)) * (12 - i);
-    remainder = (sum * 10) % 11;
-    if ((remainder === 10) || (remainder === 11)) remainder = 0;
-    if (remainder !== parseInt(cpfClean.substring(10, 11))) return false;
-    return true;
-}
-
-/**
- * Applies a CPF mask (###.###.###-##) to a string.
- * @param {string} value - The input string.
- * @returns {string} - The masked string.
- */
+// --- Helper Functions para Máscaras ---
 const maskCPF = (value: string) => {
     return value
         .replace(/\D/g, '')
@@ -41,707 +30,443 @@ const maskCPF = (value: string) => {
         .replace(/(-\d{2})\d+?$/, '$1');
 };
 
-/**
- * Applies a phone mask (+55 (XX) XXXXX-XXXX) to a string.
- * @param {string} value - The input string.
- * @returns {string} - The masked string.
- */
-const maskPhone = (value: string): string => {
-    if (!value) return "";
+const maskPhone = (value: string) => {
     return value
         .replace(/\D/g, '')
-        .replace(/^(\d{2})?(\d{2})?(\d{4,5})?(\d{4})?/, (match, p1, p2, p3, p4) => {
-            let result = '';
-            if (p1) result = `+${p1}`;
-            if (p2) result += ` (${p2})`;
-            if (p3) result += ` ${p3}`;
-            if (p4) result += `-${p4}`;
-            return result;
-        })
-        .substring(0, 19);
+        .replace(/(\d{2})(\d)/, '($1) $2')
+        .replace(/(\d{5})(\d)/, '$1-$2')
+        .replace(/(-\d{4})\d+?$/, '$1');
 };
 
-const civilStatusOptions = ['Solteiro(a)', 'Casado(a)', 'Separado(a)', 'Divorciado(a)', 'Viúvo(a)'];
-
-
 interface ExecutivesViewProps {
-  currentUser: User;
-  executives: Executive[]; // This is visibleExecutives
-  allExecutives: Executive[]; // This is the full list
-  setExecutives: React.Dispatch<React.SetStateAction<Executive[]>>;
-  organizations: Organization[];
-  departments: Department[];
-  secretaries: Secretary[];
-  setSecretaries: React.Dispatch<React.SetStateAction<Secretary[]>>;
-  setEvents: React.Dispatch<React.SetStateAction<Event[]>>;
-  setContacts: React.Dispatch<React.SetStateAction<Contact[]>>;
-  setExpenses: React.Dispatch<React.SetStateAction<Expense[]>>;
-  setTasks: React.Dispatch<React.SetStateAction<Task[]>>;
-  setDocuments: React.Dispatch<React.SetStateAction<Document[]>>;
-  setUsers: React.Dispatch<React.SetStateAction<User[]>>;
+    currentUser: User;
+    executives: Executive[];
+    allExecutives: Executive[]; // Lista completa para referência cruzada
+    setExecutives: React.Dispatch<React.SetStateAction<Executive[]>>;
+    organizations: Organization[];
+    departments: Department[];
+    secretaries: Secretary[];
+    setSecretaries: React.Dispatch<React.SetStateAction<Secretary[]>>;
+    setEvents: any;
+    setContacts: any;
+    setExpenses: any;
+    setTasks: any;
+    setDocuments: any;
+    setUsers: any;
 }
 
-const CollapsibleSection: React.FC<{ title: string; children: React.ReactNode; isOpen: boolean; onToggle: () => void }> = ({ title, children, isOpen, onToggle }) => (
-    <div className="border border-slate-200 rounded-md">
-        <button
-            type="button"
-            onClick={onToggle}
-            className="w-full flex justify-between items-center p-3 bg-slate-50 hover:bg-slate-100 rounded-t-md"
-            aria-expanded={isOpen}
-        >
-            <h3 className="font-semibold text-slate-700">{title}</h3>
-            <ChevronDownIcon className={`w-5 h-5 text-slate-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-        </button>
-        {isOpen && <div className="p-4 space-y-4 border-t border-slate-200">{children}</div>}
-    </div>
-);
+// --- Componente de Formulário (Interno) ---
+interface ExecutiveFormProps {
+    executive?: Executive;
+    organizations: Organization[];
+    departments: Department[];
+    otherExecutives: Executive[];
+    onSave: (data: any) => Promise<void>;
+    onCancel: () => void;
+}
 
-const SensitiveDataWarning: React.FC<{ message?: string }> = ({ message }) => (
-    <div className="p-3 bg-amber-50 border-l-4 border-amber-400 text-amber-800 rounded-r-md">
-        <div className="flex items-start">
-            <ExclamationTriangleIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-            <p className="text-sm">
-                <strong className="font-semibold">Atenção:</strong> {message || 'As informações nesta seção são confidenciais. Manuseie com cuidado e em conformidade com a LGPD.'}
-            </p>
-        </div>
-    </div>
-);
+const ExecutiveForm: React.FC<ExecutiveFormProps> = ({ 
+    executive, 
+    organizations, 
+    departments, 
+    otherExecutives,
+    onSave, 
+    onCancel 
+}) => {
+    const [formData, setFormData] = useState<Partial<Executive>>({
+        fullName: executive?.fullName || '',
+        // Bloco 1: Identificação
+        cpf: executive?.cpf || '',
+        rg: executive?.rg || '',
+        rgIssuer: executive?.rgIssuer || '',
+        rgIssueDate: executive?.rgIssueDate || '',
+        birthDate: executive?.birthDate || '',
+        nationality: executive?.nationality || '',
+        placeOfBirth: executive?.placeOfBirth || '',
+        civilStatus: executive?.civilStatus || '',
+        // Bloco 2: Contato
+        workEmail: executive?.workEmail || '',
+        workPhone: executive?.workPhone || '',
+        extension: executive?.extension || '',
+        personalEmail: executive?.personalEmail || '',
+        personalPhone: executive?.personalPhone || '',
+        address: executive?.address || '',
+        linkedinProfileUrl: executive?.linkedinProfileUrl || '',
+        // Bloco 3: Corporativo
+        jobTitle: executive?.jobTitle || '',
+        organizationId: executive?.organizationId || '',
+        departmentId: executive?.departmentId || '',
+        costCenter: executive?.costCenter || '',
+        reportsToExecutiveId: executive?.reportsToExecutiveId || '',
+        hireDate: executive?.hireDate || '',
+        // Bloco 4: Perfil
+        bio: executive?.bio || '',
+        education: executive?.education || '',
+        languages: executive?.languages || '',
+        // Bloco 5: Emergência
+        emergencyContactName: executive?.emergencyContactName || '',
+        emergencyContactPhone: executive?.emergencyContactPhone || '',
+        emergencyContactRelation: executive?.emergencyContactRelation || '',
+    });
 
-
-const ExecutiveForm: React.FC<{ 
-    executive: Partial<Executive>, 
-    onSave: (executive: Executive) => void, 
-    onCancel: () => void, 
-    organizations: Organization[], 
-    departments: Department[], 
-    executives: Executive[],
-    currentUser: User;
-}> = ({ executive, onSave, onCancel, organizations, departments, executives, currentUser }) => {
-    // Component State
-    const [openSections, setOpenSections] = useState<string[]>(['principal', 'org']);
-    const toggleSection = (section: string) => {
-        setOpenSections(prev => 
-            prev.includes(section) ? prev.filter(s => s !== section) : [...prev, section]
-        );
-    };
-
-    // Form Fields State
-    const [fullName, setFullName] = useState(executive.fullName || '');
-    const [jobTitle, setJobTitle] = useState(executive.jobTitle || '');
-    const [photoUrl, setPhotoUrl] = useState(executive.photoUrl || '');
-
-    // Bloco 1
-    const [cpf, setCpf] = useState(executive.cpf || '');
-    const [cpfError, setCpfError] = useState('');
-    const [rg, setRg] = useState(executive.rg || '');
-    const [rgIssuer, setRgIssuer] = useState(executive.rgIssuer || '');
-    const [rgIssueDate, setRgIssueDate] = useState(executive.rgIssueDate || '');
-    const [birthDate, setBirthDate] = useState(executive.birthDate || '');
-    const [nationality, setNationality] = useState(executive.nationality || '');
-    const [placeOfBirth, setPlaceOfBirth] = useState(executive.placeOfBirth || '');
-    const [motherName, setMotherName] = useState(executive.motherName || '');
-    const [fatherName, setFatherName] = useState(executive.fatherName || '');
-    const [civilStatus, setCivilStatus] = useState(executive.civilStatus || '');
-
-    // Bloco 2
-    const [workEmail, setWorkEmail] = useState(executive.workEmail || '');
-    const [workPhone, setWorkPhone] = useState(executive.workPhone || '');
-    const [extension, setExtension] = useState(executive.extension || '');
-    const [personalEmail, setPersonalEmail] = useState(executive.personalEmail || '');
-    const [personalPhone, setPersonalPhone] = useState(executive.personalPhone || '');
-    const [address, setAddress] = useState(executive.address || '');
-    const [linkedinProfileUrl, setLinkedinProfileUrl] = useState(executive.linkedinProfileUrl || '');
-
-    // Bloco 3
-    const [organizationId, setOrganizationId] = useState(executive.organizationId || '');
-    const [departmentId, setDepartmentId] = useState(executive.departmentId || '');
-    const [costCenter, setCostCenter] = useState(executive.costCenter || '');
-    const [employeeId, setEmployeeId] = useState(executive.employeeId || '');
-    const [reportsToExecutiveId, setReportsToExecutiveId] = useState(executive.reportsToExecutiveId || '');
-    const [hireDate, setHireDate] = useState(executive.hireDate || '');
-    const [workLocation, setWorkLocation] = useState(executive.workLocation || '');
-    const [systemAccessLevels, setSystemAccessLevels] = useState(executive.systemAccessLevels || '');
-
-    // Bloco 4
-    const [bio, setBio] = useState(executive.bio || '');
-    const [education, setEducation] = useState(executive.education || '');
-    const [languages, setLanguages] = useState(executive.languages || '');
-    
-    // Bloco 5
-    const [emergencyContactName, setEmergencyContactName] = useState(executive.emergencyContactName || '');
-    const [emergencyContactPhone, setEmergencyContactPhone] = useState(executive.emergencyContactPhone || '');
-    const [emergencyContactRelation, setEmergencyContactRelation] = useState(executive.emergencyContactRelation || '');
-    const [dependentsInfo, setDependentsInfo] = useState(executive.dependentsInfo || '');
-
-    // Bloco 6
-    const [bankInfo, setBankInfo] = useState(executive.bankInfo || '');
-    const [compensationInfo, setCompensationInfo] = useState(executive.compensationInfo || '');
-    
-    // Errors and Refs
-    const cpfInputRef = useRef<HTMLInputElement>(null);
-    const birthDateRef = useRef<HTMLInputElement>(null);
-    const rgIssueDateRef = useRef<HTMLInputElement>(null);
-    const hireDateRef = useRef<HTMLInputElement>(null);
-    const [birthDateError, setBirthDateError] = useState('');
-    const [rgIssueDateError, setRgIssueDateError] = useState('');
-    const [hireDateError, setHireDateError] = useState('');
-
-    const isSecretaryUser = currentUser.role === 'secretary';
-
-    const visibleOrganizations = useMemo(() => {
-        const isAdminForLegalOrg = currentUser.role === 'admin' && !!currentUser.legalOrganizationId;
-        const isOrgAdmin = currentUser.role === 'admin' && !!currentUser.organizationId;
-
-        if (isAdminForLegalOrg) {
-            return organizations.filter(o => o.legalOrganizationId === currentUser.legalOrganizationId);
-        }
-        if (isOrgAdmin) {
-            return organizations.filter(o => o.id === currentUser.organizationId);
-        }
-        return organizations;
-    }, [organizations, currentUser]);
+    const [activeTab, setActiveTab] = useState('pessoal');
+    const [loading, setLoading] = useState(false);
 
     const filteredDepartments = useMemo(() => {
-        if (!organizationId) return [];
-        return departments.filter(d => d.organizationId === organizationId);
-    }, [organizationId, departments]);
+        if (!formData.organizationId) return [];
+        return departments.filter(d => d.organizationId === formData.organizationId);
+    }, [formData.organizationId, departments]);
 
-    const availableManagers = useMemo(() => {
-        if (!organizationId) return [];
-        return executives.filter(e => 
-            e.organizationId === organizationId && e.id !== executive.id
-        );
-    }, [executives, organizationId, executive.id]);
-    
-    useEffect(() => {
-        const orgIsValid = visibleOrganizations.some(o => o.id === organizationId);
-        if (!orgIsValid) {
-            setOrganizationId('');
-        }
-    }, [organizationId, visibleOrganizations]);
-    
-    useEffect(() => {
-        const deptIsValid = filteredDepartments.some(d => d.id === departmentId);
-        if (!deptIsValid) {
-            setDepartmentId('');
-        }
-    }, [departmentId, filteredDepartments]);
-
-    useEffect(() => {
-        if (reportsToExecutiveId && !availableManagers.some(m => m.id === reportsToExecutiveId)) {
-            setReportsToExecutiveId('');
-        }
-    }, [organizationId, availableManagers, reportsToExecutiveId]);
-
-    const handleCpfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (cpfError) setCpfError('');
-        setCpf(maskCPF(e.target.value));
+    const handleChange = (field: keyof Executive, value: string) => {
+        setFormData(prev => ({ ...prev, [field]: value }));
     };
 
-    const handleCpfBlur = () => {
-        if (cpf && !validateCPF(cpf)) {
-            setCpfError('CPF inválido. Verifique o número e tente novamente.');
-            cpfInputRef.current?.focus();
-        } else {
-            setCpfError('');
-        }
-    };
-
-    const handleDateBlur = (e: React.FocusEvent<HTMLInputElement>, setter: React.Dispatch<React.SetStateAction<string>>, errorSetter: React.Dispatch<React.SetStateAction<string>>) => {
-        const { value, validity } = e.target;
-        if (value && !validity.valid) {
-            errorSetter('Data inválida. Verifique o dia, mês e ano.');
-            setter('');
-            e.target.value = '';
-            e.target.focus();
-        } else {
-            errorSetter('');
-        }
-    };
-
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (birthDateError || rgIssueDateError || hireDateError) {
-            return;
+        setLoading(true);
+        try {
+            await onSave(formData);
+        } catch (error) {
+            console.error("Erro ao salvar:", error);
+            alert("Erro ao salvar executivo. Verifique os dados.");
+        } finally {
+            setLoading(false);
         }
-        if (cpf && !validateCPF(cpf)) {
-            handleCpfBlur();
-            return;
-        }
-        if (!fullName) return;
-        onSave({
-            id: executive.id || `exec_${new Date().getTime()}`,
-            fullName, jobTitle, photoUrl, cpf, rg, rgIssuer, rgIssueDate,
-            birthDate, nationality, placeOfBirth, motherName, fatherName, civilStatus,
-            workEmail, workPhone, extension, personalEmail, personalPhone, address,
-            linkedinProfileUrl, organizationId, departmentId, costCenter, employeeId,
-            reportsToExecutiveId, hireDate, workLocation, systemAccessLevels, bio,
-            education, languages, emergencyContactName, emergencyContactPhone,
-            emergencyContactRelation, dependentsInfo, bankInfo, compensationInfo,
-        });
     };
+
+    const tabs = [
+        { id: 'pessoal', label: 'Dados Pessoais' },
+        { id: 'contato', label: 'Contato' },
+        { id: 'corporativo', label: 'Corporativo' },
+        { id: 'perfil', label: 'Perfil & Outros' },
+    ];
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-4">
-            <CollapsibleSection title="Informações Principais" isOpen={openSections.includes('principal')} onToggle={() => toggleSection('principal')}>
-                <div>
-                    <label htmlFor="fullName" className="block text-sm font-medium text-slate-700">Nome Completo</label>
-                    <input type="text" id="fullName" value={fullName} onChange={e => setFullName(e.target.value)} required className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                     <div>
-                        <label htmlFor="jobTitle" className="block text-sm font-medium text-slate-700">Cargo/Título</label>
-                        <input type="text" id="jobTitle" value={jobTitle} onChange={e => setJobTitle(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
-                    </div>
-                    <div>
-                        <label htmlFor="photoUrl" className="block text-sm font-medium text-slate-700">URL da Foto</label>
-                        <input type="url" id="photoUrl" value={photoUrl} onChange={e => setPhotoUrl(e.target.value)} placeholder="https://..." className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
-                    </div>
-                </div>
-            </CollapsibleSection>
+        <form onSubmit={handleSubmit} className="flex flex-col h-full max-h-[70vh]">
+            {/* Abas */}
+            <div className="flex border-b border-gray-200 mb-4 overflow-x-auto">
+                {tabs.map(tab => (
+                    <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => setActiveTab(tab.id)}
+                        className={`px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+                            activeTab === tab.id 
+                            ? 'border-blue-600 text-blue-600' 
+                            : 'border-transparent text-gray-500 hover:text-gray-700'
+                        }`}
+                    >
+                        {tab.label}
+                    </button>
+                ))}
+            </div>
 
-            <CollapsibleSection title="Identificação Pessoal (Confidencial)" isOpen={openSections.includes('identificacao')} onToggle={() => toggleSection('identificacao')}>
-                <SensitiveDataWarning />
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label htmlFor="birthDate" className="block text-sm font-medium text-slate-700">Data de Nascimento</label>
-                        <input ref={birthDateRef} type="date" id="birthDate" value={birthDate} onChange={e => setBirthDate(e.target.value)} onBlur={e => handleDateBlur(e, setBirthDate, setBirthDateError)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
-                        {birthDateError && <p className="mt-1 text-xs text-red-600">{birthDateError}</p>}
-                    </div>
-                    <div>
-                        <label htmlFor="civilStatus" className="block text-sm font-medium text-slate-700">Estado Civil</label>
-                        <select id="civilStatus" value={civilStatus} onChange={e => setCivilStatus(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-                            <option value="">Selecione...</option>
-                            {civilStatusOptions.map(o => <option key={o} value={o}>{o}</option>)}
-                        </select>
-                    </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label htmlFor="nationality" className="block text-sm font-medium text-slate-700">Nacionalidade</label>
-                        <input type="text" id="nationality" value={nationality} onChange={e => setNationality(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
-                    </div>
-                    <div>
-                        <label htmlFor="placeOfBirth" className="block text-sm font-medium text-slate-700">Naturalidade (Cidade/UF)</label>
-                        <input type="text" id="placeOfBirth" value={placeOfBirth} onChange={e => setPlaceOfBirth(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
-                    </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                     <div>
-                        <label htmlFor="cpf" className="block text-sm font-medium text-slate-700">CPF</label>
-                        <input
-                            ref={cpfInputRef}
-                            type="text"
-                            id="cpf"
-                            value={cpf}
-                            onChange={handleCpfChange}
-                            onBlur={handleCpfBlur}
-                            className={`mt-1 block w-full px-3 py-2 bg-white border ${cpfError ? 'border-red-500' : 'border-slate-300'} rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
-                        />
-                        {cpfError && <p className="mt-1 text-xs text-red-600">{cpfError}</p>}
-                    </div>
-                    <div>
-                        <label htmlFor="rg" className="block text-sm font-medium text-slate-700">RG</label>
-                        <input type="text" id="rg" value={rg} onChange={e => setRg(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
-                    </div>
-                </div>
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                     <div>
-                        <label htmlFor="rgIssuer" className="block text-sm font-medium text-slate-700">Órgão Emissor RG</label>
-                        <input type="text" id="rgIssuer" value={rgIssuer} onChange={e => setRgIssuer(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
-                    </div>
-                    <div>
-                        <label htmlFor="rgIssueDate" className="block text-sm font-medium text-slate-700">Data de Expedição RG</label>
-                        <input ref={rgIssueDateRef} type="date" id="rgIssueDate" value={rgIssueDate} onChange={e => setRgIssueDate(e.target.value)} onBlur={e => handleDateBlur(e, setRgIssueDate, setRgIssueDateError)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
-                        {rgIssueDateError && <p className="mt-1 text-xs text-red-600">{rgIssueDateError}</p>}
-                    </div>
-                </div>
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                     <div>
-                        <label htmlFor="motherName" className="block text-sm font-medium text-slate-700">Nome da Mãe</label>
-                        <input type="text" id="motherName" value={motherName} onChange={e => setMotherName(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
-                    </div>
-                    <div>
-                        <label htmlFor="fatherName" className="block text-sm font-medium text-slate-700">Nome do Pai</label>
-                        <input type="text" id="fatherName" value={fatherName} onChange={e => setFatherName(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
-                    </div>
-                </div>
-            </CollapsibleSection>
-
-            <CollapsibleSection title="Detalhes Organizacionais" isOpen={openSections.includes('org')} onToggle={() => toggleSection('org')}>
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label htmlFor="organizationId" className="block text-sm font-medium text-slate-700">Empresa</label>
-                        <select 
-                            id="organizationId" 
-                            value={organizationId} 
-                            onChange={e => {setOrganizationId(e.target.value); setDepartmentId('');}} 
-                            disabled={isSecretaryUser}
-                            className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm disabled:bg-slate-100 disabled:cursor-not-allowed"
-                        >
-                            <option value="">Sem Empresa</option>
-                            {visibleOrganizations.map(org => <option key={org.id} value={org.id}>{org.name}</option>)}
-                        </select>
-                    </div>
-                     <div>
-                        <label htmlFor="departmentId" className="block text-sm font-medium text-slate-700">Departamento</label>
-                        <select 
-                            id="departmentId" 
-                            value={departmentId} 
-                            onChange={e => setDepartmentId(e.target.value)} 
-                            disabled={isSecretaryUser || !organizationId || filteredDepartments.length === 0} 
-                            className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm disabled:bg-slate-100 disabled:cursor-not-allowed"
-                        >
-                            <option value="">Sem Departamento</option>
-                            {filteredDepartments.map(dept => <option key={dept.id} value={dept.id}>{dept.name}</option>)}
-                        </select>
-                    </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label htmlFor="employeeId" className="block text-sm font-medium text-slate-700">Matrícula / ID</label>
-                        <input 
-                            type="text" 
-                            id="employeeId" 
-                            value={employeeId} 
-                            onChange={e => setEmployeeId(e.target.value)} 
-                            disabled={isSecretaryUser}
-                            className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm disabled:bg-slate-100 disabled:cursor-not-allowed" 
-                        />
-                    </div>
-                    <div>
-                        <label htmlFor="hireDate" className="block text-sm font-medium text-slate-700">Data de Admissão</label>
-                        <input 
-                            ref={hireDateRef}
-                            type="date" 
-                            id="hireDate" 
-                            value={hireDate} 
-                            onChange={e => setHireDate(e.target.value)} 
-                            onBlur={e => handleDateBlur(e, setHireDate, setHireDateError)}
-                            disabled={isSecretaryUser}
-                            className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm disabled:bg-slate-100 disabled:cursor-not-allowed" 
-                        />
-                         {hireDateError && <p className="mt-1 text-xs text-red-600">{hireDateError}</p>}
-                    </div>
-                </div>
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label htmlFor="workLocation" className="block text-sm font-medium text-slate-700">Local de Trabalho</label>
-                        <input 
-                            type="text" 
-                            id="workLocation" 
-                            value={workLocation} 
-                            onChange={e => setWorkLocation(e.target.value)} 
-                            disabled={isSecretaryUser}
-                            className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm disabled:bg-slate-100 disabled:cursor-not-allowed" 
-                        />
-                    </div>
-                    <div>
-                        <label htmlFor="reportsToExecutiveId" className="block text-sm font-medium text-slate-700">Gestor Direto</label>
-                        <select 
-                            id="reportsToExecutiveId" 
-                            value={reportsToExecutiveId} 
-                            onChange={e => setReportsToExecutiveId(e.target.value)} 
-                            disabled={isSecretaryUser || !organizationId}
-                            className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm disabled:bg-slate-100 disabled:cursor-not-allowed"
-                        >
-                            <option value="">Ninguém (nível mais alto)</option>
-                            {availableManagers.map(e => (
-                                <option key={e.id} value={e.id}>{e.fullName}</option>
-                            ))}
-                        </select>
-                    </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label htmlFor="costCenter" className="block text-sm font-medium text-slate-700">Centro de Custo</label>
-                        <input 
-                            type="text" 
-                            id="costCenter" 
-                            value={costCenter} 
-                            onChange={e => setCostCenter(e.target.value)} 
-                            disabled={isSecretaryUser}
-                            className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm disabled:bg-slate-100 disabled:cursor-not-allowed" 
-                        />
-                    </div>
-                    <div>
-                        <label htmlFor="systemAccessLevels" className="block text-sm font-medium text-slate-700">Níveis de Acesso</label>
-                        <input 
-                            type="text" 
-                            id="systemAccessLevels" 
-                            value={systemAccessLevels} 
-                            onChange={e => setSystemAccessLevels(e.target.value)} 
-                            disabled={isSecretaryUser}
-                            className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm disabled:bg-slate-100 disabled:cursor-not-allowed" 
-                        />
-                    </div>
-                </div>
-            </CollapsibleSection>
-
-            <CollapsibleSection title="Informações de Contato" isOpen={openSections.includes('contato')} onToggle={() => toggleSection('contato')}>
-                <fieldset className="border border-slate-200 p-3 rounded-md">
-                    <legend className="text-sm font-medium text-slate-600 px-1">Contato Corporativo</legend>
-                    <div className="space-y-4 pt-2">
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label htmlFor="workEmail" className="block text-sm font-medium text-slate-700">E-mail</label>
-                                <input type="email" id="workEmail" value={workEmail} onChange={e => setWorkEmail(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
-                            </div>
-                            <div>
-                                <label htmlFor="workPhone" className="block text-sm font-medium text-slate-700">Telefone</label>
-                                <input type="tel" id="workPhone" value={workPhone} onChange={e => setWorkPhone(maskPhone(e.target.value))} placeholder="+55 (XX) XXXXX-XXXX" className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
-                            </div>
-                         </div>
-                         <div>
-                            <label htmlFor="extension" className="block text-sm font-medium text-slate-700">Ramal</label>
-                            <input type="text" id="extension" value={extension} onChange={e => setExtension(e.target.value)} className="mt-1 block w-full max-w-xs px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
-                        </div>
-                    </div>
-                </fieldset>
-                 <fieldset className="border border-slate-200 p-3 rounded-md">
-                    <legend className="text-sm font-medium text-slate-600 px-1">Contato Pessoal & Social</legend>
-                     <div className="space-y-4 pt-2">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label htmlFor="personalEmail" className="block text-sm font-medium text-slate-700">E-mail Pessoal</label>
-                                <input type="email" id="personalEmail" value={personalEmail} onChange={e => setPersonalEmail(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
-                            </div>
-                            <div>
-                                <label htmlFor="personalPhone" className="block text-sm font-medium text-slate-700">Telefone Pessoal</label>
-                                <input type="tel" id="personalPhone" value={personalPhone} onChange={e => setPersonalPhone(maskPhone(e.target.value))} placeholder="+55 (XX) XXXXX-XXXX" className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
-                            </div>
-                        </div>
-                         <div>
-                            <label htmlFor="address" className="block text-sm font-medium text-slate-700">Endereço Residencial</label>
-                            <textarea id="address" value={address} onChange={e => setAddress(e.target.value)} rows={3} placeholder="Rua, Número, Bairro, Cidade, UF, CEP" className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"></textarea>
-                        </div>
+            {/* Conteúdo das Abas com Scroll */}
+            <div className="flex-1 overflow-y-auto px-2 space-y-4">
+                {activeTab === 'pessoal' && (
+                    <div className="space-y-4">
                         <div>
-                            <label htmlFor="linkedinProfileUrl" className="block text-sm font-medium text-slate-700">Perfil do LinkedIn</label>
-                            <input type="url" id="linkedinProfileUrl" value={linkedinProfileUrl} onChange={e => setLinkedinProfileUrl(e.target.value)} placeholder="https://linkedin.com/in/..." className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                            <label className="block text-sm font-medium text-gray-700">Nome Completo *</label>
+                            <input required type="text" className="mt-1 block w-full p-2 border border-gray-300 rounded-md"
+                                value={formData.fullName} onChange={e => handleChange('fullName', e.target.value)} />
                         </div>
-                     </div>
-                </fieldset>
-            </CollapsibleSection>
-
-            <CollapsibleSection title="Perfil Público" isOpen={openSections.includes('perfil')} onToggle={() => toggleSection('perfil')}>
-                 <div>
-                    <label htmlFor="bio" className="block text-sm font-medium text-slate-700">Biografia Curta</label>
-                    <textarea id="bio" value={bio} onChange={e => setBio(e.target.value)} rows={4} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"></textarea>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label htmlFor="education" className="block text-sm font-medium text-slate-700">Formação Acadêmica</label>
-                        <input type="text" id="education" value={education} onChange={e => setEducation(e.target.value)} placeholder="Ex: MBA em Gestão, USP" className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
-                    </div>
-                    <div>
-                        <label htmlFor="languages" className="block text-sm font-medium text-slate-700">Idiomas</label>
-                        <input type="text" id="languages" value={languages} onChange={e => setLanguages(e.target.value)} placeholder="Ex: Português, Inglês" className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
-                    </div>
-                </div>
-            </CollapsibleSection>
-
-            <CollapsibleSection title="Dependentes e Emergência (Confidencial)" isOpen={openSections.includes('emergencia')} onToggle={() => toggleSection('emergencia')}>
-                <SensitiveDataWarning />
-                <fieldset className="border border-slate-200 p-3 rounded-md">
-                    <legend className="text-sm font-medium text-slate-600 px-1">Contato de Emergência</legend>
-                    <div className="space-y-4 pt-2">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <label htmlFor="emergencyContactName" className="block text-sm font-medium text-slate-700">Nome do Contato</label>
-                                <input type="text" id="emergencyContactName" value={emergencyContactName} onChange={e => setEmergencyContactName(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                                <label className="block text-sm font-medium text-gray-700">CPF</label>
+                                <input type="text" className="mt-1 block w-full p-2 border border-gray-300 rounded-md"
+                                    value={formData.cpf} onChange={e => handleChange('cpf', maskCPF(e.target.value))} />
                             </div>
                             <div>
-                                <label htmlFor="emergencyContactPhone" className="block text-sm font-medium text-slate-700">Telefone</label>
-                                <input type="tel" id="emergencyContactPhone" value={emergencyContactPhone} onChange={e => setEmergencyContactPhone(maskPhone(e.target.value))} placeholder="+55 (XX) XXXXX-XXXX" className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                                <label className="block text-sm font-medium text-gray-700">Data de Nascimento</label>
+                                <input type="date" className="mt-1 block w-full p-2 border border-gray-300 rounded-md"
+                                    value={formData.birthDate} onChange={e => handleChange('birthDate', e.target.value)} />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">RG</label>
+                                <input type="text" className="mt-1 block w-full p-2 border border-gray-300 rounded-md"
+                                    value={formData.rg} onChange={e => handleChange('rg', e.target.value)} />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Estado Civil</label>
+                                <select className="mt-1 block w-full p-2 border border-gray-300 rounded-md"
+                                    value={formData.civilStatus} onChange={e => handleChange('civilStatus', e.target.value)}>
+                                    <option value="">Selecione</option>
+                                    <option value="Solteiro(a)">Solteiro(a)</option>
+                                    <option value="Casado(a)">Casado(a)</option>
+                                    <option value="Divorciado(a)">Divorciado(a)</option>
+                                    <option value="Viúvo(a)">Viúvo(a)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'contato' && (
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Email Corporativo</label>
+                                <input type="email" className="mt-1 block w-full p-2 border border-gray-300 rounded-md"
+                                    value={formData.workEmail} onChange={e => handleChange('workEmail', e.target.value)} />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Telefone Corporativo</label>
+                                <input type="text" className="mt-1 block w-full p-2 border border-gray-300 rounded-md"
+                                    value={formData.workPhone} onChange={e => handleChange('workPhone', maskPhone(e.target.value))} />
                             </div>
                         </div>
                         <div>
-                            <label htmlFor="emergencyContactRelation" className="block text-sm font-medium text-slate-700">Relação/Parentesco</label>
-                            <input type="text" id="emergencyContactRelation" value={emergencyContactRelation} onChange={e => setEmergencyContactRelation(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                            <label className="block text-sm font-medium text-gray-700">LinkedIn URL</label>
+                            <input type="url" className="mt-1 block w-full p-2 border border-gray-300 rounded-md"
+                                value={formData.linkedinProfileUrl} onChange={e => handleChange('linkedinProfileUrl', e.target.value)} />
                         </div>
                     </div>
-                </fieldset>
-                <fieldset className="border border-slate-200 p-3 rounded-md">
-                    <legend className="text-sm font-medium text-slate-600 px-1">Dependentes</legend>
-                    <div className="pt-2">
-                        <label htmlFor="dependentsInfo" className="block text-sm font-medium text-slate-700">Informações dos Dependentes</label>
-                        <textarea id="dependentsInfo" value={dependentsInfo} onChange={e => setDependentsInfo(e.target.value)} rows={3} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"></textarea>
-                    </div>
-                </fieldset>
-            </CollapsibleSection>
+                )}
 
-             <CollapsibleSection title="Dados Financeiros (Confidencial)" isOpen={openSections.includes('financeiro')} onToggle={() => toggleSection('financeiro')}>
-                <SensitiveDataWarning message="As informações financeiras são extremamente sensíveis. Garanta que o acesso é restrito e necessário." />
-                <div>
-                    <label htmlFor="bankInfo" className="block text-sm font-medium text-slate-700">Dados Bancários para Pagamento</label>
-                    <textarea id="bankInfo" value={bankInfo} onChange={e => setBankInfo(e.target.value)} rows={3} placeholder="Banco, agência, conta, etc." className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"></textarea>
-                </div>
-                 <div>
-                    <label htmlFor="compensationInfo" className="block text-sm font-medium text-slate-700">Informações de Remuneração</label>
-                    <textarea id="compensationInfo" value={compensationInfo} onChange={e => setCompensationInfo(e.target.value)} rows={3} placeholder="Salário, bônus, stock options, etc." className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"></textarea>
-                </div>
-            </CollapsibleSection>
-            
-            <div className="flex justify-end space-x-3 pt-4">
-                <button type="button" onClick={onCancel} className="px-4 py-2 bg-slate-200 text-slate-800 rounded-md hover:bg-slate-300 transition">Cancelar</button>
-                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition">Salvar Executivo</button>
+                {activeTab === 'corporativo' && (
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Cargo</label>
+                                <input type="text" className="mt-1 block w-full p-2 border border-gray-300 rounded-md"
+                                    value={formData.jobTitle} onChange={e => handleChange('jobTitle', e.target.value)} />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Organização</label>
+                                <select className="mt-1 block w-full p-2 border border-gray-300 rounded-md"
+                                    value={formData.organizationId}
+                                    onChange={e => {
+                                        handleChange('organizationId', e.target.value);
+                                        handleChange('departmentId', '');
+                                    }}>
+                                    <option value="">Selecione...</option>
+                                    {organizations.map(org => (
+                                        <option key={org.id} value={org.id}>{org.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Departamento</label>
+                                <select className="mt-1 block w-full p-2 border border-gray-300 rounded-md"
+                                    value={formData.departmentId}
+                                    onChange={e => handleChange('departmentId', e.target.value)}
+                                    disabled={!formData.organizationId}>
+                                    <option value="">Selecione...</option>
+                                    {filteredDepartments.map(dept => (
+                                        <option key={dept.id} value={dept.id}>{dept.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Data de Admissão</label>
+                                <input type="date" className="mt-1 block w-full p-2 border border-gray-300 rounded-md"
+                                    value={formData.hireDate} onChange={e => handleChange('hireDate', e.target.value)} />
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'perfil' && (
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Bio / Resumo</label>
+                            <textarea rows={3} className="mt-1 block w-full p-2 border border-gray-300 rounded-md"
+                                value={formData.bio} onChange={e => handleChange('bio', e.target.value)} />
+                        </div>
+                        <h4 className="font-medium text-gray-900 border-t pt-4 mt-2">Contato de Emergência</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Nome</label>
+                                <input type="text" className="mt-1 block w-full p-2 border border-gray-300 rounded-md"
+                                    value={formData.emergencyContactName} onChange={e => handleChange('emergencyContactName', e.target.value)} />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Telefone</label>
+                                <input type="text" className="mt-1 block w-full p-2 border border-gray-300 rounded-md"
+                                    value={formData.emergencyContactPhone} onChange={e => handleChange('emergencyContactPhone', maskPhone(e.target.value))} />
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Rodapé do Modal */}
+            <div className="flex justify-end gap-3 pt-4 border-t mt-4">
+                <button type="button" onClick={onCancel} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">
+                    Cancelar
+                </button>
+                <button type="submit" disabled={loading} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50">
+                    {loading ? 'Salvando...' : 'Salvar'}
+                </button>
             </div>
         </form>
     );
 };
 
-const ExecutivesView: React.FC<ExecutivesViewProps> = ({ currentUser, executives, allExecutives, setExecutives, organizations, departments, secretaries, setSecretaries, setEvents, setContacts, setExpenses, setTasks, setDocuments, setUsers }) => {
-    const [isModalOpen, setModalOpen] = useState(false);
-    const [editingExecutive, setEditingExecutive] = useState<Partial<Executive> | null>(null);
+// --- Componente Principal ---
+const ExecutivesView: React.FC<ExecutivesViewProps> = ({ 
+    executives, 
+    organizations, 
+    departments,
+    allExecutives,
+    setExecutives // Usado para atualizar o estado local se necessário após refetch
+}) => {
+    // Estado local para controle da UI
+    const [searchTerm, setSearchTerm] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 8;
+    
+    // Estados de Modais
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [executiveToEdit, setExecutiveToEdit] = useState<Executive | undefined>(undefined);
     const [executiveToDelete, setExecutiveToDelete] = useState<Executive | null>(null);
 
-    const isSecretaryUser = currentUser.role === 'secretary';
-
-    const handleAddExecutive = () => {
-        setEditingExecutive({});
-        setModalOpen(true);
+    // Refresh data manual para garantir sincronia (opcional se App.tsx já gerencia)
+    const refreshData = async () => {
+        try {
+            const data = await (apiService as any).executives.getAll();
+            setExecutives(data);
+        } catch (e) { console.error(e); }
     };
 
-    const handleEditExecutive = (executive: Executive) => {
-        setEditingExecutive(executive);
-        setModalOpen(true);
+    const filteredExecutives = useMemo(() => {
+        return executives.filter(exec => 
+            exec.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            exec.workEmail?.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+    }, [executives, searchTerm]);
+
+    const paginatedExecutives = useMemo(() => {
+        const start = (currentPage - 1) * itemsPerPage;
+        return filteredExecutives.slice(start, start + itemsPerPage);
+    }, [filteredExecutives, currentPage]);
+
+    const handleSave = async (data: any) => {
+        try {
+            if (executiveToEdit) {
+                await (apiService as any).executives.update(executiveToEdit.id, data);
+            } else {
+                await (apiService as any).executives.create(data);
+            }
+            setIsModalOpen(false);
+            setExecutiveToEdit(undefined);
+            refreshData(); // Atualiza a lista
+        } catch (error) {
+            console.error("Erro ao salvar:", error);
+            throw error;
+        }
     };
 
-    const handleDeleteClick = (executive: Executive) => {
-        setExecutiveToDelete(executive);
-    };
-
-    const confirmDelete = () => {
-        if (executiveToDelete) {
-            const id = executiveToDelete.id;
-            // Delete the executive
-            setExecutives(execs => execs.filter(e => e.id !== id));
-            // Delete the user
-            setUsers(users => users.filter(u => u.executiveId !== id));
-            // Unlink from secretaries
-            setSecretaries(secs => secs.map(sec => ({
-                ...sec,
-                executiveIds: sec.executiveIds.filter(execId => execId !== id)
-            })));
-            // Cascade delete for all related data
-            setEvents(prev => prev.filter(item => item.executiveId !== id));
-            setContacts(prev => prev.filter(item => item.executiveId !== id));
-            setExpenses(prev => prev.filter(item => item.executiveId !== id));
-            setTasks(prev => prev.filter(item => item.executiveId !== id));
-            setDocuments(prev => prev.filter(item => item.executiveId !== id));
+    const handleDelete = async () => {
+        if (!executiveToDelete) return;
+        try {
+            await (apiService as any).executives.delete(executiveToDelete.id);
             setExecutiveToDelete(null);
+            refreshData();
+        } catch (error) {
+            console.error("Erro ao excluir:", error);
+            alert("Erro ao excluir executivo.");
         }
-    };
-    
-    const handleSaveExecutive = (executive: Executive) => {
-        if (editingExecutive && editingExecutive.id) {
-            setExecutives(execs => execs.map(e => e.id === executive.id ? executive : e));
-            setUsers(users => users.map(u => u.executiveId === executive.id ? { ...u, fullName: executive.fullName } : u));
-        } else {
-            setExecutives(execs => [...execs, executive]);
-            setUsers(users => [...users, {
-                id: `user_exec_${executive.id}`,
-                fullName: executive.fullName,
-                role: 'executive',
-                executiveId: executive.id,
-            }]);
-        }
-        setModalOpen(false);
-        setEditingExecutive(null);
     };
 
-    const getExecutiveDetails = (exec: Executive) => {
-        const org = organizations.find(o => o.id === exec.organizationId);
-        const dept = departments.find(d => d.id === exec.departmentId);
-        return `${org ? org.name : 'N/A'}${dept ? ` / ${dept.name}` : ''}`;
+    const openNewModal = () => {
+        setExecutiveToEdit(undefined);
+        setIsModalOpen(true);
+    };
+
+    const openEditModal = (exec: Executive) => {
+        setExecutiveToEdit(exec);
+        setIsModalOpen(true);
     };
 
     return (
-        <div className="space-y-6 animate-fade-in">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="p-6 max-w-7xl mx-auto space-y-6">
+            <div className="flex justify-between items-center">
                 <div>
-                    <h2 className="text-3xl font-bold text-slate-800">Gerenciar Executivos</h2>
-                    <p className="text-slate-500 mt-1">Adicione, edite e visualize os executivos que você gerencia.</p>
+                    <h1 className="text-2xl font-bold text-gray-800">Executivos</h1>
+                    <p className="text-gray-500">Gerencie o cadastro completo dos executivos.</p>
                 </div>
                 <button 
-                    onClick={handleAddExecutive} 
-                    className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-md shadow-sm hover:bg-indigo-700 transition duration-150 disabled:bg-slate-300 disabled:cursor-not-allowed"
-                    disabled={isSecretaryUser}
+                    onClick={openNewModal}
+                    className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
                 >
-                    <PlusIcon />
-                    Novo Executivo
+                    <PlusIcon className="w-5 h-5" /> Novo Executivo
                 </button>
             </div>
 
-            <div className="bg-white p-4 rounded-xl shadow-md">
-                 <div className="overflow-x-auto">
-                    <table className="w-full text-left">
-                        <thead className="border-b-2 border-slate-200 text-sm text-slate-500">
-                            <tr>
-                                <th className="p-3">Nome</th>
-                                <th className="p-3 hidden md:table-cell">Empresa / Departamento</th>
-                                <th className="p-3 hidden lg:table-cell">Contato</th>
-                                <th className="p-3 text-right">Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {executives.map(exec => (
-                                <tr key={exec.id} className="border-b border-slate-100 hover:bg-slate-50">
-                                    <td className="p-3 font-medium text-slate-800">
-                                        {exec.fullName}
-                                        {exec.jobTitle && <p className="font-normal text-sm text-slate-500">{exec.jobTitle}</p>}
-                                    </td>
-                                    <td className="p-3 hidden md:table-cell text-slate-600">{getExecutiveDetails(exec)}</td>
-                                    <td className="p-3 hidden lg:table-cell text-slate-600 text-sm">
-                                        {exec.workEmail && <p className="flex items-center gap-2"><EmailIcon className="text-slate-400" /> {exec.workEmail}</p>}
-                                        {exec.workPhone && <p className="flex items-center gap-2 mt-1"><PhoneIcon className="text-slate-400" /> {exec.workPhone}</p>}
-                                    </td>
-                                    <td className="p-3 text-right">
-                                        <div className="flex justify-end items-center gap-2">
-                                            <button onClick={() => handleEditExecutive(exec)} className="p-2 text-slate-500 hover:text-indigo-600 rounded-full hover:bg-slate-200 transition" aria-label="Editar executivo">
-                                                <EditIcon />
-                                            </button>
-                                            <button 
-                                                onClick={() => handleDeleteClick(exec)} 
-                                                className="p-2 text-slate-500 hover:text-red-600 rounded-full hover:bg-slate-200 transition disabled:text-slate-300 disabled:hover:text-slate-300 disabled:cursor-not-allowed" 
-                                                aria-label="Excluir executivo"
-                                                disabled={isSecretaryUser}
-                                            >
-                                                <DeleteIcon />
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                    {executives.length === 0 && <p className="text-center p-6 text-slate-500">Nenhum executivo cadastrado.</p>}
-                </div>
+            <div className="relative">
+                <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                    type="text"
+                    placeholder="Buscar por nome ou e-mail..."
+                    className="w-full pl-10 pr-4 py-2 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                />
             </div>
 
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {paginatedExecutives.map(exec => (
+                    <div key={exec.id} className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+                        <div className="flex justify-between mb-4">
+                            <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-lg">
+                                {exec.fullName.charAt(0)}
+                            </div>
+                            <div className="flex gap-2">
+                                <button onClick={() => openEditModal(exec)} className="p-1 text-gray-400 hover:text-blue-600">
+                                    <EditIcon className="w-4 h-4" />
+                                </button>
+                                <button onClick={() => setExecutiveToDelete(exec)} className="p-1 text-gray-400 hover:text-red-600">
+                                    <DeleteIcon className="w-4 h-4" />
+                                </button>
+                            </div>
+                        </div>
+                        <h3 className="font-semibold text-gray-800 truncate" title={exec.fullName}>{exec.fullName}</h3>
+                        <p className="text-sm text-blue-600 font-medium truncate">{exec.jobTitle || 'Sem cargo'}</p>
+                        <div className="mt-4 space-y-2 text-sm text-gray-500">
+                            <div className="flex items-center gap-2">
+                                <BuildingIcon className="w-4 h-4 shrink-0" /> 
+                                <span className="truncate">{organizations.find(o => o.id === exec.organizationId)?.name || 'N/A'}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <ShieldIcon className="w-4 h-4 shrink-0" /> 
+                                <span className="truncate">{exec.workEmail || 'Sem email'}</span>
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            <Pagination 
+                currentPage={currentPage} 
+                totalPages={Math.ceil(filteredExecutives.length / itemsPerPage)} 
+                onPageChange={setCurrentPage} 
+            />
+
+            {/* CORREÇÃO APLICADA AQUI: Renderização Condicional do Modal */}
             {isModalOpen && (
-                <Modal title={editingExecutive?.id ? 'Editar Executivo' : 'Novo Executivo'} onClose={() => setModalOpen(false)}>
-                    <ExecutiveForm 
-                        executive={editingExecutive || {}} 
-                        onSave={handleSaveExecutive} 
-                        onCancel={() => { setModalOpen(false); setEditingExecutive(null); }}
+                <Modal
+                    onClose={() => setIsModalOpen(false)}
+                    title={executiveToEdit ? "Editar Executivo" : "Novo Executivo"}
+                >
+                    <ExecutiveForm
+                        executive={executiveToEdit}
                         organizations={organizations}
                         departments={departments}
-                        executives={allExecutives}
-                        currentUser={currentUser}
+                        otherExecutives={allExecutives.filter(e => e.id !== executiveToEdit?.id)}
+                        onSave={handleSave}
+                        onCancel={() => setIsModalOpen(false)}
                     />
                 </Modal>
             )}
 
-            {executiveToDelete && (
-                 <ConfirmationModal
-                    isOpen={!!executiveToDelete}
-                    onClose={() => setExecutiveToDelete(null)}
-                    onConfirm={confirmDelete}
-                    title="Confirmar Exclusão"
-                    message={`Tem certeza que deseja excluir o executivo ${executiveToDelete.fullName}? Todos os seus dados (eventos, contatos, etc), vínculos com secretárias e seu acesso de usuário serão perdidos.`}
-                />
-            )}
+            <ConfirmationModal
+                isOpen={!!executiveToDelete}
+                onClose={() => setExecutiveToDelete(null)}
+                onConfirm={handleDelete}
+                title="Excluir Executivo"
+                message={`Tem certeza que deseja excluir ${executiveToDelete?.fullName}?`}
+            />
         </div>
     );
 };

@@ -1,26 +1,31 @@
 # main.py
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-# Importa o roteador de usuários que acabamos de criar
-from app.routers import user, login, legal_organization, organization, department
 
-app = FastAPI(
-    title="Executiva Cloud API",
-    description="Executiva Cloud API"
+# Importa o roteador de usuários que acabamos de criar
+from app.routers import (
+    user,
+    login,
+    legal_organization,
+    organization,
+    department,
+    executive,
 )
 
+app = FastAPI(title="Executiva Cloud API", description="Executiva Cloud API")
+
 origins = [
-    "http://localhost:3000",        # Exemplo de um frontend React/Vue/Angular em desenvolvimento
-    "https://seusite-frontend.com", # Exemplo de domínio em produção
+    "http://localhost:3000",  # Exemplo de um frontend React/Vue/Angular em desenvolvimento
+    "https://seusite-frontend.com",  # Exemplo de domínio em produção
     # Adicione outras origens aqui, se necessário
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,          # Lista de origens permitidas
-    allow_credentials=True,         # Permite cookies e cabeçalhos de autenticação
-    allow_methods=["*"],            # Permite todos os métodos (GET, POST, PUT, DELETE, etc)
-    allow_headers=["*"],            # Permite todos os cabeçalhos
+    allow_origins=origins,  # Lista de origens permitidas
+    allow_credentials=True,  # Permite cookies e cabeçalhos de autenticação
+    allow_methods=["*"],  # Permite todos os métodos (GET, POST, PUT, DELETE, etc)
+    allow_headers=["*"],  # Permite todos os cabeçalhos
 )
 
 # Inclui as rotas do módulo 'user' na aplicação principal
@@ -30,6 +35,8 @@ app.include_router(login.router)
 app.include_router(legal_organization.router)
 app.include_router(organization.router)
 app.include_router(department.router)
+app.include_router(executive.router)
+
 
 # Rota raiz simples para verificação
 @app.get("/", tags=["root"])

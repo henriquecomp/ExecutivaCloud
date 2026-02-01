@@ -10,7 +10,7 @@ from alembic import context
 config = context.config
 
 if DATABASE_URL:
-    config.set_main_option('sqlalchemy.url', DATABASE_URL)
+    config.set_main_option("sqlalchemy.url", DATABASE_URL)
 
 
 # Interpret the config file for Python logging.
@@ -25,17 +25,21 @@ if config.config_file_name is not None:
 try:
     from app.core.database import Base
 except ImportError:
-    raise ImportError("Não foi possível encontrar a Base do SQLAlchemy. "
-                      "Verifique o caminho em alembic/env.py")
+    raise ImportError(
+        "Não foi possível encontrar a Base do SQLAlchemy. "
+        "Verifique o caminho em alembic/env.py"
+    )
 
 # 2. IMPORTANTE: Importe TODOS os seus modelos aqui.
 # Mesmo que seu editor diga que "não estão sendo usados",
 # esta importação é ESSENCIAL para que os modelos
 # se registrem no 'Base.metadata'.
 from app.models import user_model
-from app.models import legal_organization_model 
-from app.models import organization_model     
-from app.models import department_model     
+from app.models import legal_organization_model
+from app.models import organization_model
+from app.models import department_model
+from app.models import executive_model
+
 # Adicione imports para quaisquer outros modelos que criar no futuro
 
 # 3. Atribua o metadata da sua Base
@@ -86,7 +90,7 @@ def run_migrations_online() -> None:
 
     with connectable.connect() as connection:
         context.configure(
-            connection=connection, target_metadata=target_metadata
+            connection=connection, target_metadata=target_metadata, render_as_batch=True
         )
 
         with context.begin_transaction():
