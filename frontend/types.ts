@@ -33,58 +33,61 @@ export interface Department {
 }
 
 export interface Executive {
-  id: string; // UUID
-  fullName: string;
+  id: number;
+  full_name: string;
   
   // Bloco 1: Identificação Pessoal
   cpf?: string;
   rg?: string;
-  rgIssuer?: string; // Órgão emissor
-  rgIssueDate?: string; // Data de expedição
-  birthDate?: string; // (already exists)
+  rg_issuer?: string;
+  rg_issue_date?: string; // Date string YYYY-MM-DD
+  birth_date?: string;    // Date string YYYY-MM-DD
   nationality?: string;
-  placeOfBirth?: string; // Naturalidade
-  motherName?: string;
-  fatherName?: string;
-  civilStatus?: string;
+  place_of_birth?: string;
+  mother_name?: string;
+  father_name?: string;
+  civil_status?: string;
 
   // Bloco 2: Informações de Contato
-  workEmail?: string; // (already exists)
-  workPhone?: string; // (already exists)
-  extension?: string; // (already exists)
-  personalEmail?: string; // (already exists)
-  personalPhone?: string; // (already exists)
-  address?: string; // Endereço Residencial Completo
-  linkedinProfileUrl?: string; // (already exists)
+  work_email: string; // Obrigatório
+  work_phone?: string;
+  extension?: string;
+  personal_email?: string;
+  personal_phone?: string;
+  street?: string; // Endereço
+  linkedin_profile_url?: string;
 
-  // Bloco 3: Dados Profissionais e Corporativos
-  jobTitle?: string; // (already exists)
-  organizationId?: string; // (already exists)
-  departmentId?: string; // (already exists)
-  costCenter?: string; // Centro de Custo
-  employeeId?: string; // (already exists)
-  reportsToExecutiveId?: string; // (already exists)
-  hireDate?: string; // (already exists)
-  workLocation?: string; // (already exists)
-  
+  // Bloco 3: Dados Profissionais
+  job_title?: string;
+  cost_center?: string;
+  employee_id?: string;
+  hire_date?: string; // Date string YYYY-MM-DD
+  work_location?: string;
+  organization_id?: number;
+  department_id?: number;
+  reports_to_executive_id?: number;
+
   // Bloco 4: Perfil Público
-  photoUrl?: string; // (already exists)
-  bio?: string; // (already exists)
-  education?: string; // (already exists)
-  languages?: string; // (already exists)
+  photo_url?: string;
+  bio?: string;
+  education?: string;
+  languages?: string;
 
-  // Bloco 5: Dados de Emergência e Dependentes
-  emergencyContactName?: string; // (already exists)
-  emergencyContactPhone?: string; // (already exists)
-  emergencyContactRelation?: string; // (already exists)
-  dependentsInfo?: string;
+  // Bloco 5: Emergência
+  emergency_contact_name?: string;
+  emergency_contact_phone?: string;
+  emergency_contact_relation?: string;
+  dependents_info?: string;
 
-  // Bloco 6: Dados Financeiros e de Acesso
-  bankInfo?: string;
-  compensationInfo?: string;
-  systemAccessLevels?: string;
+  // Bloco 6: Financeiro e Acesso
+  bank_info?: string;
+  compensation_info?: string;
+  system_access_levels?: string;
+
+  // Relacionamentos para exibição na tabela
+  organization?: Organization;
+  department?: Department;
 }
-
 
 export interface Secretary {
   id: string; // UUID

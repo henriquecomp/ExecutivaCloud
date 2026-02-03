@@ -1,75 +1,36 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
+from sqlalchemy.orm import Session
+from typing import List
+from app.core.database import get_db
+from app.schemas.executive_schema import Executive, ExecutiveCreate, ExecutiveUpdate
 from app.services.executive_service import ExecutiveService
-from app.schemas import executive_schema as schemas
-from typing import List, Dict
 
 router = APIRouter(prefix="/executives", tags=["Executives"])
+service = ExecutiveService()
 
 
-@router.post("/", response_model=schemas.Executive, status_code=status.HTTP_201_CREATED)
-def create_executive(
-    executive: schemas.ExecutiveCreate,
-    service: ExecutiveService = Depends(ExecutiveService),
-):
-    """
-    Cria um novo Executivo.
-    """
-    try:
-        return service.create_executive(executive)
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+@router.post("/", response_model=Executive, status_code=status.HTTP_201_CREATED)
+def create_executive(executive: ExecutiveCreate, db: Session = Depends(get_db)):
+    return service.create_executive(db, executive)
 
 
-@router.get("/", response_model=List[schemas.Executive])
-def get_all_executives(
-    skip: int = 0,
-    limit: int = 100,
-    service: ExecutiveService = Depends(ExecutiveService),
-):
-    """
-    Lista todos os Executivos.
-    """
-    return service.get_all_executives(skip=skip, limit=limit)
+@router.get("/", response_model=List[Executive])
+def read_executives(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    return service.list_executives(db, skip, limit)
 
 
-@router.get("/{exec_id}", response_model=schemas.Executive)
-def get_executive(exec_id: int, service: ExecutiveService = Depends(ExecutiveService)):
-    """
-    Busca um Executivo pelo ID.
-    """
-    db_exec = service.get_executive(exec_id)
-    if db_exec is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Executivo não encontrado"
-        )
-    return db_exec
+@router.get("/{executive_id}", response_model=Executive)
+def read_executive(executive_id: int, db: Session = Depends(get_db)):
+    return service.get_executive(db, executive_id)
 
 
-@router.put("/{exec_id}", response_model=schemas.Executive)
+@router.put("/{executive_id}", response_model=Executive)
 def update_executive(
-    exec_id: int,
-    exec_data: schemas.ExecutiveUpdate,
-    service: ExecutiveService = Depends(ExecutiveService),
+    executive_id: int, executive: ExecutiveUpdate, db: Session = Depends(get_db)
 ):
-    """
-    Atualiza dados de um Executivo.
-    """
-    try:
-        return service.update_executive(exec_id, exec_data)
-    except ValueError as e:
-        if "não encontrado" in str(e):
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    return service.update_executive(db, executive_id, executive)
 
 
-@router.delete("/{exec_id}", response_model=Dict[str, str])
-def delete_executive(
-    exec_id: int, service: ExecutiveService = Depends(ExecutiveService)
-):
-    """
-    Remove um Executivo.
-    """
-    try:
-        return service.delete_executive(exec_id)
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+@router.delete("/{executive_id}")
+def delete_executive(executive_id: int, db: Session = Depends(get_db)):
+    return service.delete_executive(db, executive_id)

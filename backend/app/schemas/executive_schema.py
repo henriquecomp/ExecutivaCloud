@@ -1,79 +1,62 @@
-from pydantic import BaseModel, Field, EmailStr, ConfigDict
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from typing import Optional
 from datetime import date
 
 
-# Base com todos os campos opcionais e alias para camelCase
 class ExecutiveBase(BaseModel):
-    fullName: str = Field(..., min_length=2, max_length=255)
-
-    # Bloco 1
+    full_name: str = Field(..., alias="fullName")
     cpf: Optional[str] = None
     rg: Optional[str] = None
-    rgIssuer: Optional[str] = None
-    rgIssueDate: Optional[date] = None
-    birthDate: Optional[date] = None
+    rg_issuer: Optional[str] = Field(None, alias="rgIssuer")
+    rg_issue_date: Optional[date] = Field(None, alias="rgIssueDate")
+    birth_date: Optional[date] = Field(None, alias="birthDate")
     nationality: Optional[str] = None
-    placeOfBirth: Optional[str] = None
-    motherName: Optional[str] = None
-    fatherName: Optional[str] = None
-    civilStatus: Optional[str] = None
-
-    # Bloco 2
-    workEmail: Optional[EmailStr] = None
-    workPhone: Optional[str] = None
+    place_of_birth: Optional[str] = Field(None, alias="placeOfBirth")
+    mother_name: Optional[str] = Field(None, alias="motherName")
+    father_name: Optional[str] = Field(None, alias="fatherName")
+    civil_status: Optional[str] = Field(None, alias="civilStatus")
+    work_email: EmailStr = Field(..., alias="workEmail")
+    work_phone: Optional[str] = Field(None, alias="workPhone")
     extension: Optional[str] = None
-    personalEmail: Optional[EmailStr] = None
-    personalPhone: Optional[str] = None
-    address: Optional[str] = None
-    linkedinProfileUrl: Optional[str] = None
-
-    # Bloco 3
-    jobTitle: Optional[str] = None
-    organizationId: Optional[int] = None  # Backend usa Int
-    departmentId: Optional[int] = None  # Backend usa Int
-    costCenter: Optional[str] = None
-    employeeId: Optional[str] = None
-    reportsToExecutiveId: Optional[int] = None
-    hireDate: Optional[date] = None
-    workLocation: Optional[str] = None
-
-    # Bloco 4
-    photoUrl: Optional[str] = None
+    personal_email: Optional[EmailStr] = Field(None, alias="personalEmail")
+    personal_phone: Optional[str] = Field(None, alias="personalPhone")
+    street: Optional[str] = Field(
+        None, alias="address"
+    )  # Mantendo street como original e address como alias
+    linkedin_profile_url: Optional[str] = Field(None, alias="linkedinProfileUrl")
+    job_title: Optional[str] = Field(None, alias="jobTitle")
+    organization_id: Optional[int] = Field(None, alias="organizationId")
+    department_id: Optional[int] = Field(None, alias="departmentId")
+    cost_center: Optional[str] = Field(None, alias="costCenter")
+    employee_id: Optional[str] = Field(None, alias="employeeId")
+    reports_to_executive_id: Optional[int] = Field(None, alias="reportsToExecutiveId")
+    hire_date: Optional[date] = Field(None, alias="hireDate")
+    work_location: Optional[str] = Field(None, alias="workLocation")
+    photo_url: Optional[str] = Field(None, alias="photoUrl")
     bio: Optional[str] = None
     education: Optional[str] = None
     languages: Optional[str] = None
+    emergency_contact_name: Optional[str] = Field(None, alias="emergencyContactName")
+    emergency_contact_phone: Optional[str] = Field(None, alias="emergencyContactPhone")
+    emergency_contact_relation: Optional[str] = Field(
+        None, alias="emergencyContactRelation"
+    )
+    dependents_info: Optional[str] = Field(None, alias="dependentsInfo")
+    bank_info: Optional[str] = Field(None, alias="bankInfo")
+    compensation_info: Optional[str] = Field(None, alias="compensationInfo")
+    system_access_levels: Optional[str] = Field(None, alias="systemAccessLevels")
 
-    # Bloco 5
-    emergencyContactName: Optional[str] = None
-    emergencyContactPhone: Optional[str] = None
-    emergencyContactRelation: Optional[str] = None
-    dependentsInfo: Optional[str] = None
-
-    # Bloco 6
-    bankInfo: Optional[str] = None
-    compensationInfo: Optional[str] = None
-    systemAccessLevels: Optional[str] = None
-
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, from_attributes=True)
 
 
-# Input Criação
 class ExecutiveCreate(ExecutiveBase):
     pass
 
 
-# Input Atualização
 class ExecutiveUpdate(ExecutiveBase):
-    # No update, até o nome pode ser opcional se desejar lógica de patch,
-    # mas herdando de Base, fullName é obrigatório.
-    # Se quiser tudo opcional, redeclare fullName como Optional.
-    fullName: Optional[str] = Field(None, min_length=2, max_length=255)
+    full_name: Optional[str] = Field(None, alias="fullName")
+    work_email: Optional[EmailStr] = Field(None, alias="workEmail")
 
 
-# Output
 class Executive(ExecutiveBase):
-    id: int  # Mantemos int para alinhar com o DB, o frontend deve tratar a conversão se necessário
-
-    class Config:
-        from_attributes = True
+    id: int

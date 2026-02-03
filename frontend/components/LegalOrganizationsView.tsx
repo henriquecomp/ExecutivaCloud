@@ -3,7 +3,8 @@ import { LegalOrganization, Organization, Department, Executive, Secretary, Even
 import Modal from './Modal';
 import ConfirmationModal from './ConfirmationModal';
 import { EditIcon, DeleteIcon, PlusIcon } from './Icons';
-import { apiService } from '../services/apiService';
+import { legalOrganizationService } from '@/services/legalOrganizationService';
+import { organizationService } from '@/services/organizationService';
 
 // --- Helper Functions ---
 function validateCNPJ(cnpj: string): boolean {
@@ -317,10 +318,10 @@ const LegalOrganizationsView: React.FC<LegalOrganizationsViewProps> = ({
         try {
             setApiError(null);
             if ('id' in legalOrgData && legalOrgData.id) {
-                const updated = await apiService.legalOrganizations.update(String(legalOrgData.id), legalOrgData as LegalOrganizationUpdate);
+                const updated = await legalOrganizationService.update(String(legalOrgData.id), legalOrgData as LegalOrganizationUpdate);
                 setLegalOrganizations(prev => prev.map(lo => String(lo.id) === String(legalOrgData.id) ? updated : lo));
             } else {
-                const created = await apiService.legalOrganizations.create(legalOrgData as LegalOrganizationCreate);
+                const created = await legalOrganizationService.create(legalOrgData as LegalOrganizationCreate);
                 setLegalOrganizations(prev => [...prev, created]);
             }
             if (onRefresh) onRefresh();
@@ -336,7 +337,7 @@ const LegalOrganizationsView: React.FC<LegalOrganizationsViewProps> = ({
         if (!legalOrgToDelete) return;
         try {
             setApiError(null);
-            await apiService.legalOrganizations.delete(legalOrgToDelete.id);
+            await legalOrganizationService.delete(legalOrgToDelete.id);
             setLegalOrganizations(prev => prev.filter(lo => lo.id !== legalOrgToDelete.id));
             if (onRefresh) onRefresh();
             setLegalOrgToDelete(null);
@@ -355,7 +356,7 @@ const LegalOrganizationsView: React.FC<LegalOrganizationsViewProps> = ({
         try {
             setApiError(null);
             if ('id' in companyData && companyData.id) {
-                const updated = await apiService.organizations.update(String(companyData.id), companyData as OrganizationUpdate);
+                const updated = await organizationService.update(String(companyData.id), companyData as OrganizationUpdate);
                 setOrganizations(prev => prev.map(org => String(org.id) === String(companyData.id) ? updated : org));
             }
             if (onRefresh) onRefresh();
@@ -370,7 +371,7 @@ const LegalOrganizationsView: React.FC<LegalOrganizationsViewProps> = ({
     const confirmDeleteCompany = async () => {
         if (!companyToDelete) return;
         try {
-            await apiService.organizations.delete(companyToDelete.id);
+            await organizationService.delete(companyToDelete.id);
             setOrganizations(prev => prev.filter(org => org.id !== companyToDelete.id));
             if (onRefresh) onRefresh();
             setCompanyToDelete(null);

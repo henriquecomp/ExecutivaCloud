@@ -3,7 +3,8 @@ import { Organization, Department, Executive, User, Secretary, Event, Contact, E
 import Modal from './Modal';
 import ConfirmationModal from './ConfirmationModal';
 import { EditIcon, DeleteIcon, PlusIcon } from './Icons';
-import { apiService } from '../services/apiService';
+import { organizationService } from '@/services/organizationService';
+import { departmentService } from '@/services/departmentService';
 
 // --- Helper Functions ---
 function validateCNPJ(cnpj: string): boolean {
@@ -429,7 +430,7 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
         setIsLoading(true);
         try {
             setApiError(null);
-            await apiService.organizations.delete(orgToDelete.id);
+            await organizationService.delete(orgToDelete.id);
             if (onRefresh) {
                 await onRefresh();
             }
@@ -446,9 +447,9 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
         try {
             setApiError(null);
             if ('id' in orgData && orgData.id) {
-                await apiService.organizations.update(String(orgData.id), orgData);
+                await organizationService.update(String(orgData.id), orgData);
             } else {
-                await apiService.organizations.create(orgData as OrganizationCreate);
+                await organizationService.create(orgData as OrganizationCreate);
             }
             if (onRefresh) {
                 await onRefresh();
@@ -483,7 +484,7 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
         setIsLoading(true);
         try {
             setApiError(null);
-            await apiService.departments.delete(deptToDelete.id);
+            await departmentService.delete(deptToDelete.id);
             if (onRefresh) {
                 await onRefresh();
             }
@@ -500,9 +501,9 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
             setApiError(null);
             // Verifica se é update (tem ID) ou create (sem ID)
             if ('id' in deptData && deptData.id) {
-                await apiService.departments.update(String(deptData.id), deptData);
+                await departmentService.update(String(deptData.id), deptData);
             } else {
-                await apiService.departments.create(deptData as DepartmentCreate);
+                await departmentService.create(deptData as DepartmentCreate);
             }
             if (onRefresh) {
                 await onRefresh();

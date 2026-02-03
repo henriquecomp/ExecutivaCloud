@@ -22,7 +22,7 @@ import {
   LegalOrganization 
 } from './types';
 import { useLocalStorage } from './hooks/useLocalStorage';
-import { apiService } from './services/apiService';
+
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import ExecutivesView from './components/ExecutivesView';
@@ -38,6 +38,9 @@ import ReportsView from './components/ReportsView';
 import UserMenu from './components/UserMenu';
 import DocumentsView from './components/DocumentsView';
 import LegalOrganizationsView from './components/LegalOrganizationsView';
+import { legalOrganizationService } from './services/legalOrganizationService';
+import { organizationService } from './services/organizationService';
+import { departmentService } from './services/departmentService';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('dashboard');
@@ -114,7 +117,7 @@ const App: React.FC = () => {
       // 1. Carregar Legal Organizations
       // O backend retorna IDs inteiros, convertemos para string para manter compatibilidade com o frontend
       // CORREÇÃO: O apiService agora retorna o array diretamente, não precisa de .data
-      const legalOrgsRes = await apiService.legalOrganizations.getAll();
+      const legalOrgsRes = await legalOrganizationService.getAll();
       const legalOrgsData = legalOrgsRes.map((item: any) => ({
         ...item,
         id: String(item.id)
@@ -123,7 +126,7 @@ const App: React.FC = () => {
 
       // 2. Carregar Organizations (Empresas)
       // CORREÇÃO: O apiService agora retorna o array diretamente
-      const orgsRes = await apiService.organizations.getAll();
+      const orgsRes = await organizationService.getAll();
       const orgsData = orgsRes.map((item: any) => ({
         ...item,
         id: String(item.id),
@@ -135,7 +138,7 @@ const App: React.FC = () => {
       // Como o backend atualmente busca por organização, iteramos sobre as organizações carregadas
       let allDepts: Department[] = [];
       if (orgsData.length > 0) {
-        const deptPromises = orgsData.map(org => apiService.departments.getByOrg(org.id));
+        const deptPromises = orgsData.map(org => departmentService.getByOrg(org.id));
         const deptResponses = await Promise.all(deptPromises);
         
         // CORREÇÃO: deptResponses agora é um array de arrays de departamentos
@@ -169,7 +172,7 @@ const App: React.FC = () => {
 
       const execUsers = executives.map(e => ({
         id: `user_exec_${e.id}`,
-        fullName: e.fullName,
+        fullName: e.full_name,
         role: 'executive' as UserRole,
         executiveId: e.id,
       }));
@@ -216,18 +219,18 @@ const App: React.FC = () => {
           const orgIdsForLegalOrg = organizations
             .filter(o => o.legalOrganizationId === currentUser.legalOrganizationId)
             .map(o => o.id);
-          return executives.filter(e => e.organizationId && orgIdsForLegalOrg.includes(e.organizationId));
+          return executives.filter(e => e.organization_id && orgIdsForLegalOrg.includes(e.organization_id));
         }
         if (currentUser.organizationId) {
-          return executives.filter(e => e.organizationId === currentUser.organizationId);
+          return executives.filter(e => e.organization_id === parseInt(currentUser.organizationId));
         }
         return [];
       case 'secretary':
         const secretary = secretaries.find(s => s.id === currentUser.secretaryId);
         if (!secretary) return [];
-        return executives.filter(e => secretary.executiveIds.includes(e.id));
+        //return executives.filter(e => secretary.executiveIds.includes(e.id));
       case 'executive':
-        return executives.filter(e => e.id === currentUser.executiveId);
+        return executives.filter(e => e.id === parseInt(currentUser.executiveId));
       default:
         return [];
     }
@@ -265,10 +268,10 @@ const App: React.FC = () => {
           const reminderTime = new Date(eventStartTime.getTime() - event.reminderMinutes * 60 * 1000);
 
           if (now >= reminderTime && now < eventStartTime) {
-            const executive = executives.find(e => e.id === event.executiveId);
+            const executive = executives.find(e => e.id === parseInt(event.executiveId));
             const title = `Lembrete: ${event.title}`;
             const options = {
-              body: `O evento de ${executive?.fullName || 'um executivo'} começa às ${eventStartTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}.`,
+              body: `O evento de ${executive?.full_name || 'um executivo'} começa às ${eventStartTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}.`,
               icon: '/vite.svg',
             };
 
@@ -287,7 +290,7 @@ const App: React.FC = () => {
 
 
   // --- DERIVED/FILTERED DATA ---
-  const selectedExecutive = useMemo(() => executives.find(e => e.id === selectedExecutiveId), [executives, selectedExecutiveId]);
+  const selectedExecutive = useMemo(() => executives.find(e => e.id === parseInt(selectedExecutiveId)), [executives, selectedExecutiveId]);
 
   const filteredEvents = useMemo(() => events.filter(e => e.executiveId === selectedExecutiveId), [events, selectedExecutiveId]);
   const filteredContacts = useMemo(() => contacts.filter(c => c.executiveId === selectedExecutiveId), [contacts, selectedExecutiveId]);

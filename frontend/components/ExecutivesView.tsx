@@ -1,474 +1,566 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { 
-    Executive, 
-    Organization, 
-    Department, 
-    Secretary,
-    User
-} from '../types';
-import { apiService } from '../services/apiService';
-import { 
-    SearchIcon, 
-    PlusIcon, 
-    EditIcon, 
-    DeleteIcon, 
-    UserIcon, 
-    BuildingIcon,
-    ShieldIcon 
-} from './Icons';
+import React, { useState, useEffect } from 'react';
+import { executiveService } from '../services/executiveService';
+import { organizationService } from '../services/organizationService'; // Corrigido caminho
+import { departmentService } from '../services/departmentService'; // Corrigido caminho
+import { Executive, Organization, Department } from '../types';
+import { Plus, Edit2, Trash2, Search, User, Briefcase, Phone, FileText, DollarSign, AlertCircle } from 'lucide-react';
 import Modal from './Modal';
 import ConfirmationModal from './ConfirmationModal';
 import Pagination from './Pagination';
 
-// --- Helper Functions para Máscaras ---
-const maskCPF = (value: string) => {
-    return value
-        .replace(/\D/g, '')
-        .replace(/(\d{3})(\d)/, '$1.$2')
-        .replace(/(\d{3})(\d)/, '$1.$2')
-        .replace(/(\d{3})(\d{1,2})/, '$1-$2')
-        .replace(/(-\d{2})\d+?$/, '$1');
-};
+const ExecutivesView: React.FC = () => {
+  const [executives, setExecutives] = useState<Executive[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  // Dados para Selects
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  
+  // Paginação
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
-const maskPhone = (value: string) => {
-    return value
-        .replace(/\D/g, '')
-        .replace(/(\d{2})(\d)/, '($1) $2')
-        .replace(/(\d{5})(\d)/, '$1-$2')
-        .replace(/(-\d{4})\d+?$/, '$1');
-};
+  // Modal e Edição
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [currentExecutive, setCurrentExecutive] = useState<Partial<Executive>>({});
+  const [executiveToDelete, setExecutiveToDelete] = useState<number | null>(null);
 
-interface ExecutivesViewProps {
-    currentUser: User;
-    executives: Executive[];
-    allExecutives: Executive[]; // Lista completa para referência cruzada
-    setExecutives: React.Dispatch<React.SetStateAction<Executive[]>>;
-    organizations: Organization[];
-    departments: Department[];
-    secretaries: Secretary[];
-    setSecretaries: React.Dispatch<React.SetStateAction<Secretary[]>>;
-    setEvents: any;
-    setContacts: any;
-    setExpenses: any;
-    setTasks: any;
-    setDocuments: any;
-    setUsers: any;
-}
+  // Controle de Abas do Modal
+  const [activeTab, setActiveTab] = useState<'personal' | 'contact' | 'professional' | 'profile' | 'emergency' | 'finance'>('personal');
 
-// --- Componente de Formulário (Interno) ---
-interface ExecutiveFormProps {
-    executive?: Executive;
-    organizations: Organization[];
-    departments: Department[];
-    otherExecutives: Executive[];
-    onSave: (data: any) => Promise<void>;
-    onCancel: () => void;
-}
+  useEffect(() => {
+    fetchData();
+  }, [currentPage]);
 
-const ExecutiveForm: React.FC<ExecutiveFormProps> = ({ 
-    executive, 
-    organizations, 
-    departments, 
-    otherExecutives,
-    onSave, 
-    onCancel 
-}) => {
-    const [formData, setFormData] = useState<Partial<Executive>>({
-        fullName: executive?.fullName || '',
-        // Bloco 1: Identificação
-        cpf: executive?.cpf || '',
-        rg: executive?.rg || '',
-        rgIssuer: executive?.rgIssuer || '',
-        rgIssueDate: executive?.rgIssueDate || '',
-        birthDate: executive?.birthDate || '',
-        nationality: executive?.nationality || '',
-        placeOfBirth: executive?.placeOfBirth || '',
-        civilStatus: executive?.civilStatus || '',
-        // Bloco 2: Contato
-        workEmail: executive?.workEmail || '',
-        workPhone: executive?.workPhone || '',
-        extension: executive?.extension || '',
-        personalEmail: executive?.personalEmail || '',
-        personalPhone: executive?.personalPhone || '',
-        address: executive?.address || '',
-        linkedinProfileUrl: executive?.linkedinProfileUrl || '',
-        // Bloco 3: Corporativo
-        jobTitle: executive?.jobTitle || '',
-        organizationId: executive?.organizationId || '',
-        departmentId: executive?.departmentId || '',
-        costCenter: executive?.costCenter || '',
-        reportsToExecutiveId: executive?.reportsToExecutiveId || '',
-        hireDate: executive?.hireDate || '',
-        // Bloco 4: Perfil
-        bio: executive?.bio || '',
-        education: executive?.education || '',
-        languages: executive?.languages || '',
-        // Bloco 5: Emergência
-        emergencyContactName: executive?.emergencyContactName || '',
-        emergencyContactPhone: executive?.emergencyContactPhone || '',
-        emergencyContactRelation: executive?.emergencyContactRelation || '',
-    });
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      // Alterado para getAll para garantir que temos todos os departamentos para exibição na tabela
+      const [execData, orgData, deptData] = await Promise.all([
+        executiveService.getAll((currentPage - 1) * itemsPerPage, itemsPerPage),
+        organizationService.getAll(),
+        departmentService.getByOrg("1") 
+      ]);
+      setExecutives(execData);
+      setOrganizations(orgData);
+      setDepartments(deptData);
+    } catch (error) {
+      console.error('Erro ao buscar dados:', error);
+      alert('Erro ao carregar executivos.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    const [activeTab, setActiveTab] = useState('pessoal');
-    const [loading, setLoading] = useState(false);
+  const handleSave = async () => {
+    try {
+      if (!currentExecutive.full_name || !currentExecutive.work_email) {
+        alert("Nome completo e Email corporativo são obrigatórios.");
+        return;
+      }
 
-    const filteredDepartments = useMemo(() => {
-        if (!formData.organizationId) return [];
-        return departments.filter(d => d.organizationId === formData.organizationId);
-    }, [formData.organizationId, departments]);
+      if (currentExecutive.id) {
+        await executiveService.update(currentExecutive.id, currentExecutive);
+      } else {
+        await executiveService.create(currentExecutive);
+      }
+      setIsModalOpen(false);
+      fetchData();
+    } catch (error) {
+      console.error('Erro ao salvar executivo:', error);
+      alert('Erro ao salvar executivo. Verifique os dados.');
+    }
+  };
 
-    const handleChange = (field: keyof Executive, value: string) => {
-        setFormData(prev => ({ ...prev, [field]: value }));
-    };
+  const handleDelete = async () => {
+    if (executiveToDelete) {
+      try {
+        await executiveService.delete(executiveToDelete);
+        setIsDeleteModalOpen(false);
+        fetchData();
+      } catch (error) {
+        console.error('Erro ao excluir:', error);
+        alert('Erro ao excluir executivo.');
+      }
+    }
+  };
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setLoading(true);
-        try {
-            await onSave(formData);
-        } catch (error) {
-            console.error("Erro ao salvar:", error);
-            alert("Erro ao salvar executivo. Verifique os dados.");
-        } finally {
-            setLoading(false);
-        }
-    };
+  const openEditModal = (executive: Executive) => {
+    setCurrentExecutive({ ...executive });
+    setActiveTab('personal');
+    setIsModalOpen(true);
+  };
 
-    const tabs = [
-        { id: 'pessoal', label: 'Dados Pessoais' },
-        { id: 'contato', label: 'Contato' },
-        { id: 'corporativo', label: 'Corporativo' },
-        { id: 'perfil', label: 'Perfil & Outros' },
-    ];
+  const openCreateModal = () => {
+    setCurrentExecutive({});
+    setActiveTab('personal');
+    setIsModalOpen(true);
+  };
 
-    return (
-        <form onSubmit={handleSubmit} className="flex flex-col h-full max-h-[70vh]">
-            {/* Abas */}
-            <div className="flex border-b border-gray-200 mb-4 overflow-x-auto">
-                {tabs.map(tab => (
-                    <button
-                        key={tab.id}
-                        type="button"
-                        onClick={() => setActiveTab(tab.id)}
-                        className={`px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
-                            activeTab === tab.id 
-                            ? 'border-blue-600 text-blue-600' 
-                            : 'border-transparent text-gray-500 hover:text-gray-700'
-                        }`}
-                    >
-                        {tab.label}
-                    </button>
-                ))}
-            </div>
+  // CORREÇÃO AQUI: Adicionado verificação segura (?.) e valor padrão ('')
+  const filteredExecutives = executives.filter(ex => {
+    const name = ex.full_name ? ex.full_name.toLowerCase() : '';
+    const email = ex.work_email ? ex.work_email.toLowerCase() : '';
+    const term = searchTerm.toLowerCase();
 
-            {/* Conteúdo das Abas com Scroll */}
-            <div className="flex-1 overflow-y-auto px-2 space-y-4">
-                {activeTab === 'pessoal' && (
-                    <div className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Nome Completo *</label>
-                            <input required type="text" className="mt-1 block w-full p-2 border border-gray-300 rounded-md"
-                                value={formData.fullName} onChange={e => handleChange('fullName', e.target.value)} />
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">CPF</label>
-                                <input type="text" className="mt-1 block w-full p-2 border border-gray-300 rounded-md"
-                                    value={formData.cpf} onChange={e => handleChange('cpf', maskCPF(e.target.value))} />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Data de Nascimento</label>
-                                <input type="date" className="mt-1 block w-full p-2 border border-gray-300 rounded-md"
-                                    value={formData.birthDate} onChange={e => handleChange('birthDate', e.target.value)} />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">RG</label>
-                                <input type="text" className="mt-1 block w-full p-2 border border-gray-300 rounded-md"
-                                    value={formData.rg} onChange={e => handleChange('rg', e.target.value)} />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Estado Civil</label>
-                                <select className="mt-1 block w-full p-2 border border-gray-300 rounded-md"
-                                    value={formData.civilStatus} onChange={e => handleChange('civilStatus', e.target.value)}>
-                                    <option value="">Selecione</option>
-                                    <option value="Solteiro(a)">Solteiro(a)</option>
-                                    <option value="Casado(a)">Casado(a)</option>
-                                    <option value="Divorciado(a)">Divorciado(a)</option>
-                                    <option value="Viúvo(a)">Viúvo(a)</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                )}
+    return name.includes(term) || email.includes(term);
+  });
 
-                {activeTab === 'contato' && (
-                    <div className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Email Corporativo</label>
-                                <input type="email" className="mt-1 block w-full p-2 border border-gray-300 rounded-md"
-                                    value={formData.workEmail} onChange={e => handleChange('workEmail', e.target.value)} />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Telefone Corporativo</label>
-                                <input type="text" className="mt-1 block w-full p-2 border border-gray-300 rounded-md"
-                                    value={formData.workPhone} onChange={e => handleChange('workPhone', maskPhone(e.target.value))} />
-                            </div>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">LinkedIn URL</label>
-                            <input type="url" className="mt-1 block w-full p-2 border border-gray-300 rounded-md"
-                                value={formData.linkedinProfileUrl} onChange={e => handleChange('linkedinProfileUrl', e.target.value)} />
-                        </div>
-                    </div>
-                )}
+  // Renderização das Abas
+  const renderTabButton = (id: typeof activeTab, label: string, icon: React.ReactNode) => (
+    <button
+      type="button"
+      onClick={() => setActiveTab(id)}
+      className={`flex items-center px-4 py-2 text-sm font-medium border-b-2 ${
+        activeTab === id
+          ? 'border-blue-500 text-blue-600'
+          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+      }`}
+    >
+      <span className="mr-2">{icon}</span>
+      {label}
+    </button>
+  );
 
-                {activeTab === 'corporativo' && (
-                    <div className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Cargo</label>
-                                <input type="text" className="mt-1 block w-full p-2 border border-gray-300 rounded-md"
-                                    value={formData.jobTitle} onChange={e => handleChange('jobTitle', e.target.value)} />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Organização</label>
-                                <select className="mt-1 block w-full p-2 border border-gray-300 rounded-md"
-                                    value={formData.organizationId}
-                                    onChange={e => {
-                                        handleChange('organizationId', e.target.value);
-                                        handleChange('departmentId', '');
-                                    }}>
-                                    <option value="">Selecione...</option>
-                                    {organizations.map(org => (
-                                        <option key={org.id} value={org.id}>{org.name}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Departamento</label>
-                                <select className="mt-1 block w-full p-2 border border-gray-300 rounded-md"
-                                    value={formData.departmentId}
-                                    onChange={e => handleChange('departmentId', e.target.value)}
-                                    disabled={!formData.organizationId}>
-                                    <option value="">Selecione...</option>
-                                    {filteredDepartments.map(dept => (
-                                        <option key={dept.id} value={dept.id}>{dept.name}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Data de Admissão</label>
-                                <input type="date" className="mt-1 block w-full p-2 border border-gray-300 rounded-md"
-                                    value={formData.hireDate} onChange={e => handleChange('hireDate', e.target.value)} />
-                            </div>
-                        </div>
-                    </div>
-                )}
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold text-gray-800">Executivos</h2>
+        <button
+          onClick={openCreateModal}
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 transition-colors"
+        >
+          <Plus size={20} />
+          Novo Executivo
+        </button>
+      </div>
 
-                {activeTab === 'perfil' && (
-                    <div className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Bio / Resumo</label>
-                            <textarea rows={3} className="mt-1 block w-full p-2 border border-gray-300 rounded-md"
-                                value={formData.bio} onChange={e => handleChange('bio', e.target.value)} />
-                        </div>
-                        <h4 className="font-medium text-gray-900 border-t pt-4 mt-2">Contato de Emergência</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Nome</label>
-                                <input type="text" className="mt-1 block w-full p-2 border border-gray-300 rounded-md"
-                                    value={formData.emergencyContactName} onChange={e => handleChange('emergencyContactName', e.target.value)} />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Telefone</label>
-                                <input type="text" className="mt-1 block w-full p-2 border border-gray-300 rounded-md"
-                                    value={formData.emergencyContactPhone} onChange={e => handleChange('emergencyContactPhone', maskPhone(e.target.value))} />
-                            </div>
-                        </div>
-                    </div>
-                )}
-            </div>
+      {/* Busca */}
+      <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 flex gap-4">
+        <div className="flex-1 relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+          <input
+            type="text"
+            placeholder="Buscar por nome ou email..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+      </div>
 
-            {/* Rodapé do Modal */}
-            <div className="flex justify-end gap-3 pt-4 border-t mt-4">
-                <button type="button" onClick={onCancel} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">
-                    Cancelar
-                </button>
-                <button type="submit" disabled={loading} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50">
-                    {loading ? 'Salvando...' : 'Salvar'}
-                </button>
-            </div>
-        </form>
-    );
-};
+      {/* Tabela */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead className="bg-gray-50 text-gray-600 text-sm font-semibold">
+              <tr>
+                <th className="p-4 border-b">Nome</th>
+                <th className="p-4 border-b">Cargo / Depto</th>
+                <th className="p-4 border-b">Email Corporativo</th>
+                <th className="p-4 border-b">Celular</th>
+                <th className="p-4 border-b text-right">Ações</th>
+              </tr>
+            </thead>
+            <tbody className="text-gray-700 text-sm">
+              {loading ? (
+                <tr>
+                  <td colSpan={5} className="p-8 text-center text-gray-500">Carregando...</td>
+                </tr>
+              ) : filteredExecutives.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="p-8 text-center text-gray-500">Nenhum executivo encontrado.</td>
+                </tr>
+              ) : (
+                filteredExecutives.map((ex) => (
+                  <tr key={ex.id} className="hover:bg-gray-50 border-b last:border-0">
+                    <td className="p-4 font-medium">{ex.full_name}</td>
+                    <td className="p-4">
+                      <div className="font-medium">{ex.job_title || '-'}</div>
+                      <div className="text-xs text-gray-500">
+                        {ex.department?.name ? `${ex.department.name}` : ''}
+                        {ex.department?.name && ex.organization?.name ? ' - ' : ''}
+                        {ex.organization?.name}
+                      </div>
+                    </td>
+                    <td className="p-4">{ex.work_email}</td>
+                    <td className="p-4">{ex.work_phone || '-'}</td>
+                    <td className="p-4 text-right">
+                      <div className="flex justify-end gap-2">
+                        <button onClick={() => openEditModal(ex)} className="text-blue-600 hover:bg-blue-50 p-2 rounded transition-colors">
+                          <Edit2 size={18} />
+                        </button>
+                        <button 
+                          onClick={() => { setExecutiveToDelete(ex.id); setIsDeleteModalOpen(true); }}
+                          className="text-red-600 hover:bg-red-50 p-2 rounded transition-colors"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+        {!loading && (
+          <Pagination 
+            currentPage={currentPage} 
+            totalPages={Math.ceil(filteredExecutives.length / itemsPerPage) || 1} 
+            onPageChange={setCurrentPage} 
+          />
+        )}
+      </div>
 
-// --- Componente Principal ---
-const ExecutivesView: React.FC<ExecutivesViewProps> = ({ 
-    executives, 
-    organizations, 
-    departments,
-    allExecutives,
-    setExecutives // Usado para atualizar o estado local se necessário após refetch
-}) => {
-    // Estado local para controle da UI
-    const [searchTerm, setSearchTerm] = useState('');
-    const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 8;
-    
-    // Estados de Modais
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [executiveToEdit, setExecutiveToEdit] = useState<Executive | undefined>(undefined);
-    const [executiveToDelete, setExecutiveToDelete] = useState<Executive | null>(null);
+      {/* Modal de Criação/Edição */}
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title={currentExecutive.id ? "Editar Executivo" : "Novo Executivo"}
+      >
+        <div className="flex flex-col h-[70vh]"> {/* Altura fixa para scroll interno */}
+          
+          {/* Navegação por Abas */}
+          <div className="flex border-b border-gray-200 mb-4 overflow-x-auto">
+            {renderTabButton('personal', 'Pessoal', <User size={16} />)}
+            {renderTabButton('contact', 'Contato', <Phone size={16} />)}
+            {renderTabButton('professional', 'Profissional', <Briefcase size={16} />)}
+            {renderTabButton('profile', 'Perfil', <FileText size={16} />)}
+            {renderTabButton('emergency', 'Emergência', <AlertCircle size={16} />)}
+            {renderTabButton('finance', 'Financeiro', <DollarSign size={16} />)}
+          </div>
 
-    // Refresh data manual para garantir sincronia (opcional se App.tsx já gerencia)
-    const refreshData = async () => {
-        try {
-            const data = await (apiService as any).executives.getAll();
-            setExecutives(data);
-        } catch (e) { console.error(e); }
-    };
-
-    const filteredExecutives = useMemo(() => {
-        return executives.filter(exec => 
-            exec.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            exec.workEmail?.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-    }, [executives, searchTerm]);
-
-    const paginatedExecutives = useMemo(() => {
-        const start = (currentPage - 1) * itemsPerPage;
-        return filteredExecutives.slice(start, start + itemsPerPage);
-    }, [filteredExecutives, currentPage]);
-
-    const handleSave = async (data: any) => {
-        try {
-            if (executiveToEdit) {
-                await (apiService as any).executives.update(executiveToEdit.id, data);
-            } else {
-                await (apiService as any).executives.create(data);
-            }
-            setIsModalOpen(false);
-            setExecutiveToEdit(undefined);
-            refreshData(); // Atualiza a lista
-        } catch (error) {
-            console.error("Erro ao salvar:", error);
-            throw error;
-        }
-    };
-
-    const handleDelete = async () => {
-        if (!executiveToDelete) return;
-        try {
-            await (apiService as any).executives.delete(executiveToDelete.id);
-            setExecutiveToDelete(null);
-            refreshData();
-        } catch (error) {
-            console.error("Erro ao excluir:", error);
-            alert("Erro ao excluir executivo.");
-        }
-    };
-
-    const openNewModal = () => {
-        setExecutiveToEdit(undefined);
-        setIsModalOpen(true);
-    };
-
-    const openEditModal = (exec: Executive) => {
-        setExecutiveToEdit(exec);
-        setIsModalOpen(true);
-    };
-
-    return (
-        <div className="p-6 max-w-7xl mx-auto space-y-6">
-            <div className="flex justify-between items-center">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-800">Executivos</h1>
-                    <p className="text-gray-500">Gerencie o cadastro completo dos executivos.</p>
+          {/* Conteúdo com Scroll */}
+          <div className="flex-1 overflow-y-auto pr-2 space-y-4">
+            
+            {/* --- Bloco 1: Identificação Pessoal --- */}
+            {activeTab === 'personal' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="col-span-2">
+                   <label className="block text-sm font-medium text-gray-700">Nome Completo *</label>
+                   <input
+                     type="text"
+                     className="mt-1 w-full p-2 border rounded"
+                     value={currentExecutive.full_name || ''}
+                     onChange={e => setCurrentExecutive({...currentExecutive, full_name: e.target.value})}
+                   />
                 </div>
-                <button 
-                    onClick={openNewModal}
-                    className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                    <PlusIcon className="w-5 h-5" /> Novo Executivo
-                </button>
-            </div>
-
-            <div className="relative">
-                <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input
-                    type="text"
-                    placeholder="Buscar por nome ou e-mail..."
-                    className="w-full pl-10 pr-4 py-2 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {paginatedExecutives.map(exec => (
-                    <div key={exec.id} className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-                        <div className="flex justify-between mb-4">
-                            <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-lg">
-                                {exec.fullName.charAt(0)}
-                            </div>
-                            <div className="flex gap-2">
-                                <button onClick={() => openEditModal(exec)} className="p-1 text-gray-400 hover:text-blue-600">
-                                    <EditIcon className="w-4 h-4" />
-                                </button>
-                                <button onClick={() => setExecutiveToDelete(exec)} className="p-1 text-gray-400 hover:text-red-600">
-                                    <DeleteIcon className="w-4 h-4" />
-                                </button>
-                            </div>
-                        </div>
-                        <h3 className="font-semibold text-gray-800 truncate" title={exec.fullName}>{exec.fullName}</h3>
-                        <p className="text-sm text-blue-600 font-medium truncate">{exec.jobTitle || 'Sem cargo'}</p>
-                        <div className="mt-4 space-y-2 text-sm text-gray-500">
-                            <div className="flex items-center gap-2">
-                                <BuildingIcon className="w-4 h-4 shrink-0" /> 
-                                <span className="truncate">{organizations.find(o => o.id === exec.organizationId)?.name || 'N/A'}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <ShieldIcon className="w-4 h-4 shrink-0" /> 
-                                <span className="truncate">{exec.workEmail || 'Sem email'}</span>
-                            </div>
-                        </div>
-                    </div>
-                ))}
-            </div>
-
-            <Pagination 
-                currentPage={currentPage} 
-                totalPages={Math.ceil(filteredExecutives.length / itemsPerPage)} 
-                onPageChange={setCurrentPage} 
-            />
-
-            {/* CORREÇÃO APLICADA AQUI: Renderização Condicional do Modal */}
-            {isModalOpen && (
-                <Modal
-                    onClose={() => setIsModalOpen(false)}
-                    title={executiveToEdit ? "Editar Executivo" : "Novo Executivo"}
-                >
-                    <ExecutiveForm
-                        executive={executiveToEdit}
-                        organizations={organizations}
-                        departments={departments}
-                        otherExecutives={allExecutives.filter(e => e.id !== executiveToEdit?.id)}
-                        onSave={handleSave}
-                        onCancel={() => setIsModalOpen(false)}
-                    />
-                </Modal>
+                <div>
+                   <label className="block text-sm font-medium text-gray-700">CPF</label>
+                   <input
+                     type="text"
+                     className="mt-1 w-full p-2 border rounded"
+                     value={currentExecutive.cpf || ''}
+                     onChange={e => setCurrentExecutive({...currentExecutive, cpf: e.target.value})}
+                   />
+                </div>
+                <div>
+                   <label className="block text-sm font-medium text-gray-700">RG</label>
+                   <input
+                     type="text"
+                     className="mt-1 w-full p-2 border rounded"
+                     value={currentExecutive.rg || ''}
+                     onChange={e => setCurrentExecutive({...currentExecutive, rg: e.target.value})}
+                   />
+                </div>
+                <div>
+                   <label className="block text-sm font-medium text-gray-700">Data de Nascimento</label>
+                   <input
+                     type="date"
+                     className="mt-1 w-full p-2 border rounded"
+                     value={currentExecutive.birth_date || ''}
+                     onChange={e => setCurrentExecutive({...currentExecutive, birth_date: e.target.value})}
+                   />
+                </div>
+                <div>
+                   <label className="block text-sm font-medium text-gray-700">Nacionalidade</label>
+                   <input
+                     type="text"
+                     className="mt-1 w-full p-2 border rounded"
+                     value={currentExecutive.nationality || ''}
+                     onChange={e => setCurrentExecutive({...currentExecutive, nationality: e.target.value})}
+                   />
+                </div>
+                <div>
+                   <label className="block text-sm font-medium text-gray-700">Estado Civil</label>
+                   <select 
+                      className="mt-1 w-full p-2 border rounded"
+                      value={currentExecutive.civil_status || ''}
+                      onChange={e => setCurrentExecutive({...currentExecutive, civil_status: e.target.value})}
+                   >
+                     <option value="">Selecione</option>
+                     <option value="Solteiro(a)">Solteiro(a)</option>
+                     <option value="Casado(a)">Casado(a)</option>
+                     <option value="Divorciado(a)">Divorciado(a)</option>
+                     <option value="Viúvo(a)">Viúvo(a)</option>
+                   </select>
+                </div>
+              </div>
             )}
 
-            <ConfirmationModal
-                isOpen={!!executiveToDelete}
-                onClose={() => setExecutiveToDelete(null)}
-                onConfirm={handleDelete}
-                title="Excluir Executivo"
-                message={`Tem certeza que deseja excluir ${executiveToDelete?.fullName}?`}
-            />
+            {/* --- Bloco 2: Contato --- */}
+            {activeTab === 'contact' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="col-span-2">
+                   <label className="block text-sm font-medium text-gray-700">Email Corporativo *</label>
+                   <input
+                     type="email"
+                     className="mt-1 w-full p-2 border rounded"
+                     value={currentExecutive.work_email || ''}
+                     onChange={e => setCurrentExecutive({...currentExecutive, work_email: e.target.value})}
+                   />
+                </div>
+                <div>
+                   <label className="block text-sm font-medium text-gray-700">Telefone Corporativo</label>
+                   <input
+                     type="text"
+                     className="mt-1 w-full p-2 border rounded"
+                     value={currentExecutive.work_phone || ''}
+                     onChange={e => setCurrentExecutive({...currentExecutive, work_phone: e.target.value})}
+                   />
+                </div>
+                <div>
+                   <label className="block text-sm font-medium text-gray-700">Email Pessoal</label>
+                   <input
+                     type="email"
+                     className="mt-1 w-full p-2 border rounded"
+                     value={currentExecutive.personal_email || ''}
+                     onChange={e => setCurrentExecutive({...currentExecutive, personal_email: e.target.value})}
+                   />
+                </div>
+                <div>
+                   <label className="block text-sm font-medium text-gray-700">Telefone Pessoal</label>
+                   <input
+                     type="text"
+                     className="mt-1 w-full p-2 border rounded"
+                     value={currentExecutive.personal_phone || ''}
+                     onChange={e => setCurrentExecutive({...currentExecutive, personal_phone: e.target.value})}
+                   />
+                </div>
+                <div className="col-span-2">
+                   <label className="block text-sm font-medium text-gray-700">Endereço (Rua/Núm/Comp)</label>
+                   <textarea
+                     className="mt-1 w-full p-2 border rounded"
+                     rows={2}
+                     value={currentExecutive.street || ''}
+                     onChange={e => setCurrentExecutive({...currentExecutive, street: e.target.value})}
+                   />
+                </div>
+                 <div className="col-span-2">
+                   <label className="block text-sm font-medium text-gray-700">LinkedIn URL</label>
+                   <input
+                     type="text"
+                     className="mt-1 w-full p-2 border rounded"
+                     value={currentExecutive.linkedin_profile_url || ''}
+                     onChange={e => setCurrentExecutive({...currentExecutive, linkedin_profile_url: e.target.value})}
+                   />
+                </div>
+              </div>
+            )}
+
+            {/* --- Bloco 3: Profissional --- */}
+            {activeTab === 'professional' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                 <div>
+                   <label className="block text-sm font-medium text-gray-700">Cargo (Job Title)</label>
+                   <input
+                     type="text"
+                     className="mt-1 w-full p-2 border rounded"
+                     value={currentExecutive.job_title || ''}
+                     onChange={e => setCurrentExecutive({...currentExecutive, job_title: e.target.value})}
+                   />
+                </div>
+                 <div>
+                   <label className="block text-sm font-medium text-gray-700">Centro de Custo</label>
+                   <input
+                     type="text"
+                     className="mt-1 w-full p-2 border rounded"
+                     value={currentExecutive.cost_center || ''}
+                     onChange={e => setCurrentExecutive({...currentExecutive, cost_center: e.target.value})}
+                   />
+                </div>
+                <div>
+                   <label className="block text-sm font-medium text-gray-700">Organização</label>
+                   <select 
+                      className="mt-1 w-full p-2 border rounded"
+                      value={currentExecutive.organization_id || ''}
+                      onChange={e => setCurrentExecutive({...currentExecutive, organization_id: Number(e.target.value)})}
+                   >
+                     <option value="">Selecione</option>
+                     {organizations.map(org => (
+                       <option key={org.id} value={org.id}>{org.name}</option>
+                     ))}
+                   </select>
+                </div>
+                <div>
+                   <label className="block text-sm font-medium text-gray-700">Departamento</label>
+                   <select 
+                      className="mt-1 w-full p-2 border rounded"
+                      value={currentExecutive.department_id || ''}
+                      onChange={e => setCurrentExecutive({...currentExecutive, department_id: Number(e.target.value)})}
+                   >
+                     <option value="">Selecione</option>
+                     {/* Filtra departamentos se houver organização selecionada, ou mostra todos */}
+                     {departments
+                        .filter(d => !currentExecutive.organization_id || d.organization_id === currentExecutive.organization_id)
+                        .map(dept => (
+                       <option key={dept.id} value={dept.id}>{dept.name}</option>
+                     ))}
+                   </select>
+                </div>
+                <div>
+                   <label className="block text-sm font-medium text-gray-700">Data de Contratação</label>
+                   <input
+                     type="date"
+                     className="mt-1 w-full p-2 border rounded"
+                     value={currentExecutive.hire_date || ''}
+                     onChange={e => setCurrentExecutive({...currentExecutive, hire_date: e.target.value})}
+                   />
+                </div>
+                 <div>
+                   <label className="block text-sm font-medium text-gray-700">Local de Trabalho</label>
+                   <input
+                     type="text"
+                     className="mt-1 w-full p-2 border rounded"
+                     value={currentExecutive.work_location || ''}
+                     onChange={e => setCurrentExecutive({...currentExecutive, work_location: e.target.value})}
+                   />
+                </div>
+              </div>
+            )}
+
+            {/* --- Bloco 4: Perfil --- */}
+            {activeTab === 'profile' && (
+               <div className="space-y-4">
+                  <div>
+                   <label className="block text-sm font-medium text-gray-700">Bio / Resumo Profissional</label>
+                   <textarea
+                     className="mt-1 w-full p-2 border rounded"
+                     rows={4}
+                     value={currentExecutive.bio || ''}
+                     onChange={e => setCurrentExecutive({...currentExecutive, bio: e.target.value})}
+                   />
+                </div>
+                <div>
+                   <label className="block text-sm font-medium text-gray-700">Educação / Formação</label>
+                   <textarea
+                     className="mt-1 w-full p-2 border rounded"
+                     rows={3}
+                     value={currentExecutive.education || ''}
+                     onChange={e => setCurrentExecutive({...currentExecutive, education: e.target.value})}
+                   />
+                </div>
+                <div>
+                   <label className="block text-sm font-medium text-gray-700">Idiomas</label>
+                   <input
+                     type="text"
+                     placeholder="Ex: Inglês, Espanhol"
+                     className="mt-1 w-full p-2 border rounded"
+                     value={currentExecutive.languages || ''}
+                     onChange={e => setCurrentExecutive({...currentExecutive, languages: e.target.value})}
+                   />
+                </div>
+               </div>
+            )}
+
+            {/* --- Bloco 5: Emergência --- */}
+            {activeTab === 'emergency' && (
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                 <div>
+                   <label className="block text-sm font-medium text-gray-700">Nome Contato de Emergência</label>
+                   <input
+                     type="text"
+                     className="mt-1 w-full p-2 border rounded"
+                     value={currentExecutive.emergency_contact_name || ''}
+                     onChange={e => setCurrentExecutive({...currentExecutive, emergency_contact_name: e.target.value})}
+                   />
+                </div>
+                <div>
+                   <label className="block text-sm font-medium text-gray-700">Telefone Emergência</label>
+                   <input
+                     type="text"
+                     className="mt-1 w-full p-2 border rounded"
+                     value={currentExecutive.emergency_contact_phone || ''}
+                     onChange={e => setCurrentExecutive({...currentExecutive, emergency_contact_phone: e.target.value})}
+                   />
+                </div>
+                <div>
+                   <label className="block text-sm font-medium text-gray-700">Relação (Parentesco)</label>
+                   <input
+                     type="text"
+                     className="mt-1 w-full p-2 border rounded"
+                     value={currentExecutive.emergency_contact_relation || ''}
+                     onChange={e => setCurrentExecutive({...currentExecutive, emergency_contact_relation: e.target.value})}
+                   />
+                </div>
+                 <div className="col-span-2">
+                   <label className="block text-sm font-medium text-gray-700">Informações de Dependentes</label>
+                   <textarea
+                     className="mt-1 w-full p-2 border rounded"
+                     rows={2}
+                     value={currentExecutive.dependents_info || ''}
+                     onChange={e => setCurrentExecutive({...currentExecutive, dependents_info: e.target.value})}
+                   />
+                </div>
+               </div>
+            )}
+
+            {/* --- Bloco 6: Financeiro --- */}
+            {activeTab === 'finance' && (
+               <div className="space-y-4">
+                 <div>
+                   <label className="block text-sm font-medium text-gray-700">Dados Bancários</label>
+                   <textarea
+                     className="mt-1 w-full p-2 border rounded"
+                     rows={3}
+                     placeholder="Banco, Agência, Conta..."
+                     value={currentExecutive.bank_info || ''}
+                     onChange={e => setCurrentExecutive({...currentExecutive, bank_info: e.target.value})}
+                   />
+                </div>
+                <div>
+                   <label className="block text-sm font-medium text-gray-700">Informações de Remuneração</label>
+                   <textarea
+                     className="mt-1 w-full p-2 border rounded"
+                     rows={3}
+                     value={currentExecutive.compensation_info || ''}
+                     onChange={e => setCurrentExecutive({...currentExecutive, compensation_info: e.target.value})}
+                   />
+                </div>
+               </div>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-2 mt-6 pt-4 border-t border-gray-200">
+            <button
+              onClick={() => setIsModalOpen(false)}
+              className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleSave}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              Salvar
+            </button>
+          </div>
         </div>
-    );
+      </Modal>
+
+      <ConfirmationModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={handleDelete}
+        title="Excluir Executivo"
+        message="Tem certeza que deseja excluir este executivo? Esta ação não pode ser desfeita."
+      />
+    </div>
+  );
 };
 
 export default ExecutivesView;
