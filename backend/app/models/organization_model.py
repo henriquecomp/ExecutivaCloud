@@ -2,14 +2,13 @@ from sqlalchemy import Column, Integer, String, ForeignKey
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 
-
 class Organization(Base):
     __tablename__ = "organizations"
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False, index=True)
 
-    # Chave estrangeira para legal_organizations
+    # Chave estrangeira para legal_organizations (Matriz)
     legalOrganizationId = Column(
         Integer, ForeignKey("legal_organizations.id"), nullable=False
     )
@@ -27,5 +26,4 @@ class Organization(Base):
         "LegalOrganization", back_populates="organizations"
     )
     departments = relationship("Department", back_populates="organization")
-    # Adicione aqui o relacionamento com Executivos quando o modelo for criado
     executives = relationship("Executive", back_populates="organization")

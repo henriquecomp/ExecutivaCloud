@@ -16,7 +16,7 @@ class OrganizationRepository:
     def get_by_legal_org_id(self, legal_org_id: int) -> List[models.Organization]:
         return self.db.query(self.model).filter(self.model.legalOrganizationId == legal_org_id).all()
 
-    def get_all(self, skip: int = 0, limit: int = 100) -> List[models.Organization]:
+    def get_all(self, skip: int = 0, limit: int = 1000) -> List[models.Organization]:
         return self.db.query(self.model).offset(skip).limit(limit).all()
 
     def create(self, org_data: Dict[str, Any]) -> models.Organization:

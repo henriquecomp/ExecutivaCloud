@@ -3,8 +3,8 @@ import { Organization, Department, Executive, User, Secretary, Event, Contact, E
 import Modal from './Modal';
 import ConfirmationModal from './ConfirmationModal';
 import { EditIcon, DeleteIcon, PlusIcon } from './Icons';
-import { organizationService } from '@/services/organizationService';
-import { departmentService } from '@/services/departmentService';
+import { organizationService } from '../services/organizationService';
+import { departmentService } from '../services/departmentService';
 
 // --- Helper Functions ---
 function validateCNPJ(cnpj: string): boolean {
@@ -60,29 +60,29 @@ const maskCEP = (value: string) => {
 
 
 interface OrganizationsViewProps {
-  currentUser: User;
-  organizations: Organization[];
-  setOrganizations: React.Dispatch<React.SetStateAction<Organization[]>>;
-  departments: Department[];
-  setDepartments: React.Dispatch<React.SetStateAction<Department[]>>;
-  executives: Executive[];
-  setExecutives: React.Dispatch<React.SetStateAction<Executive[]>>;
-  secretaries: Secretary[];
-  setSecretaries: React.Dispatch<React.SetStateAction<Secretary[]>>;
-  setEvents: React.Dispatch<React.SetStateAction<Event[]>>;
-  setContacts: React.Dispatch<React.SetStateAction<Contact[]>>;
-  setExpenses: React.Dispatch<React.SetStateAction<Expense[]>>;
-  setTasks: React.Dispatch<React.SetStateAction<Task[]>>;
-  setDocuments: React.Dispatch<React.SetStateAction<Document[]>>;
-  setUsers: React.Dispatch<React.SetStateAction<User[]>>;
-  legalOrganizations: LegalOrganization[];
-  onRefresh: () => Promise<void>; 
+    currentUser: User;
+    organizations: Organization[];
+    setOrganizations: React.Dispatch<React.SetStateAction<Organization[]>>;
+    departments: Department[];
+    setDepartments: React.Dispatch<React.SetStateAction<Department[]>>;
+    executives: Executive[];
+    setExecutives: React.Dispatch<React.SetStateAction<Executive[]>>;
+    secretaries: Secretary[];
+    setSecretaries: React.Dispatch<React.SetStateAction<Secretary[]>>;
+    setEvents: React.Dispatch<React.SetStateAction<Event[]>>;
+    setContacts: React.Dispatch<React.SetStateAction<Contact[]>>;
+    setExpenses: React.Dispatch<React.SetStateAction<Expense[]>>;
+    setTasks: React.Dispatch<React.SetStateAction<Task[]>>;
+    setDocuments: React.Dispatch<React.SetStateAction<Document[]>>;
+    setUsers: React.Dispatch<React.SetStateAction<User[]>>;
+    legalOrganizations: LegalOrganization[];
+    onRefresh: () => Promise<void>;
 }
 
 const OrganizationForm: React.FC<{
-    organization: Partial<Organization>, 
-    onSave: (organization: OrganizationCreate | OrganizationUpdate) => void, 
-    onCancel: () => void, 
+    organization: Partial<Organization>,
+    onSave: (organization: OrganizationCreate | OrganizationUpdate) => void,
+    onCancel: () => void,
     legalOrganizations: LegalOrganization[],
     currentUser: User;
 }> = ({ organization, onSave, onCancel, legalOrganizations, currentUser }) => {
@@ -107,7 +107,7 @@ const OrganizationForm: React.FC<{
 
     const isAdminForLegalOrg = currentUser.role === 'admin' && !!currentUser.legalOrganizationId;
     const isOrgAdmin = currentUser.role === 'admin' && !!currentUser.organizationId;
-    
+
     const [legalOrganizationId, setLegalOrganizationId] = useState(
         isAdminForLegalOrg ? currentUser.legalOrganizationId : organization.legalOrganizationId || ''
     );
@@ -141,7 +141,7 @@ const OrganizationForm: React.FC<{
         const cepClean = zipCode.replace(/\D/g, '');
         if (cepClean.length !== 8) {
             if (cepClean.length > 0) {
-                 setCepError('CEP incompleto ou inválido.');
+                setCepError('CEP incompleto ou inválido.');
             }
             return;
         }
@@ -150,7 +150,7 @@ const OrganizationForm: React.FC<{
         try {
             const response = await fetch(`https://viacep.com.br/ws/${cepClean}/json/`);
             if (!response.ok) throw new Error('Erro ao buscar CEP.');
-            
+
             const data = await response.json();
             if (data.erro) {
                 throw new Error('CEP não encontrado ou inválido.');
@@ -168,12 +168,12 @@ const OrganizationForm: React.FC<{
             setIsCepLoading(false);
         }
     };
-    
+
     const handleCompanyNameBlur = () => {
         if (!name || !legalOrganizationId || cnpj || zipCode) {
             return;
         }
-    
+
         const selectedLegalOrg = legalOrganizations.find(lo => String(lo.id) === String(legalOrganizationId));
         if (selectedLegalOrg && (selectedLegalOrg.cnpj || selectedLegalOrg.zipCode || selectedLegalOrg.street)) {
             copyConfirmedRef.current = false;
@@ -181,7 +181,7 @@ const OrganizationForm: React.FC<{
             setCopyDataConfirmOpen(true);
         }
     };
-    
+
     const handleConfirmCopyData = () => {
         if (dataToCopy) {
             setCnpj(maskCNPJ(dataToCopy.cnpj || ''));
@@ -196,7 +196,7 @@ const OrganizationForm: React.FC<{
         }
         copyConfirmedRef.current = true;
     };
-    
+
     const handleCloseCopyModal = () => {
         setCopyDataConfirmOpen(false);
         if (!copyConfirmedRef.current) {
@@ -213,7 +213,7 @@ const OrganizationForm: React.FC<{
             cnpjInputRef.current?.focus();
             return;
         };
-        
+
         const data: any = {
             name,
             legalOrganizationId,
@@ -239,11 +239,11 @@ const OrganizationForm: React.FC<{
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                     <label htmlFor="legalOrganizationId" className="block text-sm font-medium text-slate-700">Organização Matriz</label>
-                    <select 
-                        id="legalOrganizationId" 
-                        value={legalOrganizationId} 
-                        onChange={e => setLegalOrganizationId(e.target.value)} 
-                        required 
+                    <select
+                        id="legalOrganizationId"
+                        value={legalOrganizationId}
+                        onChange={e => setLegalOrganizationId(e.target.value)}
+                        required
                         disabled={isAdminForLegalOrg || isOrgAdmin}
                         className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm disabled:bg-slate-100 disabled:cursor-not-allowed"
                     >
@@ -253,14 +253,14 @@ const OrganizationForm: React.FC<{
                 </div>
                 <div>
                     <label htmlFor="name" className="block text-sm font-medium text-slate-700">Nome da Empresa</label>
-                    <input 
-                        type="text" 
-                        id="name" 
-                        value={name} 
-                        onChange={e => setName(e.target.value)} 
+                    <input
+                        type="text"
+                        id="name"
+                        value={name}
+                        onChange={e => setName(e.target.value)}
                         onBlur={handleCompanyNameBlur}
-                        required 
-                        className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" 
+                        required
+                        className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                     />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -291,12 +291,12 @@ const OrganizationForm: React.FC<{
                         {cepError && <p className="mt-1 text-xs text-red-600">{cepError}</p>}
                     </div>
                 </div>
-                
-                 <div>
+
+                <div>
                     <label htmlFor="street" className="block text-sm font-medium text-slate-700">Rua</label>
                     <input type="text" id="street" value={street} onChange={e => setStreet(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
                 </div>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="md:col-span-1">
                         <label htmlFor="number" className="block text-sm font-medium text-slate-700">Número</label>
@@ -335,22 +335,22 @@ const OrganizationForm: React.FC<{
     );
 };
 
-const DepartmentForm: React.FC<{ 
-    department: Partial<Department>, 
-    onSave: (department: DepartmentCreate | DepartmentUpdate) => void, 
-    onCancel: () => void 
+const DepartmentForm: React.FC<{
+    department: Partial<Department>,
+    onSave: (department: DepartmentCreate | DepartmentUpdate) => void,
+    onCancel: () => void
 }> = ({ department, onSave, onCancel }) => {
     const [name, setName] = useState(department.name || '');
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!name || !department.organizationId) return;
-        
+
         const data: any = {
             name,
             organizationId: department.organizationId,
         };
-        
+
         if (department.id) {
             data.id = department.id;
         }
@@ -360,7 +360,7 @@ const DepartmentForm: React.FC<{
 
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
-             <div>
+            <div>
                 <label htmlFor="dept-name" className="block text-sm font-medium text-slate-700">Nome do Departamento</label>
                 <input type="text" id="dept-name" value={name} onChange={e => setName(e.target.value)} required className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
             </div>
@@ -373,14 +373,14 @@ const DepartmentForm: React.FC<{
 };
 
 
-const OrganizationsView: React.FC<OrganizationsViewProps> = ({ 
+const OrganizationsView: React.FC<OrganizationsViewProps> = ({
     currentUser,
-    organizations, setOrganizations, 
-    departments, setDepartments, 
-    executives, setExecutives, 
+    organizations, setOrganizations,
+    departments, setDepartments,
+    executives, setExecutives,
     secretaries, setSecretaries,
     setEvents, setContacts, setExpenses, setTasks,
-    setDocuments, setUsers, 
+    setDocuments, setUsers,
     legalOrganizations,
     onRefresh
 }) => {
@@ -395,10 +395,10 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
     const [deptToDelete, setDeptToDelete] = useState<Department | null>(null);
 
     const isOrgAdmin = currentUser.role === 'admin' && !!currentUser.organizationId;
-    
+
     const visibleOrganizations = useMemo(() => {
         const isAdminForLegalOrg = currentUser.role === 'admin' && !!currentUser.legalOrganizationId;
-        
+
         if (isAdminForLegalOrg) {
             return organizations.filter(o => String(o.legalOrganizationId) === String(currentUser.legalOrganizationId));
         }
@@ -416,7 +416,7 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
         setApiError(null);
         setOrgModalOpen(true);
     };
-    
+
     const handleEditOrganization = (e: React.MouseEvent, organization: Organization) => {
         e.preventDefault();
         e.stopPropagation();
@@ -424,14 +424,14 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
         setApiError(null);
         setOrgModalOpen(true);
     };
-    
+
     const handleDeleteOrganization = (e: React.MouseEvent, org: Organization) => {
         e.preventDefault();
         e.stopPropagation();
         setApiError(null);
         setOrgToDelete(org);
     };
-    
+
     const confirmDeleteOrganization = async () => {
         if (!orgToDelete) return;
         setIsLoading(true);
@@ -478,7 +478,7 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
         setApiError(null);
         setDeptModalOpen(true);
     };
-    
+
     const handleEditDepartment = (e: React.MouseEvent, department: Department) => {
         e.preventDefault();
         e.stopPropagation();
@@ -486,14 +486,14 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
         setApiError(null);
         setDeptModalOpen(true);
     };
-    
+
     const handleDeleteDepartment = (e: React.MouseEvent, dept: Department) => {
         e.preventDefault();
         e.stopPropagation();
         setApiError(null);
         setDeptToDelete(dept);
     };
-    
+
     const confirmDeleteDepartment = async () => {
         if (!deptToDelete) return;
         setIsLoading(true);
@@ -510,7 +510,7 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
             setIsLoading(false);
         }
     };
-    
+
     const handleSaveDepartment = async (deptData: DepartmentCreate | DepartmentUpdate) => {
         setIsLoading(true);
         try {
@@ -534,7 +534,7 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
 
     return (
         <div className="space-y-6 animate-fade-in relative">
-             {isLoading && (
+            {isLoading && (
                 <div className="absolute inset-0 bg-white/50 z-50 flex items-center justify-center backdrop-blur-sm rounded-xl">
                     <div className="flex flex-col items-center">
                         <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
@@ -549,9 +549,9 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
                     <p className="text-slate-500 mt-1">Adicione ou edite as empresas e seus respectivos departamentos.</p>
                 </div>
                 {/* type="button" adicionado */}
-                <button 
+                <button
                     type="button"
-                    onClick={handleAddOrganization} 
+                    onClick={handleAddOrganization}
                     disabled={isOrgAdmin}
                     className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-md shadow-sm hover:bg-indigo-700 transition duration-150 disabled:bg-slate-300 disabled:cursor-not-allowed"
                 >
@@ -578,7 +578,7 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
                                         <EditIcon />
                                     </button>
                                     {/* type="button" adicionado */}
-                                    <button 
+                                    <button
                                         type="button"
                                         onClick={(e) => handleDeleteOrganization(e, org)}
                                         disabled={isOrgAdmin}
@@ -633,19 +633,18 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
                 )}
             </div>
 
-            {/* Código original restaurado (sem a prop inventada isOpen) */}
             {isOrgModalOpen && (
-                <Modal title={editingOrganization?.id ? 'Editar Empresa' : 'Nova Empresa'} onClose={() => {setOrgModalOpen(false); setEditingOrganization(null)}}>
+                <Modal title={editingOrganization?.id ? 'Editar Empresa' : 'Nova Empresa'} onClose={() => { setOrgModalOpen(false); setEditingOrganization(null) }}>
                     {apiError && (
                         <div className="mb-4 bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded" role="alert">
                             <p className="font-bold">Atenção</p>
                             <p>{apiError}</p>
                         </div>
                     )}
-                    <OrganizationForm 
-                        organization={editingOrganization || {}} 
-                        onSave={handleSaveOrganization} 
-                        onCancel={() => { setOrgModalOpen(false); setEditingOrganization(null); }} 
+                    <OrganizationForm
+                        organization={editingOrganization || {}}
+                        onSave={handleSaveOrganization}
+                        onCancel={() => { setOrgModalOpen(false); setEditingOrganization(null); }}
                         legalOrganizations={legalOrganizations}
                         currentUser={currentUser}
                     />
@@ -653,7 +652,7 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
             )}
 
             {isDeptModalOpen && (
-                 <Modal title={editingDepartment?.id ? 'Editar Departamento' : 'Novo Departamento'} onClose={() => {setDeptModalOpen(false); setEditingDepartment(null)}}>
+                <Modal title={editingDepartment?.id ? 'Editar Departamento' : 'Novo Departamento'} onClose={() => { setDeptModalOpen(false); setEditingDepartment(null) }}>
                     {apiError && (
                         <div className="mb-4 bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded" role="alert">
                             <p className="font-bold">Atenção</p>
@@ -673,9 +672,9 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
                     message={apiError ? `ERRO: ${apiError}` : `Tem certeza que deseja excluir a empresa ${orgToDelete.name}? TODOS os seus dados (departamentos, executivos, atividades, etc) e usuários associados serão permanentemente removidos.`}
                 />
             )}
-            
+
             {deptToDelete && (
-                 <ConfirmationModal
+                <ConfirmationModal
                     isOpen={!!deptToDelete}
                     onClose={() => setDeptToDelete(null)}
                     onConfirm={confirmDeleteDepartment}

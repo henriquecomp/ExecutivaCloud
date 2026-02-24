@@ -16,15 +16,15 @@ class OrganizationService:
     def get_organization(self, org_id: int) -> Optional[models.Organization]:
         return self.repository.get_by_id(org_id)
 
-    def get_all_organizations(self, skip: int = 0, limit: int = 100) -> List[models.Organization]:
+    def get_all_organizations(self, skip: int = 0, limit: int = 1000) -> List[models.Organization]:
         return self.repository.get_all(skip=skip, limit=limit)
 
     def create_organization(self, org_data: schemas.OrganizationCreate) -> models.Organization:
-        # Lógica de Negócio: Verificar se a LegalOrganization pai existe
+        # Lógica de Negócio: Verificar se a Matriz pai existe
         if not self.legal_org_repo.get_by_id(org_data.legalOrganizationId):
             raise ValueError("A Organização Matriz (legalOrganizationId) não existe.")
 
-        # Lógica de Negócio: Verificar se o CNPJ já existe (se fornecido)
+        # Lógica de Negócio: Verificar se o CNPJ já existe
         if org_data.cnpj:
             if self.repository.get_by_cnpj(org_data.cnpj):
                 raise ValueError("CNPJ já registrado para outra empresa.")
@@ -44,7 +44,7 @@ class OrganizationService:
             if update_dict.get("cnpj") and self.repository.get_by_cnpj(update_dict["cnpj"]):
                 raise ValueError("Novo CNPJ já está em uso.")
         
-        # Lógica de Negócio: Se o legalOrganizationId for alterado, verifique se ele existe
+        # Lógica de Negócio: Se a Matriz for alterada, verifique se ela existe
         if "legalOrganizationId" in update_dict and update_dict["legalOrganizationId"] != db_org.legalOrganizationId:
             if not self.legal_org_repo.get_by_id(update_dict["legalOrganizationId"]):
                  raise ValueError("A nova Organização Matriz (legalOrganizationId) não existe.")
@@ -58,7 +58,7 @@ class OrganizationService:
         
         # Lógica de Negócio: Verificar se há departamentos filhos
         if db_org.departments:
-             raise ValueError("Não é possível excluir. Esta empresa possui departamentos vinculados.")
+             raise ValueError("Não é possível excluir. Esta empresa possui departamentos vinculados. Exclua-os primeiro.")
         
         self.repository.delete(db_org)
         return {"message": "Empresa deletada com sucesso"}
