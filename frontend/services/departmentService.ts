@@ -2,6 +2,11 @@ import { api } from "./api";
 import { Department, DepartmentCreate, DepartmentUpdate } from "../types";
 
 export const departmentService = {
+  // Método crucial para carregar a lista completa e permitir filtro no frontend
+  getAll: async () => {
+    const response = await api.get<Department[]>("/departments/");
+    return response.data;
+  },
   getByOrg: async (orgId: string) => {
     const response = await api.get<Department[]>(
       `/departments/by-organization/${orgId}`,
@@ -21,7 +26,6 @@ export const departmentService = {
     return response.data;
   },
   delete: async (id: string) => {
-    const response = await api.delete(`/departments/${id}`);
-    return response.data;
+    await api.delete(`/departments/${id}`);
   },
 };

@@ -1,12 +1,42 @@
 import React, { useState, useEffect } from 'react';
 import { executiveService } from '../services/executiveService';
-import { organizationService } from '../services/organizationService'; // Corrigido caminho
-import { departmentService } from '../services/departmentService'; // Corrigido caminho
+import { organizationService } from '../services/organizationService';
+import { departmentService } from '../services/departmentService';
 import { Executive, Organization, Department } from '../types';
-import { Plus, Edit2, Trash2, Search, User, Briefcase, Phone, FileText, DollarSign, AlertCircle } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, User, Briefcase, Phone, FileText, DollarSign, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import Modal from './Modal';
 import ConfirmationModal from './ConfirmationModal';
 import Pagination from './Pagination';
+
+// Subcomponente de Colapso
+const CollapseSection: React.FC<{
+  title: string;
+  icon: React.ReactNode;
+  isOpen: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}> = ({ title, icon, isOpen, onToggle, children }) => {
+  return (
+    <div className="border border-gray-200 rounded-lg bg-white overflow-hidden shadow-sm">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="w-full flex justify-between items-center p-4 bg-gray-50 hover:bg-gray-100 transition-colors"
+      >
+        <div className="flex items-center gap-2 font-medium text-gray-700">
+          {icon}
+          {title}
+        </div>
+        {isOpen ? <ChevronUp size={20} className="text-gray-500" /> : <ChevronDown size={20} className="text-gray-500" />}
+      </button>
+      {isOpen && (
+        <div className="p-4 border-t border-gray-200">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const ExecutivesView: React.FC = () => {
   const [executives, setExecutives] = useState<Executive[]>([]);
@@ -27,8 +57,23 @@ const ExecutivesView: React.FC = () => {
   const [currentExecutive, setCurrentExecutive] = useState<Partial<Executive>>({});
   const [executiveToDelete, setExecutiveToDelete] = useState<number | null>(null);
 
-  // Controle de Abas do Modal
-  const [activeTab, setActiveTab] = useState<'personal' | 'contact' | 'professional' | 'profile' | 'emergency' | 'finance'>('personal');
+  // Validação (Erros)
+  const [errors, setErrors] = useState<{ full_name?: string; work_email?: string }>({});
+  const [apiError, setApiError] = useState<string | null>(null);
+
+  // Controle de Seções Colapsáveis do Modal
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+    personal: true,
+    contact: true,
+    professional: true,
+    profile: false,
+    emergency: false,
+    finance: false,
+  });
+
+  const toggleSection = (section: string) => {
+    setOpenSections((prev) => ({ ...prev, [section]: !prev[section] }));
+  };
 
   useEffect(() => {
     fetchData();
@@ -37,7 +82,6 @@ const ExecutivesView: React.FC = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Alterado para getAll para garantir que temos todos os departamentos para exibição na tabela
       const [execData, orgData, deptData] = await Promise.all([
         executiveService.getAll((currentPage - 1) * itemsPerPage, itemsPerPage),
         organizationService.getAll(),
@@ -55,12 +99,32 @@ const ExecutivesView: React.FC = () => {
   };
 
   const handleSave = async () => {
-    try {
-      if (!currentExecutive.full_name || !currentExecutive.work_email) {
-        alert("Nome completo e Email corporativo são obrigatórios.");
-        return;
-      }
+    setApiError(null); // Limpar erro da API ao tentar salvar novamente
 
+    // Validação de Frontend
+    const newErrors: { full_name?: string; work_email?: string } = {};
+    if (!currentExecutive.full_name || currentExecutive.full_name.trim() === '') {
+      newErrors.full_name = "O Nome Completo é obrigatório.";
+    }
+    if (!currentExecutive.work_email || currentExecutive.work_email.trim() === '') {
+      newErrors.work_email = "O Email Corporativo é obrigatório.";
+    }
+
+    // Se houver erros no Frontend, interrompe e mostra na tela
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      
+      // Abre automaticamente as seções que contêm erros
+      setOpenSections(prev => ({
+        ...prev,
+        personal: newErrors.full_name ? true : prev.personal,
+        contact: newErrors.work_email ? true : prev.contact
+      }));
+      return;
+    }
+
+    // Requisição Backend
+    try {
       if (currentExecutive.id) {
         await executiveService.update(currentExecutive.id, currentExecutive);
       } else {
@@ -68,9 +132,11 @@ const ExecutivesView: React.FC = () => {
       }
       setIsModalOpen(false);
       fetchData();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao salvar executivo:', error);
-      alert('Erro ao salvar executivo. Verifique os dados.');
+      // Capturar mensagem do backend ("detail") ou erro genérico
+      const errorMessage = error.response?.data?.detail || error.message || 'Erro ao salvar executivo no servidor. Verifique os dados.';
+      setApiError(errorMessage);
     }
   };
 
@@ -89,17 +155,34 @@ const ExecutivesView: React.FC = () => {
 
   const openEditModal = (executive: Executive) => {
     setCurrentExecutive({ ...executive });
-    setActiveTab('personal');
+    setErrors({}); 
+    setApiError(null); 
+    setOpenSections({
+      personal: true,
+      contact: true,
+      professional: true,
+      profile: false,
+      emergency: false,
+      finance: false,
+    });
     setIsModalOpen(true);
   };
 
   const openCreateModal = () => {
     setCurrentExecutive({});
-    setActiveTab('personal');
+    setErrors({}); 
+    setApiError(null); 
+    setOpenSections({
+      personal: true,
+      contact: true,
+      professional: true,
+      profile: false,
+      emergency: false,
+      finance: false,
+    });
     setIsModalOpen(true);
   };
 
-  // CORREÇÃO AQUI: Adicionado verificação segura (?.) e valor padrão ('')
   const filteredExecutives = executives.filter(ex => {
     const name = ex.full_name ? ex.full_name.toLowerCase() : '';
     const email = ex.work_email ? ex.work_email.toLowerCase() : '';
@@ -107,22 +190,6 @@ const ExecutivesView: React.FC = () => {
 
     return name.includes(term) || email.includes(term);
   });
-
-  // Renderização das Abas
-  const renderTabButton = (id: typeof activeTab, label: string, icon: React.ReactNode) => (
-    <button
-      type="button"
-      onClick={() => setActiveTab(id)}
-      className={`flex items-center px-4 py-2 text-sm font-medium border-b-2 ${
-        activeTab === id
-          ? 'border-blue-500 text-blue-600'
-          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-      }`}
-    >
-      <span className="mr-2">{icon}</span>
-      {label}
-    </button>
-  );
 
   return (
     <div className="space-y-6">
@@ -222,38 +289,55 @@ const ExecutivesView: React.FC = () => {
         onClose={() => setIsModalOpen(false)}
         title={currentExecutive.id ? "Editar Executivo" : "Novo Executivo"}
       >
-        <div className="flex flex-col h-[70vh]"> {/* Altura fixa para scroll interno */}
+        <div className="flex flex-col h-[75vh]">
           
-          {/* Navegação por Abas */}
-          <div className="flex border-b border-gray-200 mb-4 overflow-x-auto">
-            {renderTabButton('personal', 'Pessoal', <User size={16} />)}
-            {renderTabButton('contact', 'Contato', <Phone size={16} />)}
-            {renderTabButton('professional', 'Profissional', <Briefcase size={16} />)}
-            {renderTabButton('profile', 'Perfil', <FileText size={16} />)}
-            {renderTabButton('emergency', 'Emergência', <AlertCircle size={16} />)}
-            {renderTabButton('finance', 'Financeiro', <DollarSign size={16} />)}
-          </div>
-
-          {/* Conteúdo com Scroll */}
-          <div className="flex-1 overflow-y-auto pr-2 space-y-4">
+          {/* Conteúdo do Formulário Corrido com Scroll */}
+          <div className="flex-1 overflow-y-auto pr-2 space-y-4 pb-4">
             
+            {/* Alerta de Erro do Backend */}
+            {apiError && (
+              <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3 text-red-700">
+                <AlertCircle size={20} className="mt-0.5 flex-shrink-0" />
+                <div>
+                  <h3 className="font-semibold text-sm">Erro ao salvar os dados</h3>
+                  <p className="text-sm mt-1">{apiError}</p>
+                </div>
+              </div>
+            )}
+
             {/* --- Bloco 1: Identificação Pessoal --- */}
-            {activeTab === 'personal' && (
+            <CollapseSection
+              title="Identificação Pessoal"
+              icon={<User size={18} />}
+              isOpen={openSections.personal}
+              onToggle={() => toggleSection('personal')}
+            >
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="col-span-2">
-                   <label className="block text-sm font-medium text-gray-700">Nome Completo *</label>
+                   <label className={`block text-sm font-medium ${errors.full_name ? 'text-red-600' : 'text-gray-700'}`}>
+                     Nome Completo *
+                   </label>
                    <input
                      type="text"
-                     className="mt-1 w-full p-2 border rounded"
+                     className={`mt-1 w-full p-2 border rounded focus:outline-none focus:ring-2 ${
+                       errors.full_name ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
+                     }`}
                      value={currentExecutive.full_name || ''}
-                     onChange={e => setCurrentExecutive({...currentExecutive, full_name: e.target.value})}
+                     onChange={e => {
+                       setCurrentExecutive({...currentExecutive, full_name: e.target.value});
+                       if (errors.full_name) setErrors({...errors, full_name: undefined});
+                       if (apiError) setApiError(null);
+                     }}
                    />
+                   {errors.full_name && (
+                     <p className="mt-1 text-sm text-red-600">{errors.full_name}</p>
+                   )}
                 </div>
                 <div>
                    <label className="block text-sm font-medium text-gray-700">CPF</label>
                    <input
                      type="text"
-                     className="mt-1 w-full p-2 border rounded"
+                     className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
                      value={currentExecutive.cpf || ''}
                      onChange={e => setCurrentExecutive({...currentExecutive, cpf: e.target.value})}
                    />
@@ -262,7 +346,7 @@ const ExecutivesView: React.FC = () => {
                    <label className="block text-sm font-medium text-gray-700">RG</label>
                    <input
                      type="text"
-                     className="mt-1 w-full p-2 border rounded"
+                     className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
                      value={currentExecutive.rg || ''}
                      onChange={e => setCurrentExecutive({...currentExecutive, rg: e.target.value})}
                    />
@@ -271,7 +355,7 @@ const ExecutivesView: React.FC = () => {
                    <label className="block text-sm font-medium text-gray-700">Data de Nascimento</label>
                    <input
                      type="date"
-                     className="mt-1 w-full p-2 border rounded"
+                     className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
                      value={currentExecutive.birth_date || ''}
                      onChange={e => setCurrentExecutive({...currentExecutive, birth_date: e.target.value})}
                    />
@@ -280,15 +364,15 @@ const ExecutivesView: React.FC = () => {
                    <label className="block text-sm font-medium text-gray-700">Nacionalidade</label>
                    <input
                      type="text"
-                     className="mt-1 w-full p-2 border rounded"
+                     className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
                      value={currentExecutive.nationality || ''}
                      onChange={e => setCurrentExecutive({...currentExecutive, nationality: e.target.value})}
                    />
                 </div>
-                <div>
+                <div className="col-span-2 md:col-span-1">
                    <label className="block text-sm font-medium text-gray-700">Estado Civil</label>
                    <select 
-                      className="mt-1 w-full p-2 border rounded"
+                      className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
                       value={currentExecutive.civil_status || ''}
                       onChange={e => setCurrentExecutive({...currentExecutive, civil_status: e.target.value})}
                    >
@@ -300,25 +384,41 @@ const ExecutivesView: React.FC = () => {
                    </select>
                 </div>
               </div>
-            )}
+            </CollapseSection>
 
             {/* --- Bloco 2: Contato --- */}
-            {activeTab === 'contact' && (
+            <CollapseSection
+              title="Informações de Contato"
+              icon={<Phone size={18} />}
+              isOpen={openSections.contact}
+              onToggle={() => toggleSection('contact')}
+            >
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="col-span-2">
-                   <label className="block text-sm font-medium text-gray-700">Email Corporativo *</label>
+                   <label className={`block text-sm font-medium ${errors.work_email ? 'text-red-600' : 'text-gray-700'}`}>
+                     Email Corporativo *
+                   </label>
                    <input
                      type="email"
-                     className="mt-1 w-full p-2 border rounded"
+                     className={`mt-1 w-full p-2 border rounded focus:outline-none focus:ring-2 ${
+                       errors.work_email ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
+                     }`}
                      value={currentExecutive.work_email || ''}
-                     onChange={e => setCurrentExecutive({...currentExecutive, work_email: e.target.value})}
+                     onChange={e => {
+                       setCurrentExecutive({...currentExecutive, work_email: e.target.value});
+                       if (errors.work_email) setErrors({...errors, work_email: undefined});
+                       if (apiError) setApiError(null);
+                     }}
                    />
+                   {errors.work_email && (
+                     <p className="mt-1 text-sm text-red-600">{errors.work_email}</p>
+                   )}
                 </div>
                 <div>
                    <label className="block text-sm font-medium text-gray-700">Telefone Corporativo</label>
                    <input
                      type="text"
-                     className="mt-1 w-full p-2 border rounded"
+                     className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
                      value={currentExecutive.work_phone || ''}
                      onChange={e => setCurrentExecutive({...currentExecutive, work_phone: e.target.value})}
                    />
@@ -327,7 +427,7 @@ const ExecutivesView: React.FC = () => {
                    <label className="block text-sm font-medium text-gray-700">Email Pessoal</label>
                    <input
                      type="email"
-                     className="mt-1 w-full p-2 border rounded"
+                     className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
                      value={currentExecutive.personal_email || ''}
                      onChange={e => setCurrentExecutive({...currentExecutive, personal_email: e.target.value})}
                    />
@@ -336,7 +436,7 @@ const ExecutivesView: React.FC = () => {
                    <label className="block text-sm font-medium text-gray-700">Telefone Pessoal</label>
                    <input
                      type="text"
-                     className="mt-1 w-full p-2 border rounded"
+                     className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
                      value={currentExecutive.personal_phone || ''}
                      onChange={e => setCurrentExecutive({...currentExecutive, personal_phone: e.target.value})}
                    />
@@ -344,7 +444,7 @@ const ExecutivesView: React.FC = () => {
                 <div className="col-span-2">
                    <label className="block text-sm font-medium text-gray-700">Endereço (Rua/Núm/Comp)</label>
                    <textarea
-                     className="mt-1 w-full p-2 border rounded"
+                     className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
                      rows={2}
                      value={currentExecutive.street || ''}
                      onChange={e => setCurrentExecutive({...currentExecutive, street: e.target.value})}
@@ -354,22 +454,27 @@ const ExecutivesView: React.FC = () => {
                    <label className="block text-sm font-medium text-gray-700">LinkedIn URL</label>
                    <input
                      type="text"
-                     className="mt-1 w-full p-2 border rounded"
+                     className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
                      value={currentExecutive.linkedin_profile_url || ''}
                      onChange={e => setCurrentExecutive({...currentExecutive, linkedin_profile_url: e.target.value})}
                    />
                 </div>
               </div>
-            )}
+            </CollapseSection>
 
             {/* --- Bloco 3: Profissional --- */}
-            {activeTab === 'professional' && (
+            <CollapseSection
+              title="Dados Profissionais"
+              icon={<Briefcase size={18} />}
+              isOpen={openSections.professional}
+              onToggle={() => toggleSection('professional')}
+            >
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                  <div>
                    <label className="block text-sm font-medium text-gray-700">Cargo (Job Title)</label>
                    <input
                      type="text"
-                     className="mt-1 w-full p-2 border rounded"
+                     className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
                      value={currentExecutive.job_title || ''}
                      onChange={e => setCurrentExecutive({...currentExecutive, job_title: e.target.value})}
                    />
@@ -378,7 +483,7 @@ const ExecutivesView: React.FC = () => {
                    <label className="block text-sm font-medium text-gray-700">Centro de Custo</label>
                    <input
                      type="text"
-                     className="mt-1 w-full p-2 border rounded"
+                     className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
                      value={currentExecutive.cost_center || ''}
                      onChange={e => setCurrentExecutive({...currentExecutive, cost_center: e.target.value})}
                    />
@@ -386,7 +491,7 @@ const ExecutivesView: React.FC = () => {
                 <div>
                    <label className="block text-sm font-medium text-gray-700">Organização</label>
                    <select 
-                      className="mt-1 w-full p-2 border rounded"
+                      className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
                       value={currentExecutive.organization_id || ''}
                       onChange={e => setCurrentExecutive({...currentExecutive, organization_id: Number(e.target.value)})}
                    >
@@ -399,12 +504,11 @@ const ExecutivesView: React.FC = () => {
                 <div>
                    <label className="block text-sm font-medium text-gray-700">Departamento</label>
                    <select 
-                      className="mt-1 w-full p-2 border rounded"
+                      className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
                       value={currentExecutive.department_id || ''}
                       onChange={e => setCurrentExecutive({...currentExecutive, department_id: Number(e.target.value)})}
                    >
                      <option value="">Selecione</option>
-                     {/* Filtra departamentos se houver organização selecionada, ou mostra todos */}
                      {departments
                         .filter(d => !currentExecutive.organization_id || d.organization_id === currentExecutive.organization_id)
                         .map(dept => (
@@ -416,7 +520,7 @@ const ExecutivesView: React.FC = () => {
                    <label className="block text-sm font-medium text-gray-700">Data de Contratação</label>
                    <input
                      type="date"
-                     className="mt-1 w-full p-2 border rounded"
+                     className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
                      value={currentExecutive.hire_date || ''}
                      onChange={e => setCurrentExecutive({...currentExecutive, hire_date: e.target.value})}
                    />
@@ -425,21 +529,26 @@ const ExecutivesView: React.FC = () => {
                    <label className="block text-sm font-medium text-gray-700">Local de Trabalho</label>
                    <input
                      type="text"
-                     className="mt-1 w-full p-2 border rounded"
+                     className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
                      value={currentExecutive.work_location || ''}
                      onChange={e => setCurrentExecutive({...currentExecutive, work_location: e.target.value})}
                    />
                 </div>
               </div>
-            )}
+            </CollapseSection>
 
             {/* --- Bloco 4: Perfil --- */}
-            {activeTab === 'profile' && (
+            <CollapseSection
+              title="Perfil e Biografia"
+              icon={<FileText size={18} />}
+              isOpen={openSections.profile}
+              onToggle={() => toggleSection('profile')}
+            >
                <div className="space-y-4">
                   <div>
                    <label className="block text-sm font-medium text-gray-700">Bio / Resumo Profissional</label>
                    <textarea
-                     className="mt-1 w-full p-2 border rounded"
+                     className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
                      rows={4}
                      value={currentExecutive.bio || ''}
                      onChange={e => setCurrentExecutive({...currentExecutive, bio: e.target.value})}
@@ -448,7 +557,7 @@ const ExecutivesView: React.FC = () => {
                 <div>
                    <label className="block text-sm font-medium text-gray-700">Educação / Formação</label>
                    <textarea
-                     className="mt-1 w-full p-2 border rounded"
+                     className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
                      rows={3}
                      value={currentExecutive.education || ''}
                      onChange={e => setCurrentExecutive({...currentExecutive, education: e.target.value})}
@@ -459,22 +568,27 @@ const ExecutivesView: React.FC = () => {
                    <input
                      type="text"
                      placeholder="Ex: Inglês, Espanhol"
-                     className="mt-1 w-full p-2 border rounded"
+                     className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
                      value={currentExecutive.languages || ''}
                      onChange={e => setCurrentExecutive({...currentExecutive, languages: e.target.value})}
                    />
                 </div>
                </div>
-            )}
+            </CollapseSection>
 
             {/* --- Bloco 5: Emergência --- */}
-            {activeTab === 'emergency' && (
+            <CollapseSection
+              title="Contato de Emergência"
+              icon={<AlertCircle size={18} />}
+              isOpen={openSections.emergency}
+              onToggle={() => toggleSection('emergency')}
+            >
                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                  <div>
                    <label className="block text-sm font-medium text-gray-700">Nome Contato de Emergência</label>
                    <input
                      type="text"
-                     className="mt-1 w-full p-2 border rounded"
+                     className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
                      value={currentExecutive.emergency_contact_name || ''}
                      onChange={e => setCurrentExecutive({...currentExecutive, emergency_contact_name: e.target.value})}
                    />
@@ -483,16 +597,16 @@ const ExecutivesView: React.FC = () => {
                    <label className="block text-sm font-medium text-gray-700">Telefone Emergência</label>
                    <input
                      type="text"
-                     className="mt-1 w-full p-2 border rounded"
+                     className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
                      value={currentExecutive.emergency_contact_phone || ''}
                      onChange={e => setCurrentExecutive({...currentExecutive, emergency_contact_phone: e.target.value})}
                    />
                 </div>
-                <div>
+                <div className="col-span-2 md:col-span-1">
                    <label className="block text-sm font-medium text-gray-700">Relação (Parentesco)</label>
                    <input
                      type="text"
-                     className="mt-1 w-full p-2 border rounded"
+                     className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
                      value={currentExecutive.emergency_contact_relation || ''}
                      onChange={e => setCurrentExecutive({...currentExecutive, emergency_contact_relation: e.target.value})}
                    />
@@ -500,22 +614,27 @@ const ExecutivesView: React.FC = () => {
                  <div className="col-span-2">
                    <label className="block text-sm font-medium text-gray-700">Informações de Dependentes</label>
                    <textarea
-                     className="mt-1 w-full p-2 border rounded"
+                     className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
                      rows={2}
                      value={currentExecutive.dependents_info || ''}
                      onChange={e => setCurrentExecutive({...currentExecutive, dependents_info: e.target.value})}
                    />
                 </div>
                </div>
-            )}
+            </CollapseSection>
 
             {/* --- Bloco 6: Financeiro --- */}
-            {activeTab === 'finance' && (
+            <CollapseSection
+              title="Dados Financeiros e Remuneração"
+              icon={<DollarSign size={18} />}
+              isOpen={openSections.finance}
+              onToggle={() => toggleSection('finance')}
+            >
                <div className="space-y-4">
                  <div>
                    <label className="block text-sm font-medium text-gray-700">Dados Bancários</label>
                    <textarea
-                     className="mt-1 w-full p-2 border rounded"
+                     className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
                      rows={3}
                      placeholder="Banco, Agência, Conta..."
                      value={currentExecutive.bank_info || ''}
@@ -525,26 +644,26 @@ const ExecutivesView: React.FC = () => {
                 <div>
                    <label className="block text-sm font-medium text-gray-700">Informações de Remuneração</label>
                    <textarea
-                     className="mt-1 w-full p-2 border rounded"
+                     className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
                      rows={3}
                      value={currentExecutive.compensation_info || ''}
                      onChange={e => setCurrentExecutive({...currentExecutive, compensation_info: e.target.value})}
                    />
                 </div>
                </div>
-            )}
+            </CollapseSection>
           </div>
 
-          <div className="flex justify-end gap-2 mt-6 pt-4 border-t border-gray-200">
+          <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-gray-200">
             <button
               onClick={() => setIsModalOpen(false)}
-              className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+              className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
             >
               Cancelar
             </button>
             <button
               onClick={handleSave}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             >
               Salvar
             </button>

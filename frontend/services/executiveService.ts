@@ -1,14 +1,17 @@
-import { api } from './api';
-import { Executive } from '../types';
+import { api } from "./api";
+import { Executive } from "../types";
 
 export const executiveService = {
-  getAll: async (skip = 0, limit = 10) => {
-    const response = await api.get<Executive[]>(`/executives/?skip=${skip}&limit=${limit}`);
+  // Ajustado default para 1000 para permitir paginação no frontend fluida
+  getAll: async (skip: number = 0, limit: number = 1000) => {
+    const response = await api.get<Executive[]>(
+      `/executives/?skip=${skip}&limit=${limit}`,
+    );
     return response.data;
   },
 
   create: async (data: Partial<Executive>) => {
-    const response = await api.post<Executive>('/executives/', data);
+    const response = await api.post<Executive>("/executives/", data);
     return response.data;
   },
 
@@ -18,7 +21,6 @@ export const executiveService = {
   },
 
   delete: async (id: number) => {
-    const response = await api.delete(`/executives/${id}`);
-    return response.data;
-  }
+    await api.delete(`/executives/${id}`);
+  },
 };

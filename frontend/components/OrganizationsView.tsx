@@ -351,7 +351,6 @@ const DepartmentForm: React.FC<{
             organizationId: department.organizationId,
         };
         
-        // Se tiver ID, adiciona para que o handler saiba que é update
         if (department.id) {
             data.id = department.id;
         }
@@ -409,18 +408,26 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
         return organizations;
     }, [organizations, currentUser, isOrgAdmin]);
 
-    // Organization Handlers
-    const handleAddOrganization = () => {
+    // Handlers ajustados para prevenir propagação e submits acidentais
+    const handleAddOrganization = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
         setEditingOrganization({});
         setApiError(null);
         setOrgModalOpen(true);
     };
-    const handleEditOrganization = (organization: Organization) => {
+    
+    const handleEditOrganization = (e: React.MouseEvent, organization: Organization) => {
+        e.preventDefault();
+        e.stopPropagation();
         setEditingOrganization(organization);
         setApiError(null);
         setOrgModalOpen(true);
     };
-    const handleDeleteOrganization = (org: Organization) => {
+    
+    const handleDeleteOrganization = (e: React.MouseEvent, org: Organization) => {
+        e.preventDefault();
+        e.stopPropagation();
         setApiError(null);
         setOrgToDelete(org);
     };
@@ -464,21 +471,29 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
         }
     };
 
-    // Department Handlers
-    const handleAddDepartment = (organizationId: string) => {
+    const handleAddDepartment = (e: React.MouseEvent, organizationId: string) => {
+        e.preventDefault();
+        e.stopPropagation();
         setEditingDepartment({ organizationId });
         setApiError(null);
         setDeptModalOpen(true);
     };
-    const handleEditDepartment = (department: Department) => {
+    
+    const handleEditDepartment = (e: React.MouseEvent, department: Department) => {
+        e.preventDefault();
+        e.stopPropagation();
         setEditingDepartment(department);
         setApiError(null);
         setDeptModalOpen(true);
     };
-    const handleDeleteDepartment = (dept: Department) => {
+    
+    const handleDeleteDepartment = (e: React.MouseEvent, dept: Department) => {
+        e.preventDefault();
+        e.stopPropagation();
         setApiError(null);
         setDeptToDelete(dept);
     };
+    
     const confirmDeleteDepartment = async () => {
         if (!deptToDelete) return;
         setIsLoading(true);
@@ -495,11 +510,11 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
             setIsLoading(false);
         }
     };
+    
     const handleSaveDepartment = async (deptData: DepartmentCreate | DepartmentUpdate) => {
         setIsLoading(true);
         try {
             setApiError(null);
-            // Verifica se é update (tem ID) ou create (sem ID)
             if ('id' in deptData && deptData.id) {
                 await departmentService.update(String(deptData.id), deptData);
             } else {
@@ -512,12 +527,10 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
             setEditingDepartment(null);
         } catch (error: any) {
             setApiError(error.response?.data?.detail || "Erro ao salvar departamento.");
-            // Mantém o modal aberto para mostrar o erro
         } finally {
             setIsLoading(false);
         }
     };
-
 
     return (
         <div className="space-y-6 animate-fade-in relative">
@@ -535,7 +548,9 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
                     <h2 className="text-3xl font-bold text-slate-800">Gerenciar Empresas</h2>
                     <p className="text-slate-500 mt-1">Adicione ou edite as empresas e seus respectivos departamentos.</p>
                 </div>
+                {/* type="button" adicionado */}
                 <button 
+                    type="button"
                     onClick={handleAddOrganization} 
                     disabled={isOrgAdmin}
                     className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-md shadow-sm hover:bg-indigo-700 transition duration-150 disabled:bg-slate-300 disabled:cursor-not-allowed"
@@ -558,11 +573,14 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
                                     {org.cnpj && <p className="text-sm text-slate-500 mt-1">CNPJ: {org.cnpj}</p>}
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <button onClick={() => handleEditOrganization(org)} className="p-2 text-slate-500 hover:text-indigo-600 rounded-full hover:bg-slate-100 transition" aria-label="Editar empresa">
+                                    {/* type="button" adicionado */}
+                                    <button type="button" onClick={(e) => handleEditOrganization(e, org)} className="p-2 text-slate-500 hover:text-indigo-600 rounded-full hover:bg-slate-100 transition" aria-label="Editar empresa">
                                         <EditIcon />
                                     </button>
+                                    {/* type="button" adicionado */}
                                     <button 
-                                        onClick={() => handleDeleteOrganization(org)}
+                                        type="button"
+                                        onClick={(e) => handleDeleteOrganization(e, org)}
                                         disabled={isOrgAdmin}
                                         className="p-2 text-slate-500 hover:text-red-600 rounded-full hover:bg-slate-100 transition disabled:text-slate-300 disabled:hover:text-slate-300 disabled:cursor-not-allowed" aria-label="Excluir empresa"
                                     >
@@ -587,8 +605,9 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
                                             <li key={dept.id} className="flex items-center justify-between p-2 bg-slate-50 rounded-md">
                                                 <p className="text-slate-700">{dept.name}</p>
                                                 <div className="flex items-center gap-1">
-                                                    <button onClick={() => handleEditDepartment(dept)} className="p-1 text-slate-400 hover:text-indigo-600" aria-label="Editar departamento"><EditIcon /></button>
-                                                    <button onClick={() => handleDeleteDepartment(dept)} className="p-1 text-slate-400 hover:text-red-600" aria-label="Excluir departamento"><DeleteIcon /></button>
+                                                    {/* type="button" adicionado */}
+                                                    <button type="button" onClick={(e) => handleEditDepartment(e, dept)} className="p-1 text-slate-400 hover:text-indigo-600" aria-label="Editar departamento"><EditIcon /></button>
+                                                    <button type="button" onClick={(e) => handleDeleteDepartment(e, dept)} className="p-1 text-slate-400 hover:text-red-600" aria-label="Excluir departamento"><DeleteIcon /></button>
                                                 </div>
                                             </li>
                                         ))}
@@ -598,7 +617,8 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
                                 )}
                             </div>
                             <footer className="p-4 border-t border-slate-200">
-                                <button onClick={() => handleAddDepartment(org.id)} className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm bg-slate-100 text-slate-700 rounded-md hover:bg-slate-200 transition">
+                                {/* type="button" adicionado */}
+                                <button type="button" onClick={(e) => handleAddDepartment(e, org.id)} className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm bg-slate-100 text-slate-700 rounded-md hover:bg-slate-200 transition">
                                     <PlusIcon /> Adicionar Departamento
                                 </button>
                             </footer>
@@ -613,6 +633,7 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
                 )}
             </div>
 
+            {/* Código original restaurado (sem a prop inventada isOpen) */}
             {isOrgModalOpen && (
                 <Modal title={editingOrganization?.id ? 'Editar Empresa' : 'Nova Empresa'} onClose={() => {setOrgModalOpen(false); setEditingOrganization(null)}}>
                     {apiError && (

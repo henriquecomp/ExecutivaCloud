@@ -3,8 +3,10 @@ import { Organization, OrganizationCreate, OrganizationUpdate } from "../types";
 
 export const organizationService = {
   getAll: async () => {
-    // Ajuste o limit conforme necessário para dropdowns
-    const response = await api.get<Organization[]>("/organizations");
+    // Garante retorno de array mesmo que a API use paginação padrão
+    const response = await api.get<Organization[]>(
+      "/organizations/?skip=0&limit=1000",
+    );
     return response.data;
   },
 

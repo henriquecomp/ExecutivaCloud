@@ -2,17 +2,18 @@ import React, { useEffect, useRef } from 'react';
 import { CloseIcon } from './Icons';
 
 interface ModalProps {
+  isOpen: boolean;
   title: string;
   onClose: () => void;
   children: React.ReactNode;
 }
 
-const Modal: React.FC<ModalProps> = ({ title, onClose, children }) => {
+const Modal: React.FC<ModalProps> = ({ isOpen, title, onClose, children }) => {
   const modalRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
+      if (event.key === 'Escape' && isOpen) {
         onClose();
       }
     };
@@ -21,7 +22,11 @@ const Modal: React.FC<ModalProps> = ({ title, onClose, children }) => {
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [onClose]);
+  }, [onClose, isOpen]);
+
+  if (!isOpen) {
+    return null;
+  }
 
   return (
     <div
