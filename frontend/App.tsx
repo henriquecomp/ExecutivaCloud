@@ -1,25 +1,25 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { 
-  Executive, 
-  Organization, 
-  Event, 
-  EventType, 
-  Contact, 
-  ContactType, 
-  Expense, 
-  View, 
-  ExpenseStatus, 
-  Task, 
-  Priority, 
-  Status, 
-  Department, 
-  Secretary, 
-  User, 
-  UserRole, 
-  Document, 
-  DocumentCategory, 
-  ExpenseCategory, 
-  LegalOrganization 
+import {
+  Executive,
+  Organization,
+  Event,
+  EventType,
+  Contact,
+  ContactType,
+  Expense,
+  View,
+  ExpenseStatus,
+  Task,
+  Priority,
+  Status,
+  Department,
+  Secretary,
+  User,
+  UserRole,
+  Document,
+  DocumentCategory,
+  ExpenseCategory,
+  LegalOrganization
 } from './types';
 import { useLocalStorage } from './hooks/useLocalStorage';
 
@@ -38,45 +38,28 @@ import ReportsView from './components/ReportsView';
 import UserMenu from './components/UserMenu';
 import DocumentsView from './components/DocumentsView';
 import LegalOrganizationsView from './components/LegalOrganizationsView';
+
+// Importando os serviços
 import { legalOrganizationService } from './services/legalOrganizationService';
 import { organizationService } from './services/organizationService';
 import { departmentService } from './services/departmentService';
+import { executiveService } from './services/executiveService';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [isSidebarOpen, setSidebarOpen] = useState(false);
 
   // --- STATE MANAGEMENT (Backend Integrated) ---
-  // Dados que vêm do backend via API.
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [legalOrganizations, setLegalOrganizations] = useState<LegalOrganization[]>([]);
+  const [executives, setExecutives] = useState<Executive[]>([]); // Mudou para useState simples
 
   // --- STATE MANAGEMENT (LocalStorage / Mock) ---
-  // Dados que ainda não possuem backend completo ou são específicos de sessão/mock.
   const [currentUser, setCurrentUser] = useLocalStorage<User | null>('currentUser', null);
   const [selectedExecutiveId, setSelectedExecutiveId] = useLocalStorage<string | null>('selectedExecutiveId', null);
 
-  // Dummies inicias para dados que ainda não tem backend
-  const initialExecutives: Executive[] = useMemo(() => [
-    {
-      id: 'exec1',
-      fullName: 'Carlos Silva',
-      workEmail: 'carlos.silva@techsolutions.com',
-      organizationId: 'org1', 
-      workPhone: '(11) 98888-1111',
-      departmentId: 'dept1',
-      jobTitle: 'Diretor de Engenharia',
-      hireDate: '2018-05-10',
-      birthDate: '1980-11-23',
-      cpf: '111.222.333-44',
-      rg: '12.345.678-9',
-      address: 'Rua das Inovações, 123, São Paulo, SP, 01234-567',
-      bankInfo: 'Banco Digital S.A.\nAgência: 0001\nConta Corrente: 12345-6',
-      compensationInfo: 'Salário Base + Bônus Anual + Stock Options',
-    },
-  ], []);
-
+  // Dummies iniciais para dados que ainda não tem backend
   const initialSecretaries: Secretary[] = [];
   const initialEventTypes: EventType[] = [
     { id: 'et1', name: 'Reunião Diretoria', color: '#ef4444' },
@@ -97,9 +80,8 @@ const App: React.FC = () => {
   ];
 
   // States com LocalStorage
-  const [executives, setExecutives] = useLocalStorage<Executive[]>('executives', initialExecutives);
   const [secretaries, setSecretaries] = useLocalStorage<Secretary[]>('secretaries', initialSecretaries);
-  const [users, setUsers] = useLocalStorage<User[]>('users', []); 
+  const [users, setUsers] = useLocalStorage<User[]>('users', []);
   const [eventTypes, setEventTypes] = useLocalStorage<EventType[]>('eventTypes', initialEventTypes);
   const [events, setEvents] = useLocalStorage<Event[]>('events', []);
   const [contactTypes, setContactTypes] = useLocalStorage<ContactType[]>('contactTypes', initialContactTypes);
@@ -115,8 +97,6 @@ const App: React.FC = () => {
   const loadBackendData = useCallback(async () => {
     try {
       // 1. Carregar Legal Organizations
-      // O backend retorna IDs inteiros, convertemos para string para manter compatibilidade com o frontend
-      // CORREÇÃO: O apiService agora retorna o array diretamente, não precisa de .data
       const legalOrgsRes = await legalOrganizationService.getAll();
       const legalOrgsData = legalOrgsRes.map((item: any) => ({
         ...item,
@@ -125,7 +105,6 @@ const App: React.FC = () => {
       setLegalOrganizations(legalOrgsData);
 
       // 2. Carregar Organizations (Empresas)
-      // CORREÇÃO: O apiService agora retorna o array diretamente
       const orgsRes = await organizationService.getAll();
       const orgsData = orgsRes.map((item: any) => ({
         ...item,
@@ -135,13 +114,11 @@ const App: React.FC = () => {
       setOrganizations(orgsData);
 
       // 3. Carregar Departamentos
-      // Como o backend atualmente busca por organização, iteramos sobre as organizações carregadas
       let allDepts: Department[] = [];
       if (orgsData.length > 0) {
         const deptPromises = orgsData.map(org => departmentService.getByOrg(org.id));
         const deptResponses = await Promise.all(deptPromises);
-        
-        // CORREÇÃO: deptResponses agora é um array de arrays de departamentos
+
         deptResponses.forEach(res => {
           const mappedDepts = res.map((item: any) => ({
             ...item,
@@ -153,9 +130,13 @@ const App: React.FC = () => {
       }
       setDepartments(allDepts);
 
-      // Atualizar lista de usuários mockados para incluir admins das novas organizações
+      // 4. Carregar Executivos (Do Backend!)
+      const execsRes = await executiveService.getAll();
+      setExecutives(execsRes);
+
+      // Atualizar lista de usuários mockados
       const masterUser: User = { id: 'user_master', fullName: 'Usuário Master', role: 'master' };
-      
+
       const orgAdmins = orgsData.map(org => ({
         id: `user_admin_${org.id}`,
         fullName: `Admin ${org.name}`,
@@ -170,11 +151,11 @@ const App: React.FC = () => {
         legalOrganizationId: lo.id
       }));
 
-      const execUsers = executives.map(e => ({
+      const execUsers = execsRes.map(e => ({
         id: `user_exec_${e.id}`,
         fullName: e.full_name,
         role: 'executive' as UserRole,
-        executiveId: e.id,
+        executiveId: String(e.id),
       }));
 
       const secUsers = secretaries.map(s => ({
@@ -184,13 +165,12 @@ const App: React.FC = () => {
         secretaryId: s.id,
       }));
 
-      // Mescla usuários gerados dinamicamente com usuários persistidos
       setUsers([masterUser, ...legalOrgAdmins, ...orgAdmins, ...execUsers, ...secUsers]);
 
     } catch (error) {
       console.error("Erro ao carregar dados do backend:", error);
     }
-  }, [executives, secretaries, setUsers]);
+  }, [secretaries, setUsers]);
 
   // Efeito inicial
   useEffect(() => {
@@ -228,9 +208,9 @@ const App: React.FC = () => {
       case 'secretary':
         const secretary = secretaries.find(s => s.id === currentUser.secretaryId);
         if (!secretary) return [];
-        //return executives.filter(e => secretary.executiveIds.includes(e.id));
+        return executives.filter(e => secretary.executiveIds.includes(String(e.id)));
       case 'executive':
-        return executives.filter(e => e.id === parseInt(currentUser.executiveId));
+        return executives.filter(e => String(e.id) === currentUser.executiveId);
       default:
         return [];
     }
@@ -240,9 +220,9 @@ const App: React.FC = () => {
     if (currentUser?.role === 'executive') {
       setSelectedExecutiveId(currentUser.executiveId || null);
     } else if (currentUser) {
-      const isSelectionValid = visibleExecutives.some(e => e.id === selectedExecutiveId);
+      const isSelectionValid = visibleExecutives.some(e => String(e.id) === selectedExecutiveId);
       if (!isSelectionValid) {
-        setSelectedExecutiveId(visibleExecutives.length > 0 ? visibleExecutives[0].id : null);
+        setSelectedExecutiveId(visibleExecutives.length > 0 ? String(visibleExecutives[0].id) : null);
       }
     }
   }, [currentUser, visibleExecutives, selectedExecutiveId, setSelectedExecutiveId]);
@@ -268,7 +248,7 @@ const App: React.FC = () => {
           const reminderTime = new Date(eventStartTime.getTime() - event.reminderMinutes * 60 * 1000);
 
           if (now >= reminderTime && now < eventStartTime) {
-            const executive = executives.find(e => e.id === parseInt(event.executiveId));
+            const executive = executives.find(e => String(e.id) === event.executiveId);
             const title = `Lembrete: ${event.title}`;
             const options = {
               body: `O evento de ${executive?.full_name || 'um executivo'} começa às ${eventStartTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}.`,
@@ -282,15 +262,15 @@ const App: React.FC = () => {
       });
     };
 
-    const intervalId = setInterval(checkReminders, 60000); 
-    checkReminders(); 
+    const intervalId = setInterval(checkReminders, 60000);
+    checkReminders();
 
     return () => clearInterval(intervalId);
   }, [events, executives, notifiedEventIds]);
 
 
   // --- DERIVED/FILTERED DATA ---
-  const selectedExecutive = useMemo(() => executives.find(e => e.id === parseInt(selectedExecutiveId)), [executives, selectedExecutiveId]);
+  const selectedExecutive = useMemo(() => executives.find(e => String(e.id) === selectedExecutiveId), [executives, selectedExecutiveId]);
 
   const filteredEvents = useMemo(() => events.filter(e => e.executiveId === selectedExecutiveId), [events, selectedExecutiveId]);
   const filteredContacts = useMemo(() => contacts.filter(c => c.executiveId === selectedExecutiveId), [contacts, selectedExecutiveId]);
@@ -339,8 +319,8 @@ const App: React.FC = () => {
       case 'legalOrganizations':
         return <LegalOrganizationsView
           currentUser={currentUser}
-          legalOrganizations={legalOrganizations} // Passando estado do pai
-          setLegalOrganizations={setLegalOrganizations} // Passando setter do pai
+          legalOrganizations={legalOrganizations}
+          setLegalOrganizations={setLegalOrganizations}
           organizations={organizations} setOrganizations={setOrganizations}
           departments={departments} setDepartments={setDepartments}
           executives={executives} setExecutives={setExecutives}
@@ -351,24 +331,15 @@ const App: React.FC = () => {
           setTasks={setTasks}
           setDocuments={setDocuments}
           setUsers={setUsers}
-          onRefresh={loadBackendData} // Função de refresh
+          onRefresh={loadBackendData}
         />;
       case 'executives':
         return <ExecutivesView
           currentUser={currentUser}
           executives={visibleExecutives}
-          allExecutives={executives}
-          setExecutives={setExecutives}
           organizations={organizations}
           departments={departments}
-          secretaries={secretaries}
-          setSecretaries={setSecretaries}
-          setEvents={setEvents}
-          setContacts={setContacts}
-          setExpenses={setExpenses}
-          setTasks={setTasks}
-          setDocuments={setDocuments}
-          setUsers={setUsers}
+          onRefresh={loadBackendData} // Passamos o onRefresh para a tela usar
         />;
       case 'organizations':
         return <OrganizationsView
@@ -383,8 +354,8 @@ const App: React.FC = () => {
           setTasks={setTasks}
           setDocuments={setDocuments}
           setUsers={setUsers}
-          legalOrganizations={legalOrganizations} // Passando a lista atualizada
-          onRefresh={loadBackendData} // Passando função de refresh
+          legalOrganizations={legalOrganizations}
+          onRefresh={loadBackendData}
         />;
       case 'secretaries':
         return <SecretariesView
@@ -461,12 +432,12 @@ const App: React.FC = () => {
               >
                 <option value="">-- Selecione um Executivo --</option>
                 {visibleExecutives.map(exec => {
-                  const org = organizations.find(o => o.id === exec.organizationId);
-                  const dept = departments.find(d => d.id === exec.departmentId);
+                  const org = organizations.find(o => String(o.id) === String(exec.organization_id));
+                  const dept = departments.find(d => String(d.id) === String(exec.department_id));
                   const orgDeptString = org ? `${org.name}${dept ? ` / ${dept.name}` : ''}` : '';
                   return (
                     <option key={exec.id} value={exec.id}>
-                      {exec.fullName} {orgDeptString && `(${orgDeptString})`}
+                      {exec.full_name} {orgDeptString && `(${orgDeptString})`}
                     </option>
                   )
                 })}
