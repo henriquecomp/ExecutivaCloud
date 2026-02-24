@@ -1,25 +1,8 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
-  Executive,
-  Organization,
-  Event,
-  EventType,
-  Contact,
-  ContactType,
-  Expense,
-  View,
-  ExpenseStatus,
-  Task,
-  Priority,
-  Status,
-  Department,
-  Secretary,
-  User,
-  UserRole,
-  Document,
-  DocumentCategory,
-  ExpenseCategory,
-  LegalOrganization
+  Executive, Organization, Event, EventType, Contact, ContactType,
+  Expense, View, Task, Department, Secretary, User, UserRole,
+  Document, DocumentCategory, ExpenseCategory, LegalOrganization
 } from './types';
 import { useLocalStorage } from './hooks/useLocalStorage';
 
@@ -44,6 +27,7 @@ import { legalOrganizationService } from './services/legalOrganizationService';
 import { organizationService } from './services/organizationService';
 import { departmentService } from './services/departmentService';
 import { executiveService } from './services/executiveService';
+import { secretaryService } from './services/secretaryService';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('dashboard');
@@ -53,14 +37,15 @@ const App: React.FC = () => {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [legalOrganizations, setLegalOrganizations] = useState<LegalOrganization[]>([]);
-  const [executives, setExecutives] = useState<Executive[]>([]); // Mudou para useState simples
+  const [executives, setExecutives] = useState<Executive[]>([]);
+  const [secretaries, setSecretaries] = useState<Secretary[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
 
   // --- STATE MANAGEMENT (LocalStorage / Mock) ---
   const [currentUser, setCurrentUser] = useLocalStorage<User | null>('currentUser', null);
   const [selectedExecutiveId, setSelectedExecutiveId] = useLocalStorage<string | null>('selectedExecutiveId', null);
 
   // Dummies iniciais para dados que ainda não tem backend
-  const initialSecretaries: Secretary[] = [];
   const initialEventTypes: EventType[] = [
     { id: 'et1', name: 'Reunião Diretoria', color: '#ef4444' },
     { id: 'et2', name: 'Pessoal', color: '#22c55e' },
@@ -80,8 +65,6 @@ const App: React.FC = () => {
   ];
 
   // States com LocalStorage
-  const [secretaries, setSecretaries] = useLocalStorage<Secretary[]>('secretaries', initialSecretaries);
-  const [users, setUsers] = useLocalStorage<User[]>('users', []);
   const [eventTypes, setEventTypes] = useLocalStorage<EventType[]>('eventTypes', initialEventTypes);
   const [events, setEvents] = useLocalStorage<Event[]>('events', []);
   const [contactTypes, setContactTypes] = useLocalStorage<ContactType[]>('contactTypes', initialContactTypes);
@@ -130,11 +113,21 @@ const App: React.FC = () => {
       }
       setDepartments(allDepts);
 
-      // 4. Carregar Executivos (Do Backend!)
+      // 4. Carregar Executivos
       const execsRes = await executiveService.getAll();
       setExecutives(execsRes);
 
-      // Atualizar lista de usuários mockados
+      // 5. Carregar Secretárias
+      const secsRes = await secretaryService.getAll();
+      const secData = secsRes.map((item: any) => ({
+        ...item,
+        id: String(item.id),
+        // O backend retorna executive_ids, então mapeamos de volta para string conforme o Types
+        executiveIds: item.executiveIds ? item.executiveIds.map(String) : []
+      }));
+      setSecretaries(secData);
+
+      // Atualizar lista de usuários (Montagem baseada nas entidades carregadas)
       const masterUser: User = { id: 'user_master', fullName: 'Usuário Master', role: 'master' };
 
       const orgAdmins = orgsData.map(org => ({
@@ -158,11 +151,11 @@ const App: React.FC = () => {
         executiveId: String(e.id),
       }));
 
-      const secUsers = secretaries.map(s => ({
+      const secUsers = secData.map((s: any) => ({
         id: `user_sec_${s.id}`,
         fullName: s.fullName,
         role: 'secretary' as UserRole,
-        secretaryId: s.id,
+        secretaryId: String(s.id),
       }));
 
       setUsers([masterUser, ...legalOrgAdmins, ...orgAdmins, ...execUsers, ...secUsers]);
@@ -170,7 +163,7 @@ const App: React.FC = () => {
     } catch (error) {
       console.error("Erro ao carregar dados do backend:", error);
     }
-  }, [secretaries, setUsers]);
+  }, []);
 
   // Efeito inicial
   useEffect(() => {
@@ -199,10 +192,10 @@ const App: React.FC = () => {
           const orgIdsForLegalOrg = organizations
             .filter(o => o.legalOrganizationId === currentUser.legalOrganizationId)
             .map(o => o.id);
-          return executives.filter(e => e.organization_id && orgIdsForLegalOrg.includes(e.organization_id));
+          return executives.filter(e => e.organization_id && orgIdsForLegalOrg.includes(String(e.organization_id)));
         }
         if (currentUser.organizationId) {
-          return executives.filter(e => e.organization_id === parseInt(currentUser.organizationId));
+          return executives.filter(e => String(e.organization_id) === currentUser.organizationId);
         }
         return [];
       case 'secretary':
@@ -339,7 +332,7 @@ const App: React.FC = () => {
           executives={visibleExecutives}
           organizations={organizations}
           departments={departments}
-          onRefresh={loadBackendData} // Passamos o onRefresh para a tela usar
+          onRefresh={loadBackendData}
         />;
       case 'organizations':
         return <OrganizationsView
@@ -360,12 +353,11 @@ const App: React.FC = () => {
       case 'secretaries':
         return <SecretariesView
           secretaries={secretaries}
-          setSecretaries={setSecretaries}
           executives={executives}
-          setUsers={setUsers}
           currentUser={currentUser}
           organizations={organizations}
           departments={departments}
+          onRefresh={loadBackendData} // Substituiu os setManual
         />;
       case 'agenda':
         return <AgendaView events={filteredEvents} setEvents={setEvents} eventTypes={eventTypes} setEventTypes={setEventTypes} executiveId={selectedExecutiveId!} />;

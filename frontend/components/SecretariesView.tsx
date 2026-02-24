@@ -3,13 +3,9 @@ import { Secretary, Executive, User, Organization, Department } from '../types';
 import Modal from './Modal';
 import ConfirmationModal from './ConfirmationModal';
 import { EditIcon, DeleteIcon, PlusIcon, ChevronDownIcon, ExclamationTriangleIcon } from './Icons';
+import { secretaryService } from '../services/secretaryService';
 
 // --- Helper Functions ---
-/**
- * Validates a Brazilian CPF number.
- * @param {string} cpf - The CPF string to validate.
- * @returns {boolean} - True if the CPF is valid, false otherwise.
- */
 function validateCPF(cpf: string): boolean {
     const cpfClean = cpf.replace(/[^\d]+/g, '');
     if (cpfClean.length !== 11 || /^(\d)\1+$/.test(cpfClean)) return false;
@@ -27,11 +23,6 @@ function validateCPF(cpf: string): boolean {
     return true;
 }
 
-/**
- * Applies a CPF mask (###.###.###-##) to a string.
- * @param {string} value - The input string.
- * @returns {string} - The masked string.
- */
 const maskCPF = (value: string) => {
     return value
         .replace(/\D/g, '')
@@ -41,11 +32,6 @@ const maskCPF = (value: string) => {
         .replace(/(-\d{2})\d+?$/, '$1');
 };
 
-/**
- * Applies a phone mask (+55 (XX) XXXXX-XXXX) to a string.
- * @param {string} value - The input string.
- * @returns {string} - The masked string.
- */
 const maskPhone = (value: string): string => {
     if (!value) return "";
     return value
@@ -65,13 +51,12 @@ const civilStatusOptions = ['Solteiro(a)', 'Casado(a)', 'Separado(a)', 'Divorcia
 
 
 interface SecretariesViewProps {
-  secretaries: Secretary[];
-  setSecretaries: React.Dispatch<React.SetStateAction<Secretary[]>>;
-  executives: Executive[];
-  setUsers: React.Dispatch<React.SetStateAction<User[]>>;
-  currentUser: User;
-  organizations: Organization[];
-  departments: Department[];
+    secretaries: Secretary[];
+    executives: Executive[];
+    currentUser: User;
+    organizations: Organization[];
+    departments: Department[];
+    onRefresh: () => Promise<void>;
 }
 
 const CollapsibleSection: React.FC<{ title: string; children: React.ReactNode; isOpen: boolean; onToggle: () => void }> = ({ title, children, isOpen, onToggle }) => (
@@ -101,9 +86,9 @@ const SensitiveDataWarning: React.FC<{ message?: string }> = ({ message }) => (
 );
 
 const SecretaryForm: React.FC<{
-    secretary: Partial<Secretary>, 
-    onSave: (secretary: Secretary) => void, 
-    onCancel: () => void, 
+    secretary: Partial<Secretary>,
+    onSave: (secretary: any) => void,
+    onCancel: () => void,
     organizations: Organization[],
     departments: Department[],
     executives: Executive[],
@@ -151,7 +136,7 @@ const SecretaryForm: React.FC<{
     const [bankInfo, setBankInfo] = useState(secretary.bankInfo || '');
     const [compensationInfo, setCompensationInfo] = useState(secretary.compensationInfo || '');
     const [selectedExecutiveIds, setSelectedExecutiveIds] = useState<string[]>(secretary.executiveIds || []);
-    
+
     // Errors and Refs
     const cpfInputRef = useRef<HTMLInputElement>(null);
     const birthDateRef = useRef<HTMLInputElement>(null);
@@ -173,24 +158,24 @@ const SecretaryForm: React.FC<{
 
     const filteredDepartments = useMemo(() => {
         if (!organizationId) return [];
-        return departments.filter(d => d.organizationId === organizationId);
+        return departments.filter(d => String(d.organizationId) === String(organizationId));
     }, [organizationId, departments]);
 
     const availableManagers = useMemo(() => {
         if (!organizationId) return [];
-        return executives.filter(e => e.organizationId === organizationId);
+        return executives.filter(e => String(e.organization_id) === String(organizationId));
     }, [executives, organizationId]);
-    
+
     const adminScopedExecutives = useMemo(() => {
         if (isSecretaryUser) {
-            return executives.filter(exec => (secretary.executiveIds || []).includes(exec.id));
+            return executives.filter(exec => (secretary.executiveIds || []).includes(String(exec.id)));
         }
         if (isAdminForLegalOrg) {
-            const orgIds = organizations.filter(o => o.legalOrganizationId === currentUser.legalOrganizationId).map(o => o.id);
-            return executives.filter(e => e.organizationId && orgIds.includes(e.organizationId));
+            const orgIds = organizations.filter(o => o.legalOrganizationId === currentUser.legalOrganizationId).map(o => String(o.id));
+            return executives.filter(e => e.organization_id && orgIds.includes(String(e.organization_id)));
         }
         if (isOrgAdmin) {
-            return executives.filter(e => e.organizationId === currentUser.organizationId);
+            return executives.filter(e => String(e.organization_id) === currentUser.organizationId);
         }
         return executives;
     }, [executives, organizations, currentUser, secretary.executiveIds, isSecretaryUser, isAdminForLegalOrg, isOrgAdmin]);
@@ -200,26 +185,26 @@ const SecretaryForm: React.FC<{
             return adminScopedExecutives;
         }
         if (organizationId) {
-            return adminScopedExecutives.filter(exec => exec.organizationId === organizationId);
+            return adminScopedExecutives.filter(exec => String(exec.organization_id) === String(organizationId));
         }
         return [];
     }, [adminScopedExecutives, organizationId, isSecretaryUser]);
 
     useEffect(() => {
-        const assignableIds = new Set(assignableExecutives.map(e => e.id));
+        const assignableIds = new Set(assignableExecutives.map(e => String(e.id)));
         setSelectedExecutiveIds(prevIds => prevIds.filter(id => assignableIds.has(id)));
     }, [assignableExecutives]);
 
     useEffect(() => {
-        if (organizationId && !visibleOrganizations.some(o => o.id === organizationId)) setOrganizationId('');
+        if (organizationId && !visibleOrganizations.some(o => String(o.id) === String(organizationId))) setOrganizationId('');
     }, [organizationId, visibleOrganizations]);
-    
+
     useEffect(() => {
-        if (departmentId && !filteredDepartments.some(d => d.id === departmentId)) setDepartmentId('');
+        if (departmentId && !filteredDepartments.some(d => String(d.id) === String(departmentId))) setDepartmentId('');
     }, [departmentId, filteredDepartments]);
 
     useEffect(() => {
-        if (reportsToExecutiveId && !availableManagers.some(m => m.id === reportsToExecutiveId)) setReportsToExecutiveId('');
+        if (reportsToExecutiveId && !availableManagers.some(m => String(m.id) === String(reportsToExecutiveId))) setReportsToExecutiveId('');
     }, [organizationId, availableManagers, reportsToExecutiveId]);
 
     const handleExecutiveToggle = (execId: string) => {
@@ -227,8 +212,8 @@ const SecretaryForm: React.FC<{
     };
 
     const getExecutiveDetails = (exec: Executive) => {
-        const org = organizations.find(o => o.id === exec.organizationId);
-        return `${org?.name || 'Sem Empresa'} - ${exec.fullName} (${exec.jobTitle || 'Sem Cargo'})`;
+        const org = organizations.find(o => String(o.id) === String(exec.organization_id));
+        return `${org?.name || 'Sem Empresa'} - ${exec.full_name} (${exec.job_title || 'Sem Cargo'})`;
     };
 
     const handleCpfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -244,7 +229,7 @@ const SecretaryForm: React.FC<{
             setCpfError('');
         }
     };
-    
+
     const handleDateBlur = (e: React.FocusEvent<HTMLInputElement>, setter: React.Dispatch<React.SetStateAction<string>>, errorSetter: React.Dispatch<React.SetStateAction<string>>) => {
         const { value, validity } = e.target;
         if (value && !validity.valid) {
@@ -257,20 +242,19 @@ const SecretaryForm: React.FC<{
         }
     };
 
-
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (birthDateError || rgIssueDateError || hireDateError) {
-            return;
-        }
+        if (birthDateError || rgIssueDateError || hireDateError) return;
         if (cpf && !validateCPF(cpf)) {
             handleCpfBlur();
             return;
         }
         if (!fullName) return;
+
+        // Monta o payload garantindo que os IDs de executivos sejam numéricos para o backend
         onSave({
-            id: secretary.id || `sec_${new Date().getTime()}`,
-            executiveIds: selectedExecutiveIds,
+            id: secretary.id,
+            executiveIds: selectedExecutiveIds.map(Number), // Tratamento numérico para backend
             fullName, jobTitle, photoUrl, cpf, rg, rgIssuer, rgIssueDate,
             birthDate, nationality, placeOfBirth, motherName, fatherName, civilStatus,
             workEmail, workPhone, extension, personalEmail, personalPhone, address,
@@ -288,8 +272,8 @@ const SecretaryForm: React.FC<{
                     <label htmlFor="fullName" className="block text-sm font-medium text-slate-700">Nome Completo</label>
                     <input type="text" id="fullName" value={fullName} onChange={e => setFullName(e.target.value)} required className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
                 </div>
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                     <div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
                         <label htmlFor="jobTitle" className="block text-sm font-medium text-slate-700">Cargo/Título</label>
                         <input type="text" id="jobTitle" value={jobTitle} onChange={e => setJobTitle(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
                     </div>
@@ -302,7 +286,7 @@ const SecretaryForm: React.FC<{
 
             <CollapsibleSection title="Identificação Pessoal (Confidencial)" isOpen={openSections.includes('identificacao')} onToggle={() => toggleSection('identificacao')}>
                 <SensitiveDataWarning />
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label htmlFor="birthDate" className="block text-sm font-medium text-slate-700">Data de Nascimento</label>
                         <input ref={birthDateRef} type="date" id="birthDate" value={birthDate} onChange={e => setBirthDate(e.target.value)} onBlur={e => handleDateBlur(e, setBirthDate, setBirthDateError)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
@@ -338,15 +322,15 @@ const SecretaryForm: React.FC<{
             </CollapsibleSection>
 
             <CollapsibleSection title="Detalhes Organizacionais" isOpen={openSections.includes('org')} onToggle={() => toggleSection('org')}>
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label htmlFor="organizationId" className="block text-sm font-medium text-slate-700">Empresa</label>
-                        <select id="organizationId" value={organizationId} onChange={e => {setOrganizationId(e.target.value); setDepartmentId('');}} disabled={isSecretaryUser} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm disabled:bg-slate-100 disabled:cursor-not-allowed">
+                        <select id="organizationId" value={organizationId} onChange={e => { setOrganizationId(e.target.value); setDepartmentId(''); }} disabled={isSecretaryUser} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm disabled:bg-slate-100 disabled:cursor-not-allowed">
                             <option value="">Selecione uma Empresa</option>
                             {visibleOrganizations.map(org => <option key={org.id} value={org.id}>{org.name}</option>)}
                         </select>
                     </div>
-                     <div>
+                    <div>
                         <label htmlFor="departmentId" className="block text-sm font-medium text-slate-700">Departamento</label>
                         <select id="departmentId" value={departmentId} onChange={e => setDepartmentId(e.target.value)} disabled={isSecretaryUser || !organizationId || filteredDepartments.length === 0} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm disabled:bg-slate-50 disabled:cursor-not-allowed">
                             <option value="">Sem Departamento</option>
@@ -354,12 +338,12 @@ const SecretaryForm: React.FC<{
                         </select>
                     </div>
                 </div>
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label htmlFor="reportsToExecutiveId" className="block text-sm font-medium text-slate-700">Gestor Direto</label>
                         <select id="reportsToExecutiveId" value={reportsToExecutiveId} onChange={e => setReportsToExecutiveId(e.target.value)} disabled={isSecretaryUser || !organizationId} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm disabled:bg-slate-50 disabled:cursor-not-allowed">
                             <option value="">Ninguém (nível mais alto)</option>
-                            {availableManagers.map(e => (<option key={e.id} value={e.id}>{e.fullName}</option>))}
+                            {availableManagers.map(e => (<option key={e.id} value={e.id}>{e.full_name}</option>))}
                         </select>
                     </div>
                     <div>
@@ -376,8 +360,8 @@ const SecretaryForm: React.FC<{
                                 <input
                                     type="checkbox"
                                     id={`exec-${exec.id}`}
-                                    checked={selectedExecutiveIds.includes(exec.id)}
-                                    onChange={() => handleExecutiveToggle(exec.id)}
+                                    checked={selectedExecutiveIds.includes(String(exec.id))}
+                                    onChange={() => handleExecutiveToggle(String(exec.id))}
                                     disabled={isSecretaryUser}
                                     className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:text-slate-400"
                                 />
@@ -399,11 +383,11 @@ const SecretaryForm: React.FC<{
                 </div>
             </CollapsibleSection>
 
-             <CollapsibleSection title="Informações de Contato" isOpen={openSections.includes('contato')} onToggle={() => toggleSection('contato')}>
+            <CollapsibleSection title="Informações de Contato" isOpen={openSections.includes('contato')} onToggle={() => toggleSection('contato')}>
                 <fieldset className="border border-slate-200 p-3 rounded-md">
                     <legend className="text-sm font-medium text-slate-600 px-1">Contato Corporativo</legend>
                     <div className="space-y-4 pt-2">
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label htmlFor="workEmail" className="block text-sm font-medium text-slate-700">E-mail</label>
                                 <input type="email" id="workEmail" value={workEmail} onChange={e => setWorkEmail(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
@@ -412,12 +396,12 @@ const SecretaryForm: React.FC<{
                                 <label htmlFor="workPhone" className="block text-sm font-medium text-slate-700">Telefone</label>
                                 <input type="tel" id="workPhone" value={workPhone} onChange={e => setWorkPhone(maskPhone(e.target.value))} placeholder="+55 (XX) XXXXX-XXXX" className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
                             </div>
-                         </div>
+                        </div>
                     </div>
                 </fieldset>
-                 <fieldset className="border border-slate-200 p-3 rounded-md">
+                <fieldset className="border border-slate-200 p-3 rounded-md">
                     <legend className="text-sm font-medium text-slate-600 px-1">Contato Pessoal & Social</legend>
-                     <div className="space-y-4 pt-2">
+                    <div className="space-y-4 pt-2">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label htmlFor="personalEmail" className="block text-sm font-medium text-slate-700">E-mail Pessoal</label>
@@ -428,11 +412,11 @@ const SecretaryForm: React.FC<{
                                 <input type="tel" id="personalPhone" value={personalPhone} onChange={e => setPersonalPhone(maskPhone(e.target.value))} placeholder="+55 (XX) XXXXX-XXXX" className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
                             </div>
                         </div>
-                         <div>
+                        <div>
                             <label htmlFor="address" className="block text-sm font-medium text-slate-700">Endereço Residencial</label>
                             <textarea id="address" value={address} onChange={e => setAddress(e.target.value)} rows={3} placeholder="Rua, Número, Bairro, Cidade, UF, CEP" className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"></textarea>
                         </div>
-                     </div>
+                    </div>
                 </fieldset>
             </CollapsibleSection>
 
@@ -463,10 +447,14 @@ const SecretaryForm: React.FC<{
     );
 };
 
-const SecretariesView: React.FC<SecretariesViewProps> = ({ secretaries, setSecretaries, executives, setUsers, currentUser, organizations, departments }) => {
+const SecretariesView: React.FC<SecretariesViewProps> = ({ secretaries, executives, currentUser, organizations, departments, onRefresh }) => {
     const [isModalOpen, setModalOpen] = useState(false);
     const [editingSecretary, setEditingSecretary] = useState<Partial<Secretary> | null>(null);
     const [secretaryToDelete, setSecretaryToDelete] = useState<Secretary | null>(null);
+
+    // Novas states para carregar e exibir erros
+    const [isLoading, setIsLoading] = useState(false);
+    const [apiError, setApiError] = useState<string | null>(null);
 
     const isSecretaryUser = currentUser.role === 'secretary';
     const isAdminForLegalOrg = currentUser.role === 'admin' && !!currentUser.legalOrganizationId;
@@ -474,11 +462,11 @@ const SecretariesView: React.FC<SecretariesViewProps> = ({ secretaries, setSecre
 
     const adminScopedExecutiveIds = useMemo(() => {
         if (isAdminForLegalOrg) {
-            const orgIds = organizations.filter(o => o.legalOrganizationId === currentUser.legalOrganizationId).map(o => o.id);
-            return executives.filter(e => e.organizationId && orgIds.includes(e.organizationId)).map(e => e.id);
+            const orgIds = organizations.filter(o => o.legalOrganizationId === currentUser.legalOrganizationId).map(o => String(o.id));
+            return executives.filter(e => e.organization_id && orgIds.includes(String(e.organization_id))).map(e => String(e.id));
         }
         if (isOrgAdmin) {
-            return executives.filter(e => e.organizationId === currentUser.organizationId).map(e => e.id);
+            return executives.filter(e => String(e.organization_id) === currentUser.organizationId).map(e => String(e.id));
         }
         return [];
     }, [isAdminForLegalOrg, isOrgAdmin, organizations, executives, currentUser]);
@@ -492,60 +480,81 @@ const SecretariesView: React.FC<SecretariesViewProps> = ({ secretaries, setSecre
     }, [secretaries, currentUser, isSecretaryUser, isAdminForLegalOrg, isOrgAdmin, adminScopedExecutiveIds]);
 
     const handleAddSecretary = () => {
+        setApiError(null);
         setEditingSecretary({});
         setModalOpen(true);
     };
 
     const handleEditSecretary = (secretary: Secretary) => {
+        setApiError(null);
         setEditingSecretary(secretary);
         setModalOpen(true);
     };
 
     const handleDeleteSecretary = (secretary: Secretary) => {
+        setApiError(null);
         setSecretaryToDelete(secretary);
     };
-    
-    const confirmDelete = () => {
-        if(secretaryToDelete) {
-            setSecretaries(prev => prev.filter(s => s.id !== secretaryToDelete.id));
-            setUsers(prev => prev.filter(u => u.secretaryId !== secretaryToDelete.id));
+
+    const confirmDelete = async () => {
+        if (!secretaryToDelete) return;
+        setIsLoading(true);
+        setApiError(null);
+        try {
+            await secretaryService.delete(secretaryToDelete.id);
+            await onRefresh();
             setSecretaryToDelete(null);
+        } catch (error: any) {
+            setApiError(error.response?.data?.detail || "Erro ao excluir secretária.");
+        } finally {
+            setIsLoading(false);
         }
     };
-    
-    const handleSaveSecretary = (secretary: Secretary) => {
-        if (editingSecretary && editingSecretary.id) {
-            setSecretaries(prev => prev.map(s => s.id === secretary.id ? secretary : s));
-            setUsers(users => users.map(u => u.secretaryId === secretary.id ? { ...u, fullName: secretary.fullName } : u));
-        } else {
-            setSecretaries(prev => [...prev, secretary]);
-            setUsers(users => [...users, {
-                id: `user_sec_${secretary.id}`,
-                fullName: secretary.fullName,
-                role: 'secretary',
-                secretaryId: secretary.id,
-            }]);
+
+    const handleSaveSecretary = async (secretaryData: any) => {
+        setIsLoading(true);
+        setApiError(null);
+        try {
+            if (secretaryData.id) {
+                await secretaryService.update(secretaryData.id, secretaryData);
+            } else {
+                await secretaryService.create(secretaryData);
+            }
+            await onRefresh();
+            setModalOpen(false);
+            setEditingSecretary(null);
+        } catch (error: any) {
+            setApiError(error.response?.data?.detail || "Erro ao salvar secretária.");
+        } finally {
+            setIsLoading(false);
         }
-        setModalOpen(false);
-        setEditingSecretary(null);
     };
 
     const getExecutiveNames = (executiveIds: string[]): string => {
         return executiveIds
-            .map(id => executives.find(exec => exec.id === id)?.fullName)
+            .map(id => executives.find(exec => String(exec.id) === String(id))?.full_name)
             .filter(Boolean)
             .join(', ');
     };
 
     return (
-        <div className="space-y-6 animate-fade-in">
+        <div className="space-y-6 animate-fade-in relative">
+            {isLoading && (
+                <div className="absolute inset-0 bg-white/50 z-50 flex items-center justify-center backdrop-blur-sm rounded-xl">
+                    <div className="flex flex-col items-center">
+                        <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+                        <p className="mt-2 text-indigo-700 font-medium">Processando...</p>
+                    </div>
+                </div>
+            )}
+
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
                     <h2 className="text-3xl font-bold text-slate-800">{isSecretaryUser ? 'Meu Perfil' : 'Gerenciar Secretárias'}</h2>
                     <p className="text-slate-500 mt-1">{isSecretaryUser ? 'Visualize e edite suas informações.' : 'Adicione e associe secretárias aos executivos.'}</p>
                 </div>
-                <button 
-                    onClick={handleAddSecretary} 
+                <button
+                    onClick={handleAddSecretary}
                     disabled={isSecretaryUser}
                     className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-md shadow-sm hover:bg-indigo-700 transition duration-150 disabled:bg-slate-300 disabled:cursor-not-allowed"
                 >
@@ -555,7 +564,7 @@ const SecretariesView: React.FC<SecretariesViewProps> = ({ secretaries, setSecre
             </div>
 
             <div className="bg-white p-4 rounded-xl shadow-md">
-                 <div className="overflow-x-auto">
+                <div className="overflow-x-auto">
                     <table className="w-full text-left">
                         <thead className="border-b-2 border-slate-200 text-sm text-slate-500">
                             <tr>
@@ -578,10 +587,10 @@ const SecretariesView: React.FC<SecretariesViewProps> = ({ secretaries, setSecre
                                             <button onClick={() => handleEditSecretary(sec)} className="p-2 text-slate-500 hover:text-indigo-600 rounded-full hover:bg-slate-200 transition" aria-label="Editar secretária">
                                                 <EditIcon />
                                             </button>
-                                            <button 
-                                                onClick={() => handleDeleteSecretary(sec)} 
+                                            <button
+                                                onClick={() => handleDeleteSecretary(sec)}
                                                 disabled={isSecretaryUser}
-                                                className="p-2 text-slate-500 hover:text-red-600 rounded-full hover:bg-slate-200 transition disabled:text-slate-300 disabled:hover:text-slate-300 disabled:cursor-not-allowed" 
+                                                className="p-2 text-slate-500 hover:text-red-600 rounded-full hover:bg-slate-200 transition disabled:text-slate-300 disabled:hover:text-slate-300 disabled:cursor-not-allowed"
                                                 aria-label="Excluir secretária"
                                             >
                                                 <DeleteIcon />
@@ -598,9 +607,15 @@ const SecretariesView: React.FC<SecretariesViewProps> = ({ secretaries, setSecre
 
             {isModalOpen && (
                 <Modal title={editingSecretary?.id ? 'Editar Perfil' : 'Nova Secretária'} onClose={() => setModalOpen(false)}>
+                    {apiError && (
+                        <div className="mb-4 bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded" role="alert">
+                            <p className="font-bold">Atenção</p>
+                            <p>{apiError}</p>
+                        </div>
+                    )}
                     <SecretaryForm
-                        secretary={editingSecretary || {}} 
-                        onSave={handleSaveSecretary} 
+                        secretary={editingSecretary || {}}
+                        onSave={handleSaveSecretary}
                         onCancel={() => { setModalOpen(false); setEditingSecretary(null); }}
                         executives={executives}
                         currentUser={currentUser}
@@ -611,12 +626,12 @@ const SecretariesView: React.FC<SecretariesViewProps> = ({ secretaries, setSecre
             )}
 
             {secretaryToDelete && (
-                 <ConfirmationModal
+                <ConfirmationModal
                     isOpen={!!secretaryToDelete}
                     onClose={() => setSecretaryToDelete(null)}
                     onConfirm={confirmDelete}
                     title="Confirmar Exclusão"
-                    message={`Tem certeza que deseja excluir a secretária ${secretaryToDelete.fullName}? O usuário associado também será removido.`}
+                    message={apiError ? `ERRO: ${apiError}` : `Tem certeza que deseja excluir a secretária ${secretaryToDelete.fullName}?`}
                 />
             )}
         </div>
