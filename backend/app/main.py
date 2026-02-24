@@ -10,6 +10,7 @@ from app.routers import (
     organization,
     department,
     executive,
+    secretary
 )
 
 app = FastAPI(title="Executiva Cloud API", description="Executiva Cloud API")
@@ -35,6 +36,7 @@ app.include_router(legal_organization.router)
 app.include_router(organization.router)
 app.include_router(department.router)
 app.include_router(executive.router)
+app.include_router(secretary.router) # <-- ADICIONADO
 
 
 # Rota raiz simples para verificação
