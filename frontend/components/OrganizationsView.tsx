@@ -633,56 +633,62 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
                 )}
             </div>
 
-            {/* Código original restaurado (sem a prop inventada isOpen) */}
-            {isOrgModalOpen && (
-                <Modal title={editingOrganization?.id ? 'Editar Empresa' : 'Nova Empresa'} onClose={() => {setOrgModalOpen(false); setEditingOrganization(null)}}>
-                    {apiError && (
-                        <div className="mb-4 bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded" role="alert">
-                            <p className="font-bold">Atenção</p>
-                            <p>{apiError}</p>
-                        </div>
-                    )}
-                    <OrganizationForm 
-                        organization={editingOrganization || {}} 
-                        onSave={handleSaveOrganization} 
-                        onCancel={() => { setOrgModalOpen(false); setEditingOrganization(null); }} 
-                        legalOrganizations={legalOrganizations}
-                        currentUser={currentUser}
-                    />
-                </Modal>
-            )}
-
-            {isDeptModalOpen && (
-                 <Modal title={editingDepartment?.id ? 'Editar Departamento' : 'Novo Departamento'} onClose={() => {setDeptModalOpen(false); setEditingDepartment(null)}}>
-                    {apiError && (
-                        <div className="mb-4 bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded" role="alert">
-                            <p className="font-bold">Atenção</p>
-                            <p>{apiError}</p>
-                        </div>
-                    )}
-                    <DepartmentForm department={editingDepartment || {}} onSave={handleSaveDepartment} onCancel={() => { setDeptModalOpen(false); setEditingDepartment(null); }} />
-                </Modal>
-            )}
-
-            {orgToDelete && (
-                <ConfirmationModal
-                    isOpen={!!orgToDelete}
-                    onClose={() => setOrgToDelete(null)}
-                    onConfirm={confirmDeleteOrganization}
-                    title="Confirmar Exclusão"
-                    message={apiError ? `ERRO: ${apiError}` : `Tem certeza que deseja excluir a empresa ${orgToDelete.name}? TODOS os seus dados (departamentos, executivos, atividades, etc) e usuários associados serão permanentemente removidos.`}
+            {/* AQUI ESTÁ A CORREÇÃO PRINCIPAL: Passando isOpen explicitamente e removendo o && */}
+            <Modal 
+                isOpen={isOrgModalOpen}
+                title={editingOrganization?.id ? 'Editar Empresa' : 'Nova Empresa'} 
+                onClose={() => {setOrgModalOpen(false); setEditingOrganization(null)}}
+            >
+                {apiError && (
+                    <div className="mb-4 bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded" role="alert">
+                        <p className="font-bold">Atenção</p>
+                        <p>{apiError}</p>
+                    </div>
+                )}
+                <OrganizationForm 
+                    organization={editingOrganization || {}} 
+                    onSave={handleSaveOrganization} 
+                    onCancel={() => { setOrgModalOpen(false); setEditingOrganization(null); }} 
+                    legalOrganizations={legalOrganizations}
+                    currentUser={currentUser}
                 />
-            )}
+            </Modal>
+
+            {/* AQUI ESTÁ A CORREÇÃO PRINCIPAL: Passando isOpen explicitamente e removendo o && */}
+            <Modal 
+                isOpen={isDeptModalOpen}
+                title={editingDepartment?.id ? 'Editar Departamento' : 'Novo Departamento'} 
+                onClose={() => {setDeptModalOpen(false); setEditingDepartment(null)}}
+            >
+                {apiError && (
+                    <div className="mb-4 bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded" role="alert">
+                        <p className="font-bold">Atenção</p>
+                        <p>{apiError}</p>
+                    </div>
+                )}
+                <DepartmentForm 
+                    department={editingDepartment || {}} 
+                    onSave={handleSaveDepartment} 
+                    onCancel={() => { setDeptModalOpen(false); setEditingDepartment(null); }} 
+                />
+            </Modal>
+
+            {/* ConfirmationModal também usa isOpen internamente, e no seu código original ele é baseado na variável orgToDelete/deptToDelete. Está correto. */}
+            <ConfirmationModal
+                isOpen={!!orgToDelete}
+                onClose={() => setOrgToDelete(null)}
+                onConfirm={confirmDeleteOrganization}
+                title="Confirmar Exclusão"
+                message={apiError ? `ERRO: ${apiError}` : `Tem certeza que deseja excluir a empresa ${orgToDelete?.name}? TODOS os seus dados (departamentos, executivos, atividades, etc) e usuários associados serão permanentemente removidos.`}
+            />
             
-            {deptToDelete && (
-                 <ConfirmationModal
-                    isOpen={!!deptToDelete}
-                    onClose={() => setDeptToDelete(null)}
-                    onConfirm={confirmDeleteDepartment}
-                    title="Confirmar Exclusão"
-                    message={apiError ? `ERRO: ${apiError}` : `Tem certeza que deseja excluir o departamento ${deptToDelete.name}? Os executivos associados serão desvinculados.`}
-                />
-            )}
+            <ConfirmationModal
+                isOpen={!!deptToDelete}
+                onClose={() => setDeptToDelete(null)}
+                onConfirm={confirmDeleteDepartment}
+                title="Confirmar Exclusão"
+                message={apiError ? `ERRO: ${apiError}` : `Tem certeza que deseja excluir o departamento ${deptToDelete?.name}? Os executivos associados serão desvinculados.`}
+            />
         </div>
     );
 };

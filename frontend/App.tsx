@@ -41,6 +41,7 @@ import LegalOrganizationsView from './components/LegalOrganizationsView';
 import { legalOrganizationService } from './services/legalOrganizationService';
 import { organizationService } from './services/organizationService';
 import { departmentService } from './services/departmentService';
+import { executiveService } from './services/executiveService';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('dashboard');
@@ -58,24 +59,7 @@ const App: React.FC = () => {
   const [selectedExecutiveId, setSelectedExecutiveId] = useLocalStorage<string | null>('selectedExecutiveId', null);
 
   // Dummies inicias para dados que ainda não tem backend
-  const initialExecutives: Executive[] = useMemo(() => [
-    {
-      id: 'exec1',
-      fullName: 'Carlos Silva',
-      workEmail: 'carlos.silva@techsolutions.com',
-      organizationId: 'org1', 
-      workPhone: '(11) 98888-1111',
-      departmentId: 'dept1',
-      jobTitle: 'Diretor de Engenharia',
-      hireDate: '2018-05-10',
-      birthDate: '1980-11-23',
-      cpf: '111.222.333-44',
-      rg: '12.345.678-9',
-      address: 'Rua das Inovações, 123, São Paulo, SP, 01234-567',
-      bankInfo: 'Banco Digital S.A.\nAgência: 0001\nConta Corrente: 12345-6',
-      compensationInfo: 'Salário Base + Bônus Anual + Stock Options',
-    },
-  ], []);
+  const initialExecutives: Executive[] = useMemo(() => [], []);
 
   const initialSecretaries: Secretary[] = [];
   const initialEventTypes: EventType[] = [
@@ -114,65 +98,44 @@ const App: React.FC = () => {
   // --- CARREGAR DADOS DO BACKEND ---
   const loadBackendData = useCallback(async () => {
     try {
-      // 1. Carregar Legal Organizations
-      // O backend retorna IDs inteiros, convertemos para string para manter compatibilidade com o frontend
-      // CORREÇÃO: O apiService agora retorna o array diretamente, não precisa de .data
       const legalOrgsRes = await legalOrganizationService.getAll();
-      const legalOrgsData = legalOrgsRes.map((item: any) => ({
-        ...item,
-        id: String(item.id)
-      }));
-      setLegalOrganizations(legalOrgsData);
+      setLegalOrganizations(legalOrgsRes);
 
-      // 2. Carregar Organizations (Empresas)
-      // CORREÇÃO: O apiService agora retorna o array diretamente
       const orgsRes = await organizationService.getAll();
-      const orgsData = orgsRes.map((item: any) => ({
-        ...item,
-        id: String(item.id),
-        legalOrganizationId: String(item.legalOrganizationId)
-      }));
-      setOrganizations(orgsData);
+      setOrganizations(orgsRes);
 
-      // 3. Carregar Departamentos
-      // Como o backend atualmente busca por organização, iteramos sobre as organizações carregadas
       let allDepts: Department[] = [];
-      if (orgsData.length > 0) {
-        const deptPromises = orgsData.map(org => departmentService.getByOrg(org.id));
+      if (orgsRes.length > 0) {
+        const deptPromises = orgsRes.map((org) => departmentService.getByOrg(org.id));
         const deptResponses = await Promise.all(deptPromises);
-        
-        // CORREÇÃO: deptResponses agora é um array de arrays de departamentos
-        deptResponses.forEach(res => {
-          const mappedDepts = res.map((item: any) => ({
-            ...item,
-            id: String(item.id),
-            organizationId: String(item.organizationId)
-          }));
-          allDepts = [...allDepts, ...mappedDepts];
+        deptResponses.forEach((res) => {
+          allDepts = [...allDepts, ...res];
         });
       }
       setDepartments(allDepts);
 
-      // Atualizar lista de usuários mockados para incluir admins das novas organizações
+      const executivesData = await executiveService.getAll(0, 1000);
+      setExecutives(executivesData);
+
       const masterUser: User = { id: 'user_master', fullName: 'Usuário Master', role: 'master' };
       
-      const orgAdmins = orgsData.map(org => ({
+      const orgAdmins = orgsRes.map((org) => ({
         id: `user_admin_${org.id}`,
         fullName: `Admin ${org.name}`,
         role: 'admin' as UserRole,
         organizationId: org.id,
       }));
 
-      const legalOrgAdmins = legalOrgsData.map(lo => ({
+      const legalOrgAdmins = legalOrgsRes.map((lo) => ({
         id: `user_admin_legal_${lo.id}`,
         fullName: `Admin ${lo.name}`,
         role: 'admin' as UserRole,
         legalOrganizationId: lo.id
       }));
 
-      const execUsers = executives.map(e => ({
+      const execUsers = executivesData.map((e) => ({
         id: `user_exec_${e.id}`,
-        fullName: e.full_name,
+        fullName: e.fullName,
         role: 'executive' as UserRole,
         executiveId: e.id,
       }));
@@ -190,7 +153,7 @@ const App: React.FC = () => {
     } catch (error) {
       console.error("Erro ao carregar dados do backend:", error);
     }
-  }, [executives, secretaries, setUsers]);
+  }, [secretaries, setUsers, setExecutives]);
 
   // Efeito inicial
   useEffect(() => {
@@ -219,18 +182,18 @@ const App: React.FC = () => {
           const orgIdsForLegalOrg = organizations
             .filter(o => o.legalOrganizationId === currentUser.legalOrganizationId)
             .map(o => o.id);
-          return executives.filter(e => e.organization_id && orgIdsForLegalOrg.includes(e.organization_id));
+          return executives.filter((e) => e.organizationId && orgIdsForLegalOrg.includes(e.organizationId));
         }
         if (currentUser.organizationId) {
-          return executives.filter(e => e.organization_id === parseInt(currentUser.organizationId));
+          return executives.filter((e) => e.organizationId === currentUser.organizationId);
         }
         return [];
       case 'secretary':
         const secretary = secretaries.find(s => s.id === currentUser.secretaryId);
         if (!secretary) return [];
-        //return executives.filter(e => secretary.executiveIds.includes(e.id));
+        return executives.filter((e) => secretary.executiveIds.includes(e.id));
       case 'executive':
-        return executives.filter(e => e.id === parseInt(currentUser.executiveId));
+        return executives.filter((e) => e.id === currentUser.executiveId);
       default:
         return [];
     }
@@ -268,10 +231,10 @@ const App: React.FC = () => {
           const reminderTime = new Date(eventStartTime.getTime() - event.reminderMinutes * 60 * 1000);
 
           if (now >= reminderTime && now < eventStartTime) {
-            const executive = executives.find(e => e.id === parseInt(event.executiveId));
+            const executive = executives.find((e) => e.id === event.executiveId);
             const title = `Lembrete: ${event.title}`;
             const options = {
-              body: `O evento de ${executive?.full_name || 'um executivo'} começa às ${eventStartTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}.`,
+              body: `O evento de ${executive?.fullName || 'um executivo'} começa às ${eventStartTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}.`,
               icon: '/vite.svg',
             };
 
@@ -290,7 +253,10 @@ const App: React.FC = () => {
 
 
   // --- DERIVED/FILTERED DATA ---
-  const selectedExecutive = useMemo(() => executives.find(e => e.id === parseInt(selectedExecutiveId)), [executives, selectedExecutiveId]);
+  const selectedExecutive = useMemo(
+    () => executives.find((e) => e.id === selectedExecutiveId),
+    [executives, selectedExecutiveId],
+  );
 
   const filteredEvents = useMemo(() => events.filter(e => e.executiveId === selectedExecutiveId), [events, selectedExecutiveId]);
   const filteredContacts = useMemo(() => contacts.filter(c => c.executiveId === selectedExecutiveId), [contacts, selectedExecutiveId]);

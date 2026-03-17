@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { CloseIcon } from './Icons';
 
 interface ModalProps {
-  isOpen: boolean;
+  isOpen?: boolean;
   title: string;
   onClose: () => void;
   children: React.ReactNode;
@@ -24,7 +24,8 @@ const Modal: React.FC<ModalProps> = ({ isOpen, title, onClose, children }) => {
     };
   }, [onClose, isOpen]);
 
-  if (!isOpen) {
+  // Backward compatibility: when isOpen is omitted, render modal.
+  if (isOpen === false) {
     return null;
   }
 

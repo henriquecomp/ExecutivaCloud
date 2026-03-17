@@ -1,8 +1,7 @@
-from pydantic import BaseModel, EmailStr, Field, model_validator, AliasChoices
-from typing import Optional
+from pydantic import BaseModel, Field, AliasChoices
 
 class LoginBase(BaseModel):
-    id: int = Field(alias='fullName', validation_alias=AliasChoices('name') )
+    id: int = Field(validation_alias=AliasChoices("id", "userId"))
     
 
 

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field, ConfigDict
+from pydantic import BaseModel, EmailStr, Field, ConfigDict, AliasChoices
 from typing import Optional
 from datetime import date
 
@@ -21,8 +21,10 @@ class ExecutiveBase(BaseModel):
     personal_email: Optional[EmailStr] = Field(None, alias="personalEmail")
     personal_phone: Optional[str] = Field(None, alias="personalPhone")
     street: Optional[str] = Field(
-        None, alias="address"
-    )  # Mantendo street como original e address como alias
+        None,
+        alias="street",
+        validation_alias=AliasChoices("street", "address"),
+    )
     linkedin_profile_url: Optional[str] = Field(None, alias="linkedinProfileUrl")
     job_title: Optional[str] = Field(None, alias="jobTitle")
     organization_id: Optional[int] = Field(None, alias="organizationId")

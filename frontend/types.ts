@@ -33,56 +33,56 @@ export interface Department {
 }
 
 export interface Executive {
-  id: number;
-  full_name: string;
+  id: string;
+  fullName: string;
   
   // Bloco 1: Identificação Pessoal
   cpf?: string;
   rg?: string;
-  rg_issuer?: string;
-  rg_issue_date?: string; // Date string YYYY-MM-DD
-  birth_date?: string;    // Date string YYYY-MM-DD
+  rgIssuer?: string;
+  rgIssueDate?: string; // Date string YYYY-MM-DD
+  birthDate?: string;    // Date string YYYY-MM-DD
   nationality?: string;
-  place_of_birth?: string;
-  mother_name?: string;
-  father_name?: string;
-  civil_status?: string;
+  placeOfBirth?: string;
+  motherName?: string;
+  fatherName?: string;
+  civilStatus?: string;
 
   // Bloco 2: Informações de Contato
-  work_email: string; // Obrigatório
-  work_phone?: string;
+  workEmail: string; // Obrigatório
+  workPhone?: string;
   extension?: string;
-  personal_email?: string;
-  personal_phone?: string;
+  personalEmail?: string;
+  personalPhone?: string;
   street?: string; // Endereço
-  linkedin_profile_url?: string;
+  linkedinProfileUrl?: string;
 
   // Bloco 3: Dados Profissionais
-  job_title?: string;
-  cost_center?: string;
-  employee_id?: string;
-  hire_date?: string; // Date string YYYY-MM-DD
-  work_location?: string;
-  organization_id?: number;
-  department_id?: number;
-  reports_to_executive_id?: number;
+  jobTitle?: string;
+  costCenter?: string;
+  employeeId?: string;
+  hireDate?: string; // Date string YYYY-MM-DD
+  workLocation?: string;
+  organizationId?: string;
+  departmentId?: string;
+  reportsToExecutiveId?: string;
 
   // Bloco 4: Perfil Público
-  photo_url?: string;
+  photoUrl?: string;
   bio?: string;
   education?: string;
   languages?: string;
 
   // Bloco 5: Emergência
-  emergency_contact_name?: string;
-  emergency_contact_phone?: string;
-  emergency_contact_relation?: string;
-  dependents_info?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  emergencyContactRelation?: string;
+  dependentsInfo?: string;
 
   // Bloco 6: Financeiro e Acesso
-  bank_info?: string;
-  compensation_info?: string;
-  system_access_levels?: string;
+  bankInfo?: string;
+  compensationInfo?: string;
+  systemAccessLevels?: string;
 
   // Relacionamentos para exibição na tabela
   organization?: Organization;

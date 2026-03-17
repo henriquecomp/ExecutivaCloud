@@ -15,6 +15,7 @@ from app.routers import (
 app = FastAPI(title="Executiva Cloud API", description="Executiva Cloud API")
 
 origins = [
+    "http://localhost:3000",
     "http://localhost:3001",  # Exemplo de um frontend React/Vue/Angular em desenvolvimento
     # Adicione outras origens aqui, se necessário
 ]

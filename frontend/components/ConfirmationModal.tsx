@@ -13,7 +13,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({ isOpen, onClose, 
   if (!isOpen) return null;
 
   return (
-    <Modal title={title} onClose={onClose}>
+    <Modal isOpen={isOpen} title={title} onClose={onClose}>
       <div className="space-y-6">
         <p className="text-slate-600">{message}</p>
         <div className="flex justify-end space-x-3">

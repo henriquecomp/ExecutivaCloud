@@ -165,6 +165,12 @@ const SecretaryForm: React.FC<{
     const isAdminForLegalOrg = currentUser.role === 'admin' && !!currentUser.legalOrganizationId;
     const isOrgAdmin = currentUser.role === 'admin' && !!currentUser.organizationId;
 
+    useEffect(() => {
+        if (isOrgAdmin && currentUser.organizationId && organizationId !== currentUser.organizationId) {
+            setOrganizationId(currentUser.organizationId);
+        }
+    }, [isOrgAdmin, currentUser.organizationId, organizationId]);
+
     const visibleOrganizations = useMemo(() => {
         if (isAdminForLegalOrg) return organizations.filter(o => o.legalOrganizationId === currentUser.legalOrganizationId);
         if (isOrgAdmin) return organizations.filter(o => o.id === currentUser.organizationId);
@@ -268,16 +274,55 @@ const SecretaryForm: React.FC<{
             return;
         }
         if (!fullName) return;
+        const normalize = (value?: string) => {
+            if (value == null) return undefined;
+            const trimmed = value.trim();
+            return trimmed === '' ? undefined : trimmed;
+        };
+        const selectedOrganizationId = isOrgAdmin ? currentUser.organizationId : organizationId;
+        const validExecutiveIds = selectedExecutiveIds.filter((id, idx, arr) =>
+            id && arr.indexOf(id) === idx && assignableExecutives.some((exec) => exec.id === id),
+        );
         onSave({
             id: secretary.id || `sec_${new Date().getTime()}`,
-            executiveIds: selectedExecutiveIds,
-            fullName, jobTitle, photoUrl, cpf, rg, rgIssuer, rgIssueDate,
-            birthDate, nationality, placeOfBirth, motherName, fatherName, civilStatus,
-            workEmail, workPhone, extension, personalEmail, personalPhone, address,
-            linkedinProfileUrl, organizationId, departmentId, costCenter, employeeId,
-            reportsToExecutiveId, hireDate, workLocation, systemAccessLevels, bio,
-            education, languages, emergencyContactName, emergencyContactPhone,
-            emergencyContactRelation, dependentsInfo, bankInfo, compensationInfo,
+            executiveIds: validExecutiveIds,
+            fullName: normalize(fullName) || '',
+            jobTitle: normalize(jobTitle),
+            photoUrl: normalize(photoUrl),
+            cpf: normalize(cpf),
+            rg: normalize(rg),
+            rgIssuer: normalize(rgIssuer),
+            rgIssueDate: normalize(rgIssueDate),
+            birthDate: normalize(birthDate),
+            nationality: normalize(nationality),
+            placeOfBirth: normalize(placeOfBirth),
+            motherName: normalize(motherName),
+            fatherName: normalize(fatherName),
+            civilStatus: normalize(civilStatus),
+            workEmail: normalize(workEmail),
+            workPhone: normalize(workPhone),
+            extension: normalize(extension),
+            personalEmail: normalize(personalEmail),
+            personalPhone: normalize(personalPhone),
+            address: normalize(address),
+            linkedinProfileUrl: normalize(linkedinProfileUrl),
+            organizationId: normalize(selectedOrganizationId),
+            departmentId: normalize(departmentId),
+            costCenter: normalize(costCenter),
+            employeeId: normalize(employeeId),
+            reportsToExecutiveId: normalize(reportsToExecutiveId),
+            hireDate: normalize(hireDate),
+            workLocation: normalize(workLocation),
+            systemAccessLevels: normalize(systemAccessLevels),
+            bio: normalize(bio),
+            education: normalize(education),
+            languages: normalize(languages),
+            emergencyContactName: normalize(emergencyContactName),
+            emergencyContactPhone: normalize(emergencyContactPhone),
+            emergencyContactRelation: normalize(emergencyContactRelation),
+            dependentsInfo: normalize(dependentsInfo),
+            bankInfo: normalize(bankInfo),
+            compensationInfo: normalize(compensationInfo),
         });
     };
 
@@ -341,7 +386,7 @@ const SecretaryForm: React.FC<{
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label htmlFor="organizationId" className="block text-sm font-medium text-slate-700">Empresa</label>
-                        <select id="organizationId" value={organizationId} onChange={e => {setOrganizationId(e.target.value); setDepartmentId('');}} disabled={isSecretaryUser} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm disabled:bg-slate-100 disabled:cursor-not-allowed">
+                        <select id="organizationId" value={organizationId} onChange={e => {setOrganizationId(e.target.value); setDepartmentId('');}} disabled={isSecretaryUser || isOrgAdmin} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm disabled:bg-slate-100 disabled:cursor-not-allowed">
                             <option value="">Selecione uma Empresa</option>
                             {visibleOrganizations.map(org => <option key={org.id} value={org.id}>{org.name}</option>)}
                         </select>
@@ -483,16 +528,47 @@ const SecretariesView: React.FC<SecretariesViewProps> = ({ secretaries, setSecre
         return [];
     }, [isAdminForLegalOrg, isOrgAdmin, organizations, executives, currentUser]);
 
+    const adminScopedOrganizationIds = useMemo(() => {
+        if (isAdminForLegalOrg) {
+            return organizations
+                .filter((o) => o.legalOrganizationId === currentUser.legalOrganizationId)
+                .map((o) => o.id);
+        }
+        if (isOrgAdmin && currentUser.organizationId) {
+            return [currentUser.organizationId];
+        }
+        return [];
+    }, [isAdminForLegalOrg, isOrgAdmin, organizations, currentUser]);
+
     const visibleSecretaries = useMemo(() => {
         if (isSecretaryUser) return secretaries.filter(s => s.id === currentUser.secretaryId);
         if (isAdminForLegalOrg || isOrgAdmin) {
-            return secretaries.filter(s => s.executiveIds.some(execId => adminScopedExecutiveIds.includes(execId)));
+            return secretaries.filter((s) => {
+                const hasScopedExecutive = s.executiveIds.some((execId) =>
+                    adminScopedExecutiveIds.includes(execId),
+                );
+                const hasScopedOrganization = !!s.organizationId &&
+                    adminScopedOrganizationIds.includes(s.organizationId);
+                return hasScopedExecutive || hasScopedOrganization;
+            });
         }
         return secretaries;
-    }, [secretaries, currentUser, isSecretaryUser, isAdminForLegalOrg, isOrgAdmin, adminScopedExecutiveIds]);
+    }, [
+        secretaries,
+        currentUser,
+        isSecretaryUser,
+        isAdminForLegalOrg,
+        isOrgAdmin,
+        adminScopedExecutiveIds,
+        adminScopedOrganizationIds,
+    ]);
 
     const handleAddSecretary = () => {
-        setEditingSecretary({});
+        setEditingSecretary(
+            isOrgAdmin && currentUser.organizationId
+                ? { organizationId: currentUser.organizationId }
+                : {},
+        );
         setModalOpen(true);
     };
 
@@ -597,7 +673,11 @@ const SecretariesView: React.FC<SecretariesViewProps> = ({ secretaries, setSecre
             </div>
 
             {isModalOpen && (
-                <Modal title={editingSecretary?.id ? 'Editar Perfil' : 'Nova Secretária'} onClose={() => setModalOpen(false)}>
+                <Modal
+                    isOpen={isModalOpen}
+                    title={editingSecretary?.id ? 'Editar Perfil' : 'Nova Secretária'}
+                    onClose={() => { setModalOpen(false); setEditingSecretary(null); }}
+                >
                     <SecretaryForm
                         secretary={editingSecretary || {}} 
                         onSave={handleSaveSecretary} 
