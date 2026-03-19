@@ -5,6 +5,8 @@ import Modal from './Modal';
 import ConfirmationModal from './ConfirmationModal';
 import Pagination from './Pagination';
 import { EditIcon, DeleteIcon, PlusIcon, BellIcon, RecurrenceIcon, SettingsIcon } from './Icons';
+import { eventService } from '../services/eventService';
+import { eventTypeService } from '../services/eventTypeService';
 
 interface AgendaViewProps {
   events: Event[];
@@ -12,6 +14,7 @@ interface AgendaViewProps {
   eventTypes: EventType[];
   setEventTypes: React.Dispatch<React.SetStateAction<EventType[]>>;
   executiveId: string;
+  onRefresh: () => Promise<void>;
 }
 
 // --- Event Type Management Components (Moved from SettingsView) ---
@@ -51,21 +54,44 @@ const EventTypeSettingsModal: React.FC<{
     onClose: () => void;
     eventTypes: EventType[];
     setEventTypes: React.Dispatch<React.SetStateAction<EventType[]>>;
-}> = ({ isOpen, onClose, eventTypes, setEventTypes }) => {
+    onRefresh: () => Promise<void>;
+}> = ({ isOpen, onClose, eventTypes, setEventTypes, onRefresh }) => {
     const [isFormModalOpen, setFormModalOpen] = useState(false);
     const [editingEventType, setEditingEventType] = useState<Partial<EventType> | null>(null);
     const [eventTypeToDelete, setEventTypeToDelete] = useState<EventType | null>(null);
 
-    const handleSave = (eventType: EventType) => {
-        setEventTypes(prev => editingEventType?.id ? prev.map(et => et.id === eventType.id ? eventType : et) : [...prev, eventType]);
-        setFormModalOpen(false);
-        setEditingEventType(null);
+    const handleSave = async (eventType: EventType) => {
+        try {
+            if (editingEventType?.id) {
+                await eventTypeService.update(eventType.id, {
+                    name: eventType.name,
+                    color: eventType.color,
+                });
+            } else {
+                await eventTypeService.create({
+                    name: eventType.name,
+                    color: eventType.color,
+                });
+            }
+            await onRefresh();
+            setFormModalOpen(false);
+            setEditingEventType(null);
+        } catch (error) {
+            console.error('Erro ao salvar tipo de evento:', error);
+            alert('Erro ao salvar tipo de evento.');
+        }
     };
 
-    const confirmDelete = () => {
+    const confirmDelete = async () => {
         if (!eventTypeToDelete) return;
-        setEventTypes(prev => prev.filter(et => et.id !== eventTypeToDelete.id));
-        setEventTypeToDelete(null);
+        try {
+            await eventTypeService.delete(eventTypeToDelete.id);
+            await onRefresh();
+            setEventTypeToDelete(null);
+        } catch (error) {
+            console.error('Erro ao excluir tipo de evento:', error);
+            alert('Erro ao excluir tipo de evento.');
+        }
     };
     
     if (!isOpen) return null;
@@ -406,7 +432,7 @@ const generateRecurringEvents = (baseEvent: Partial<Event>, rule: RecurrenceRule
 };
 
 
-const AgendaView: React.FC<AgendaViewProps> = ({ events, setEvents, eventTypes, setEventTypes, executiveId }) => {
+const AgendaView: React.FC<AgendaViewProps> = ({ events, setEvents, eventTypes, setEventTypes, executiveId, onRefresh }) => {
     const [isModalOpen, setModalOpen] = useState(false);
     const [editingEvent, setEditingEvent] = useState<Partial<Event> | null>(null);
     const [eventToDelete, setEventToDelete] = useState<Event | null>(null);
@@ -448,60 +474,79 @@ const AgendaView: React.FC<AgendaViewProps> = ({ events, setEvents, eventTypes, 
         }
     };
     
-    const confirmDelete = () => {
+    const confirmDelete = async () => {
         if (!eventToDelete) return;
-        setEvents(allEvents => allEvents.filter(e => e.id !== eventToDelete.id));
-        setEventToDelete(null);
+        try {
+            await eventService.delete(eventToDelete.id);
+            await onRefresh();
+            setEventToDelete(null);
+        } catch (error) {
+            console.error('Erro ao excluir evento:', error);
+            alert('Erro ao excluir evento.');
+        }
     };
 
-    const executeRecurrenceDelete = (type: 'one' | 'all' | 'future') => {
+    const executeRecurrenceDelete = async (type: 'one' | 'all' | 'future') => {
         if (!eventToDelete) return;
-
-        setEvents(allEvents => {
+        try {
             if (type === 'one') {
-                return allEvents.filter(e => e.id !== eventToDelete.id);
+                await eventService.delete(eventToDelete.id);
+            } else if (eventToDelete.recurrenceId) {
+                await eventService.deleteByRecurrence(
+                    eventToDelete.recurrenceId,
+                    type === 'future' ? eventToDelete.startTime : undefined,
+                );
             }
-            const seriesId = eventToDelete.recurrenceId;
-            if (type === 'all') {
-                return allEvents.filter(e => e.recurrenceId !== seriesId);
-            }
-            if (type === 'future') {
-                const eventStartTime = new Date(eventToDelete.startTime).getTime();
-                return allEvents.filter(e => {
-                    if (e.recurrenceId !== seriesId) return true;
-                    return new Date(e.startTime).getTime() < eventStartTime;
-                });
-            }
-            return allEvents;
-        });
-        
-        setShowRecurrenceDeleteModal(false);
-        setEventToDelete(null);
+            await onRefresh();
+            setShowRecurrenceDeleteModal(false);
+            setEventToDelete(null);
+        } catch (error) {
+            console.error('Erro ao excluir recorrência:', error);
+            alert('Erro ao excluir recorrência.');
+        }
     };
 
-    const handleSaveEvent = (eventData: Partial<Event>, recurrenceRule: RecurrenceRule | null) => {
+    const handleSaveEvent = async (eventData: Partial<Event>, recurrenceRule: RecurrenceRule | null) => {
          const fullEventData = { ...eventData, executiveId: executiveId };
+         const oldRecurrenceId = fullEventData.id
+            ? events.find((e) => e.id === fullEventData.id)?.recurrenceId
+            : undefined;
 
-         setEvents(allEvents => {
-            // Remove the old series if it exists (for both editing recurrence and making it non-recurrent)
-            const oldRecurrenceId = fullEventData.id ? allEvents.find(e => e.id === fullEventData.id)?.recurrenceId : undefined;
-            let filteredEvents = oldRecurrenceId ? allEvents.filter(e => e.recurrenceId !== oldRecurrenceId) : allEvents;
-            
+        const toPayload = (evt: Partial<Event>) => ({
+            ...evt,
+            id: undefined,
+        });
+
+        try {
             if (recurrenceRule) {
                 const recurrenceId = oldRecurrenceId || `recur_${new Date().getTime()}`;
-                const newSeries = generateRecurringEvents(fullEventData, recurrenceRule, recurrenceId);
-                return [...filteredEvents, ...newSeries];
+                const series = generateRecurringEvents(fullEventData, recurrenceRule, recurrenceId);
+
+                if (oldRecurrenceId) {
+                    await eventService.deleteByRecurrence(oldRecurrenceId);
+                } else if (fullEventData.id) {
+                    await eventService.delete(fullEventData.id);
+                }
+
+                await eventService.createBulk(series.map(toPayload));
             } else {
-                if (fullEventData.id) { // Editing a single event or a previously recurring event made single
-                    return filteredEvents.filter(e => e.id !== fullEventData.id).concat(fullEventData as Event);
-                } else { // New single event
-                    return [...allEvents, { ...fullEventData, id: `single_${new Date().getTime()}` } as Event];
+                if (oldRecurrenceId) {
+                    await eventService.deleteByRecurrence(oldRecurrenceId);
+                    await eventService.create(toPayload(fullEventData));
+                } else if (fullEventData.id) {
+                    await eventService.update(fullEventData.id, fullEventData);
+                } else {
+                    await eventService.create(toPayload(fullEventData));
                 }
             }
-        });
-        
-        setModalOpen(false);
-        setEditingEvent(null);
+
+            await onRefresh();
+            setModalOpen(false);
+            setEditingEvent(null);
+        } catch (error) {
+            console.error('Erro ao salvar evento:', error);
+            alert('Erro ao salvar evento.');
+        }
     };
     
     const formatFullDate = (isoString: string) => {
@@ -618,6 +663,7 @@ const AgendaView: React.FC<AgendaViewProps> = ({ events, setEvents, eventTypes, 
                 onClose={() => setSettingsModalOpen(false)}
                 eventTypes={eventTypes}
                 setEventTypes={setEventTypes}
+                onRefresh={onRefresh}
             />
 
             {showRecurrenceDeleteModal && (

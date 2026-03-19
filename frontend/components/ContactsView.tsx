@@ -6,23 +6,25 @@ import ConfirmationModal from './ConfirmationModal';
 import Pagination from './Pagination';
 import ViewSwitcher from './ViewSwitcher';
 import { EditIcon, DeleteIcon, PlusIcon, EmailIcon, PhoneIcon, SettingsIcon } from './Icons';
+import { contactTypeService } from '../services/contactTypeService';
+import { contactService } from '../services/contactService';
 
 interface ContactsViewProps {
   contacts: Contact[];
-  setContacts: React.Dispatch<React.SetStateAction<Contact[]>>;
   contactTypes: ContactType[];
-  setContactTypes: React.Dispatch<React.SetStateAction<ContactType[]>>;
   executiveId: string;
+  onRefresh: () => Promise<void>;
 }
 
 // --- Contact Type Management Components (Moved from SettingsView) ---
 const ContactTypeForm: React.FC<{ contactType: Partial<ContactType>, onSave: (ct: ContactType) => void, onCancel: () => void }> = ({ contactType, onSave, onCancel }) => {
     const [name, setName] = useState(contactType.name || '');
+    const [color, setColor] = useState(contactType.color || '#64748b');
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!name) return;
-        onSave({ id: contactType.id || `ct_${new Date().getTime()}`, name });
+        onSave({ id: contactType.id || `ct_${new Date().getTime()}`, name, color });
     };
 
     return (
@@ -30,6 +32,25 @@ const ContactTypeForm: React.FC<{ contactType: Partial<ContactType>, onSave: (ct
             <div>
                 <label htmlFor="ct-name" className="block text-sm font-medium text-slate-700">Nome do Tipo</label>
                 <input type="text" id="ct-name" value={name} onChange={e => setName(e.target.value)} required className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+            </div>
+            <div>
+                <label htmlFor="ct-color" className="block text-sm font-medium text-slate-700">Cor da Etiqueta</label>
+                <div className="mt-1 flex items-center gap-3">
+                    <input
+                        type="color"
+                        id="ct-color"
+                        value={color}
+                        onChange={e => setColor(e.target.value)}
+                        className="h-10 w-14 cursor-pointer rounded border border-slate-300 bg-white p-1"
+                    />
+                    <input
+                        type="text"
+                        value={color}
+                        onChange={e => setColor(e.target.value)}
+                        placeholder="#64748b"
+                        className="block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    />
+                </div>
             </div>
             <div className="flex justify-end space-x-3 pt-4">
                 <button type="button" onClick={onCancel} className="px-4 py-2 bg-slate-200 text-slate-800 rounded-md hover:bg-slate-300 transition">Cancelar</button>
@@ -43,22 +64,38 @@ const ContactTypeSettingsModal: React.FC<{
     isOpen: boolean;
     onClose: () => void;
     contactTypes: ContactType[];
-    setContactTypes: React.Dispatch<React.SetStateAction<ContactType[]>>;
-}> = ({ isOpen, onClose, contactTypes, setContactTypes }) => {
+    onRefresh: () => Promise<void>;
+}> = ({ isOpen, onClose, contactTypes, onRefresh }) => {
     const [isFormModalOpen, setFormModalOpen] = useState(false);
     const [editingContactType, setEditingContactType] = useState<Partial<ContactType> | null>(null);
     const [contactTypeToDelete, setContactTypeToDelete] = useState<ContactType | null>(null);
 
-    const handleSave = (contactType: ContactType) => {
-        setContactTypes(prev => editingContactType?.id ? prev.map(ct => ct.id === contactType.id ? contactType : ct) : [...prev, contactType]);
-        setFormModalOpen(false);
-        setEditingContactType(null);
+    const handleSave = async (contactType: ContactType) => {
+        try {
+            if (editingContactType?.id) {
+                await contactTypeService.update(editingContactType.id, { name: contactType.name, color: contactType.color });
+            } else {
+                await contactTypeService.create({ name: contactType.name, color: contactType.color });
+            }
+            await onRefresh();
+            setFormModalOpen(false);
+            setEditingContactType(null);
+        } catch (error) {
+            console.error('Erro ao salvar tipo de contato:', error);
+            alert('Nao foi possivel salvar o tipo de contato.');
+        }
     };
 
-    const confirmDelete = () => {
+    const confirmDelete = async () => {
         if (!contactTypeToDelete) return;
-        setContactTypes(prev => prev.filter(ct => ct.id !== contactTypeToDelete.id));
-        setContactTypeToDelete(null);
+        try {
+            await contactTypeService.delete(contactTypeToDelete.id);
+            await onRefresh();
+            setContactTypeToDelete(null);
+        } catch (error) {
+            console.error('Erro ao excluir tipo de contato:', error);
+            alert('Nao foi possivel excluir o tipo de contato.');
+        }
     };
 
     if (!isOpen) return null;
@@ -105,7 +142,7 @@ const ContactTypeSettingsModal: React.FC<{
 };
 
 
-const ContactForm: React.FC<{ contact: Partial<Contact>, onSave: (contact: Contact) => void, onCancel: () => void, contactTypes: ContactType[] }> = ({ contact, onSave, onCancel, contactTypes }) => {
+const ContactForm: React.FC<{ contact: Partial<Contact>, onSave: (contact: Partial<Contact>) => void, onCancel: () => void, contactTypes: ContactType[] }> = ({ contact, onSave, onCancel, contactTypes }) => {
     const [fullName, setFullName] = useState(contact.fullName || '');
     const [company, setCompany] = useState(contact.company || '');
     const [role, setRole] = useState(contact.role || '');
@@ -118,7 +155,7 @@ const ContactForm: React.FC<{ contact: Partial<Contact>, onSave: (contact: Conta
         e.preventDefault();
         if (!fullName || !contact.executiveId) return;
         onSave({
-            id: contact.id || new Date().toISOString(),
+            id: contact.id,
             executiveId: contact.executiveId,
             fullName,
             company,
@@ -177,7 +214,7 @@ const ContactForm: React.FC<{ contact: Partial<Contact>, onSave: (contact: Conta
     );
 };
 
-const ContactsView: React.FC<ContactsViewProps> = ({ contacts, setContacts, contactTypes, setContactTypes, executiveId }) => {
+const ContactsView: React.FC<ContactsViewProps> = ({ contacts, contactTypes, executiveId, onRefresh }) => {
     const [isModalOpen, setModalOpen] = useState(false);
     const [editingContact, setEditingContact] = useState<Partial<Contact> | null>(null);
     const [contactToDelete, setContactToDelete] = useState<Contact | null>(null);
@@ -187,6 +224,27 @@ const ContactsView: React.FC<ContactsViewProps> = ({ contacts, setContacts, cont
     const [layout, setLayout] = useLocalStorage<LayoutView>('contactsViewLayout', 'card');
     const [limit, setLimit] = useLocalStorage('contactsViewLimit', 10);
     const [currentPage, setCurrentPage] = useState(1);
+
+    const getTypeById = (contactTypeId?: string) => {
+        if (!contactTypeId) return undefined;
+        return contactTypes.find(ct => ct.id === contactTypeId);
+    };
+
+    const getTagStyle = (color?: string) => {
+        const safeColor = color || '#64748b';
+        const hex = safeColor.replace('#', '');
+        if (hex.length !== 6) {
+            return { backgroundColor: '#e2e8f0', color: '#334155' };
+        }
+        const r = parseInt(hex.substring(0, 2), 16);
+        const g = parseInt(hex.substring(2, 4), 16);
+        const b = parseInt(hex.substring(4, 6), 16);
+        const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+        return {
+            backgroundColor: safeColor,
+            color: luminance > 0.6 ? '#0f172a' : '#ffffff',
+        };
+    };
 
     const filteredContacts = useMemo(() => {
         const sorted = [...contacts].sort((a, b) => a.fullName.localeCompare(b.fullName));
@@ -221,21 +279,55 @@ const ContactsView: React.FC<ContactsViewProps> = ({ contacts, setContacts, cont
         setContactToDelete(contact);
     };
     
-    const confirmDelete = () => {
+    const confirmDelete = async () => {
         if (contactToDelete) {
-            setContacts(contacts.filter(c => c.id !== contactToDelete.id));
-            setContactToDelete(null);
+            try {
+                await contactService.delete(contactToDelete.id);
+                await onRefresh();
+                setContactToDelete(null);
+            } catch (error) {
+                console.error('Erro ao excluir contato:', error);
+                alert('Nao foi possivel excluir o contato.');
+            }
         }
     };
 
-    const handleSaveContact = (contact: Contact) => {
-        if (editingContact && editingContact.id) {
-            setContacts(contacts.map(c => c.id === contact.id ? contact : c));
-        } else {
-            setContacts([...contacts, contact]);
+    const normalizeContactPayload = (contact: Partial<Contact>) => {
+        const cleanText = (value?: string) => {
+            if (value == null) return undefined;
+            const trimmed = value.trim();
+            return trimmed === '' ? null : trimmed;
+        };
+        return {
+            fullName: cleanText(contact.fullName) ?? '',
+            company: cleanText(contact.company),
+            role: cleanText(contact.role),
+            email: cleanText(contact.email),
+            phone: cleanText(contact.phone),
+            notes: cleanText(contact.notes),
+            contactTypeId:
+                contact.contactTypeId == null || contact.contactTypeId === ''
+                    ? null
+                    : Number(contact.contactTypeId),
+            executiveId: Number(contact.executiveId),
+        };
+    };
+
+    const handleSaveContact = async (contact: Partial<Contact>) => {
+        try {
+            const payload = normalizeContactPayload(contact);
+            if (editingContact?.id) {
+                await contactService.update(editingContact.id, payload);
+            } else {
+                await contactService.create(payload);
+            }
+            await onRefresh();
+            setModalOpen(false);
+            setEditingContact(null);
+        } catch (error) {
+            console.error('Erro ao salvar contato:', error);
+            alert('Nao foi possivel salvar o contato.');
         }
-        setModalOpen(false);
-        setEditingContact(null);
     };
 
     const renderItems = () => {
@@ -272,8 +364,11 @@ const ContactsView: React.FC<ContactsViewProps> = ({ contacts, setContacts, cont
                                         </td>
                                         <td className="p-3 text-slate-600">
                                             {contact.contactTypeId && (
-                                                <span className="text-xs bg-slate-200 text-slate-600 font-semibold px-2 py-1 rounded-full whitespace-nowrap">
-                                                    {contactTypes.find(ct => ct.id === contact.contactTypeId)?.name}
+                                                <span
+                                                    className="text-xs font-semibold px-2 py-1 rounded-full whitespace-nowrap"
+                                                    style={getTagStyle(getTypeById(contact.contactTypeId)?.color)}
+                                                >
+                                                    {getTypeById(contact.contactTypeId)?.name}
                                                 </span>
                                             )}
                                         </td>
@@ -300,7 +395,14 @@ const ContactsView: React.FC<ContactsViewProps> = ({ contacts, setContacts, cont
                                 <div className="flex-1">
                                     <div className="flex items-center gap-3">
                                         <h3 className="text-lg font-semibold text-slate-800">{contact.fullName}</h3>
-                                        {contact.contactTypeId && <span className="text-xs bg-slate-200 text-slate-600 font-semibold px-2 py-1 rounded-full whitespace-nowrap">{contactTypes.find(ct => ct.id === contact.contactTypeId)?.name}</span>}
+                                        {contact.contactTypeId && (
+                                            <span
+                                                className="text-xs font-semibold px-2 py-1 rounded-full whitespace-nowrap"
+                                                style={getTagStyle(getTypeById(contact.contactTypeId)?.color)}
+                                            >
+                                                {getTypeById(contact.contactTypeId)?.name}
+                                            </span>
+                                        )}
                                     </div>
                                     <p className="text-sm text-slate-500">{contact.company}</p>
                                     {contact.email && <p className="flex items-center text-slate-600 truncate text-sm mt-1"><EmailIcon className="text-slate-400" /> <a href={`mailto:${contact.email}`} className="ml-2 hover:underline">{contact.email}</a></p>}
@@ -332,8 +434,11 @@ const ContactsView: React.FC<ContactsViewProps> = ({ contacts, setContacts, cont
                                             </div>
                                         </div>
                                         {contact.contactTypeId && (
-                                            <span className="text-xs bg-slate-200 text-slate-600 font-semibold px-2 py-1 rounded-full whitespace-nowrap">
-                                                {contactTypes.find(ct => ct.id === contact.contactTypeId)?.name}
+                                            <span
+                                                className="text-xs font-semibold px-2 py-1 rounded-full whitespace-nowrap"
+                                                style={getTagStyle(getTypeById(contact.contactTypeId)?.color)}
+                                            >
+                                                {getTypeById(contact.contactTypeId)?.name}
                                             </span>
                                         )}
                                     </div>
@@ -390,7 +495,12 @@ const ContactsView: React.FC<ContactsViewProps> = ({ contacts, setContacts, cont
                         Todos
                     </button>
                     {contactTypes.map(ct => (
-                         <button key={ct.id} onClick={() => setFilterType(ct.id)} className={`px-3 py-1 text-sm rounded-full transition ${filterType === ct.id ? 'bg-indigo-600 text-white font-semibold' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                         <button
+                            key={ct.id}
+                            onClick={() => setFilterType(ct.id)}
+                            className="px-3 py-1 text-sm rounded-full transition font-semibold"
+                            style={filterType === ct.id ? getTagStyle(ct.color) : { backgroundColor: '#f1f5f9', color: '#475569' }}
+                         >
                             {ct.name}
                         </button>
                     ))}
@@ -426,7 +536,7 @@ const ContactsView: React.FC<ContactsViewProps> = ({ contacts, setContacts, cont
                 isOpen={isSettingsModalOpen}
                 onClose={() => setSettingsModalOpen(false)}
                 contactTypes={contactTypes}
-                setContactTypes={setContactTypes}
+                onRefresh={onRefresh}
             />
 
             {contactToDelete && (

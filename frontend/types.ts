@@ -195,6 +195,7 @@ export interface Appointment {
 export interface ContactType {
     id: string; // UUID
     name: string;
+    color: string;
 }
 
 export interface Contact {
@@ -216,6 +217,7 @@ export type ExpenseEntityType = 'Pessoa Física' | 'Pessoa Jurídica';
 export interface ExpenseCategory {
   id: string;
   name: string;
+  color: string;
 }
 
 export interface Expense {

@@ -42,6 +42,12 @@ import { legalOrganizationService } from './services/legalOrganizationService';
 import { organizationService } from './services/organizationService';
 import { departmentService } from './services/departmentService';
 import { executiveService } from './services/executiveService';
+import { eventTypeService } from './services/eventTypeService';
+import { eventService } from './services/eventService';
+import { documentCategoryService } from './services/documentCategoryService';
+import { documentService } from './services/documentService';
+import { contactTypeService } from './services/contactTypeService';
+import { contactService } from './services/contactService';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('dashboard');
@@ -68,12 +74,12 @@ const App: React.FC = () => {
     { id: 'et3', name: 'Viagem', color: '#3b82f6' },
   ];
   const initialContactTypes: ContactType[] = [
-    { id: 'ct1', name: 'Cliente' },
-    { id: 'ct2', name: 'Fornecedor' },
+    { id: 'ct1', name: 'Cliente', color: '#6366f1' },
+    { id: 'ct2', name: 'Fornecedor', color: '#0ea5e9' },
   ];
   const initialExpenseCategories: ExpenseCategory[] = [
-    { id: 'ec1', name: 'Alimentação' },
-    { id: 'ec2', name: 'Transporte' },
+    { id: 'ec1', name: 'Alimentação', color: '#f59e0b' },
+    { id: 'ec2', name: 'Transporte', color: '#06b6d4' },
   ];
   const initialDocumentCategories: DocumentCategory[] = [
     { id: 'dc1', name: 'Viagem' },
@@ -117,6 +123,21 @@ const App: React.FC = () => {
       const executivesData = await executiveService.getAll(0, 1000);
       setExecutives(executivesData);
 
+      const [eventTypesData, eventsData, contactTypesData, contactsData, documentCategoriesData, documentsData] = await Promise.all([
+        eventTypeService.getAll(),
+        eventService.getAll(),
+        contactTypeService.getAll(),
+        contactService.getAll(),
+        documentCategoryService.getAll(),
+        documentService.getAll(),
+      ]);
+      setEventTypes(eventTypesData);
+      setEvents(eventsData);
+      setContactTypes(contactTypesData);
+      setContacts(contactsData);
+      setDocumentCategories(documentCategoriesData);
+      setDocuments(documentsData);
+
       const masterUser: User = { id: 'user_master', fullName: 'Usuário Master', role: 'master' };
       
       const orgAdmins = orgsRes.map((org) => ({
@@ -153,7 +174,17 @@ const App: React.FC = () => {
     } catch (error) {
       console.error("Erro ao carregar dados do backend:", error);
     }
-  }, [secretaries, setUsers, setExecutives]);
+  }, [
+    secretaries,
+    setUsers,
+    setExecutives,
+    setEventTypes,
+    setEvents,
+    setContactTypes,
+    setContacts,
+    setDocumentCategories,
+    setDocuments,
+  ]);
 
   // Efeito inicial
   useEffect(() => {
@@ -363,15 +394,34 @@ const App: React.FC = () => {
           departments={departments}
         />;
       case 'agenda':
-        return <AgendaView events={filteredEvents} setEvents={setEvents} eventTypes={eventTypes} setEventTypes={setEventTypes} executiveId={selectedExecutiveId!} />;
+        return <AgendaView
+          events={filteredEvents}
+          setEvents={setEvents}
+          eventTypes={eventTypes}
+          setEventTypes={setEventTypes}
+          executiveId={selectedExecutiveId!}
+          onRefresh={loadBackendData}
+        />;
       case 'contacts':
-        return <ContactsView contacts={filteredContacts} setContacts={setContacts} contactTypes={contactTypes} setContactTypes={setContactTypes} executiveId={selectedExecutiveId!} />;
+        return <ContactsView
+          contacts={filteredContacts}
+          contactTypes={contactTypes}
+          executiveId={selectedExecutiveId!}
+          onRefresh={loadBackendData}
+        />;
       case 'finances':
         return <FinancesView expenses={filteredFinances} setExpenses={setExpenses} expenseCategories={expenseCategories} setExpenseCategories={setExpenseCategories} executiveId={selectedExecutiveId!} />;
       case 'tasks':
         return <TasksView tasks={filteredTasks} setTasks={setTasks} executiveId={selectedExecutiveId!} />;
       case 'documents':
-        return <DocumentsView documents={filteredDocuments} setDocuments={setDocuments} documentCategories={documentCategories} setDocumentCategories={setDocumentCategories} executiveId={selectedExecutiveId!} />;
+        return <DocumentsView
+          documents={filteredDocuments}
+          setDocuments={setDocuments}
+          documentCategories={documentCategories}
+          setDocumentCategories={setDocumentCategories}
+          executiveId={selectedExecutiveId!}
+          onRefresh={loadBackendData}
+        />;
       case 'reports':
         return <ReportsView executives={executives} events={events} expenses={expenses} tasks={tasks} contacts={contacts} />;
       case 'settings':

@@ -4,6 +4,8 @@ import Modal from './Modal';
 import ConfirmationModal from './ConfirmationModal';
 import ImageModal from './ImageModal';
 import { EditIcon, DeleteIcon, PlusIcon, SettingsIcon, UploadIcon } from './Icons';
+import { documentCategoryService } from '../services/documentCategoryService';
+import { documentService } from '../services/documentService';
 
 interface DocumentsViewProps {
   documents: Document[];
@@ -11,6 +13,7 @@ interface DocumentsViewProps {
   documentCategories: DocumentCategory[];
   setDocumentCategories: React.Dispatch<React.SetStateAction<DocumentCategory[]>>;
   executiveId: string;
+  onRefresh: () => Promise<void>;
 }
 
 // --- Category Management Components ---
@@ -42,21 +45,38 @@ const CategorySettingsModal: React.FC<{
     onClose: () => void;
     categories: DocumentCategory[];
     setCategories: React.Dispatch<React.SetStateAction<DocumentCategory[]>>;
-}> = ({ isOpen, onClose, categories, setCategories }) => {
+    onRefresh: () => Promise<void>;
+}> = ({ isOpen, onClose, categories, setCategories, onRefresh }) => {
     const [isFormOpen, setFormOpen] = useState(false);
     const [editingCategory, setEditingCategory] = useState<Partial<DocumentCategory> | null>(null);
     const [categoryToDelete, setCategoryToDelete] = useState<DocumentCategory | null>(null);
 
-    const handleSave = (category: DocumentCategory) => {
-        setCategories(prev => editingCategory?.id ? prev.map(c => c.id === category.id ? category : c) : [...prev, category]);
-        setFormOpen(false);
-        setEditingCategory(null);
+    const handleSave = async (category: DocumentCategory) => {
+        try {
+            if (editingCategory?.id) {
+                await documentCategoryService.update(category.id, { name: category.name });
+            } else {
+                await documentCategoryService.create({ name: category.name });
+            }
+            await onRefresh();
+            setFormOpen(false);
+            setEditingCategory(null);
+        } catch (error) {
+            console.error('Erro ao salvar categoria de documento:', error);
+            alert('Erro ao salvar categoria de documento.');
+        }
     };
 
-    const confirmDelete = () => {
+    const confirmDelete = async () => {
         if (!categoryToDelete) return;
-        setCategories(prev => prev.filter(c => c.id !== categoryToDelete.id));
-        setCategoryToDelete(null);
+        try {
+            await documentCategoryService.delete(categoryToDelete.id);
+            await onRefresh();
+            setCategoryToDelete(null);
+        } catch (error) {
+            console.error('Erro ao excluir categoria de documento:', error);
+            alert('Erro ao excluir categoria de documento.');
+        }
     };
     
     if (!isOpen) return null;
@@ -200,7 +220,7 @@ const DocumentForm: React.FC<{ document: Partial<Document>, onSave: (doc: Docume
 };
 
 // --- Main View Component ---
-const DocumentsView: React.FC<DocumentsViewProps> = ({ documents, setDocuments, documentCategories, setDocumentCategories, executiveId }) => {
+const DocumentsView: React.FC<DocumentsViewProps> = ({ documents, setDocuments, documentCategories, setDocumentCategories, executiveId, onRefresh }) => {
     const [isModalOpen, setModalOpen] = useState(false);
     const [editingDoc, setEditingDoc] = useState<Partial<Document> | null>(null);
     const [docToDelete, setDocToDelete] = useState<Document | null>(null);
@@ -225,16 +245,32 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({ documents, setDocuments, 
         setModalOpen(true);
     };
 
-    const confirmDelete = () => {
+    const confirmDelete = async () => {
         if (!docToDelete) return;
-        setDocuments(prev => prev.filter(d => d.id !== docToDelete.id));
-        setDocToDelete(null);
+        try {
+            await documentService.delete(docToDelete.id);
+            await onRefresh();
+            setDocToDelete(null);
+        } catch (error) {
+            console.error('Erro ao excluir documento:', error);
+            alert('Erro ao excluir documento.');
+        }
     };
 
-    const handleSaveDoc = (doc: Document) => {
-        setDocuments(prev => editingDoc?.id ? prev.map(d => d.id === doc.id ? doc : d) : [...prev, doc]);
-        setModalOpen(false);
-        setEditingDoc(null);
+    const handleSaveDoc = async (doc: Document) => {
+        try {
+            if (editingDoc?.id) {
+                await documentService.update(doc.id, doc);
+            } else {
+                await documentService.create(doc);
+            }
+            await onRefresh();
+            setModalOpen(false);
+            setEditingDoc(null);
+        } catch (error) {
+            console.error('Erro ao salvar documento:', error);
+            alert('Erro ao salvar documento.');
+        }
     };
 
     const formatDate = (isoString: string) => {
@@ -315,6 +351,7 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({ documents, setDocuments, 
                 onClose={() => setCategoryModalOpen(false)}
                 categories={documentCategories}
                 setCategories={setDocumentCategories}
+                onRefresh={onRefresh}
             />
 
             {docToDelete && (

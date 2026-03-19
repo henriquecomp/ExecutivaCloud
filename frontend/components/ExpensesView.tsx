@@ -18,16 +18,36 @@ interface FinancesViewProps {
 // --- Category Management Components ---
 const CategoryForm: React.FC<{ category: Partial<ExpenseCategory>, onSave: (cat: ExpenseCategory) => void, onCancel: () => void }> = ({ category, onSave, onCancel }) => {
     const [name, setName] = useState(category.name || '');
+    const [color, setColor] = useState(category.color || '#64748b');
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!name) return;
-        onSave({ id: category.id || `ec_${new Date().getTime()}`, name });
+        onSave({ id: category.id || `ec_${new Date().getTime()}`, name, color });
     };
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
             <div>
                 <label htmlFor="cat-name" className="block text-sm font-medium text-slate-700">Nome da Categoria</label>
                 <input type="text" id="cat-name" value={name} onChange={e => setName(e.target.value)} required className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+            </div>
+            <div>
+                <label htmlFor="cat-color" className="block text-sm font-medium text-slate-700">Cor da Etiqueta</label>
+                <div className="mt-1 flex items-center gap-3">
+                    <input
+                        type="color"
+                        id="cat-color"
+                        value={color}
+                        onChange={e => setColor(e.target.value)}
+                        className="h-10 w-14 cursor-pointer rounded border border-slate-300 bg-white p-1"
+                    />
+                    <input
+                        type="text"
+                        value={color}
+                        onChange={e => setColor(e.target.value)}
+                        placeholder="#64748b"
+                        className="block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    />
+                </div>
             </div>
             <div className="flex justify-end space-x-3 pt-4">
                 <button type="button" onClick={onCancel} className="px-4 py-2 bg-slate-200 text-slate-800 rounded-md hover:bg-slate-300 transition">Cancelar</button>
@@ -71,7 +91,10 @@ const CategorySettingsModal: React.FC<{
                 <ul className="space-y-2 max-h-80 overflow-y-auto pr-2">
                     {categories.map(cat => (
                        <li key={cat.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                            <span className="font-medium text-slate-800">{cat.name}</span>
+                            <div className="flex items-center gap-2">
+                                <span className="inline-block h-3 w-3 rounded-full border border-slate-300" style={{ backgroundColor: cat.color || '#64748b' }} />
+                                <span className="font-medium text-slate-800">{cat.name}</span>
+                            </div>
                             <div className="flex items-center gap-2">
                                 <button onClick={() => { setEditingCategory(cat); setFormOpen(true); }} className="p-2 text-slate-400 hover:text-indigo-600"><EditIcon /></button>
                                 <button onClick={() => setCategoryToDelete(cat)} className="p-2 text-slate-400 hover:text-red-600"><DeleteIcon /></button>
@@ -250,6 +273,22 @@ const FinancesView: React.FC<FinancesViewProps> = ({ expenses, setExpenses, expe
       'Recebida': 'bg-emerald-100 text-emerald-800 border-emerald-500',
       'Pendente': 'bg-yellow-100 text-yellow-800 border-yellow-500',
     }[status] || 'bg-slate-100 text-slate-800 border-slate-500');
+
+    const getCategoryById = (categoryId?: string) => {
+      if (!categoryId) return undefined;
+      return expenseCategories.find(c => c.id === categoryId);
+    };
+
+    const getTagStyle = (color?: string) => {
+      const safeColor = color || '#64748b';
+      const hex = safeColor.replace('#', '');
+      if (hex.length !== 6) return { backgroundColor: '#e2e8f0', color: '#334155' };
+      const r = parseInt(hex.substring(0, 2), 16);
+      const g = parseInt(hex.substring(2, 4), 16);
+      const b = parseInt(hex.substring(4, 6), 16);
+      const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+      return { backgroundColor: safeColor, color: luminance > 0.6 ? '#0f172a' : '#ffffff' };
+    };
     
     const formatDate = (dateString: string) => new Date(dateString + 'T00:00:00').toLocaleDateString('pt-BR', { year: 'numeric', month: 'short', day: 'numeric' });
     const formatCurrency = (amount: number) => amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -260,7 +299,7 @@ const FinancesView: React.FC<FinancesViewProps> = ({ expenses, setExpenses, expe
             case 'card': return (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {paginatedExpenses.map(expense => {
-                        const categoryName = expenseCategories.find(c => c.id === expense.categoryId)?.name;
+                        const category = getCategoryById(expense.categoryId);
                         return (
                         <div key={expense.id} className="bg-white rounded-xl shadow-md p-5 flex flex-col justify-between">
                             <div>
@@ -273,7 +312,14 @@ const FinancesView: React.FC<FinancesViewProps> = ({ expenses, setExpenses, expe
                                 </p>
                                 <div className="text-sm text-slate-500 mt-3 space-y-1 border-t pt-3">
                                     <p><strong>Data:</strong> {formatDate(expense.expenseDate)}</p>
-                                    <p><strong>Categoria:</strong> {categoryName || 'N/A'}</p>
+                                    <p>
+                                      <strong>Categoria:</strong>{' '}
+                                      {category ? (
+                                        <span className="text-xs font-semibold px-2 py-1 rounded-full whitespace-nowrap inline-block" style={getTagStyle(category.color)}>
+                                          {category.name}
+                                        </span>
+                                      ) : 'N/A'}
+                                    </p>
                                     <p><strong>Origem:</strong> {expense.entityType}</p>
                                 </div>
                             </div>
@@ -288,7 +334,7 @@ const FinancesView: React.FC<FinancesViewProps> = ({ expenses, setExpenses, expe
              case 'list': return (
                 <div className="bg-white p-4 sm:p-6 rounded-xl shadow-md space-y-4">
                     {paginatedExpenses.map(expense => {
-                        const categoryName = expenseCategories.find(c => c.id === expense.categoryId)?.name;
+                        const category = getCategoryById(expense.categoryId);
                         return (
                         <div key={expense.id} className={`flex items-center space-x-4 p-4 rounded-lg bg-slate-50 border-l-4 ${expense.type === 'A receber' ? 'border-green-500' : 'border-red-500'}`}>
                             <div className="flex-1">
@@ -301,7 +347,13 @@ const FinancesView: React.FC<FinancesViewProps> = ({ expenses, setExpenses, expe
                                 <div className="flex items-center gap-x-4 gap-y-1 flex-wrap text-sm text-slate-500 mt-1">
                                     <span>{formatDate(expense.expenseDate)}</span>
                                     <span className="text-slate-300 hidden sm:inline">|</span>
-                                    <span>{categoryName || 'N/A'}</span>
+                                    {category ? (
+                                        <span className="text-xs font-semibold px-2 py-1 rounded-full whitespace-nowrap" style={getTagStyle(category.color)}>
+                                          {category.name}
+                                        </span>
+                                    ) : (
+                                        <span>N/A</span>
+                                    )}
                                     <span className="text-slate-300 hidden sm:inline">|</span>
                                     <span className={`text-xs font-semibold px-2 py-1 rounded-full ${getStatusBadgeClass(expense.status)}`}>{expense.status}</span>
                                 </div>
@@ -329,7 +381,7 @@ const FinancesView: React.FC<FinancesViewProps> = ({ expenses, setExpenses, expe
                         </thead>
                         <tbody>
                             {paginatedExpenses.map(expense => {
-                                const categoryName = expenseCategories.find(c => c.id === expense.categoryId)?.name;
+                                const category = getCategoryById(expense.categoryId);
                                 return (
                                 <tr key={expense.id} className="border-b border-slate-100 hover:bg-slate-50">
                                     <td className="p-3 font-medium text-slate-800">
@@ -337,7 +389,13 @@ const FinancesView: React.FC<FinancesViewProps> = ({ expenses, setExpenses, expe
                                         <p className="font-normal text-xs text-slate-500">{expense.entityType} - {expense.type}</p>
                                     </td>
                                     <td className="p-3 hidden md:table-cell text-slate-600">{formatDate(expense.expenseDate)}</td>
-                                    <td className="p-3 hidden lg:table-cell text-slate-600">{categoryName}</td>
+                                    <td className="p-3 hidden lg:table-cell text-slate-600">
+                                      {category ? (
+                                        <span className="text-xs font-semibold px-2 py-1 rounded-full whitespace-nowrap" style={getTagStyle(category.color)}>
+                                          {category.name}
+                                        </span>
+                                      ) : null}
+                                    </td>
                                     <td className={`p-3 font-medium ${expense.type === 'A receber' ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(expense.amount)}</td>
                                     <td className="p-3"><span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadgeClass(expense.status)}`}>{expense.status}</span></td>
                                     <td className="p-3 text-right">
