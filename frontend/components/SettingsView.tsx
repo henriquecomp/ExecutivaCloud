@@ -1,22 +1,29 @@
 import React, { useState, useEffect } from 'react';
-import { AllDataBackup } from '../types';
+import { AllDataBackup, Secretary } from '../types';
 import Modal from './Modal';
 import ConfirmationModal from './ConfirmationModal';
 import { DownloadIcon, UploadIcon, CheckCircleIcon, ExclamationTriangleIcon } from './Icons';
+import { settingsBackupService, SettingsBackup } from '../services/settingsBackupService';
 
 // --- Main Settings View ---
 interface SettingsViewProps {
   allData: Omit<AllDataBackup, 'version'>;
   setAllData: { [K in keyof Omit<AllDataBackup, 'version'> as `set${Capitalize<K>}`]: React.Dispatch<React.SetStateAction<AllDataBackup[K]>> };
+  /** Após restaurar no servidor, recarrega dados da API. Passe secretárias do backup para montar usuários de login sem depender do estado ainda não atualizado. */
+  onAfterRestore?: (options?: { secretariesForUsers?: Secretary[] }) => Promise<void>;
 }
 
-const SettingsView: React.FC<SettingsViewProps> = ({ allData, setAllData }) => {
+const SettingsView: React.FC<SettingsViewProps> = ({ allData, setAllData, onAfterRestore }) => {
     const appVersion = '1.3.0'; // Should match the one in Sidebar.tsx
     
     const [fileToImport, setFileToImport] = useState<File | null>(null);
     const [isImportConfirmOpen, setImportConfirmOpen] = useState(false);
     const [dataToImport, setDataToImport] = useState<AllDataBackup | null>(null);
     const [importMessage, setImportMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+    const [savedBackups, setSavedBackups] = useState<SettingsBackup[]>([]);
+    const [isLoadingBackups, setIsLoadingBackups] = useState(false);
+    const [backupToRestore, setBackupToRestore] = useState<SettingsBackup | null>(null);
+    const [backupToDelete, setBackupToDelete] = useState<SettingsBackup | null>(null);
     
     useEffect(() => {
         if (importMessage) {
@@ -27,6 +34,75 @@ const SettingsView: React.FC<SettingsViewProps> = ({ allData, setAllData }) => {
 
 
     // Data Management Handlers
+    const requiredKeys: (keyof AllDataBackup)[] = [
+        'legalOrganizations',
+        'organizations',
+        'departments',
+        'executives',
+        'secretaries',
+        'users',
+        'events',
+        'tasks',
+        'contacts',
+        'expenses',
+        'expenseCategories',
+        'eventTypes',
+        'contactTypes',
+        'documents',
+        'documentCategories',
+    ];
+
+    const isValidBackup = (parsedData: AllDataBackup) => {
+        if (parsedData.version !== appVersion) {
+            return false;
+        }
+        return requiredKeys.every(key => Array.isArray(parsedData[key]));
+    };
+
+    const applyBackupData = (backupData: Omit<AllDataBackup, 'version'>) => {
+        setAllData.setLegalOrganizations(backupData.legalOrganizations);
+        setAllData.setOrganizations(backupData.organizations);
+        setAllData.setDepartments(backupData.departments);
+        setAllData.setExecutives(backupData.executives);
+        setAllData.setSecretaries(backupData.secretaries);
+        setAllData.setUsers(backupData.users);
+        setAllData.setEventTypes(backupData.eventTypes);
+        setAllData.setEvents(backupData.events);
+        setAllData.setContactTypes(backupData.contactTypes);
+        setAllData.setContacts(backupData.contacts);
+        setAllData.setExpenses(backupData.expenses);
+        setAllData.setExpenseCategories(backupData.expenseCategories);
+        setAllData.setTasks(backupData.tasks);
+        setAllData.setDocumentCategories(backupData.documentCategories);
+        setAllData.setDocuments(backupData.documents);
+    };
+
+    const loadSavedBackups = async () => {
+        try {
+            setIsLoadingBackups(true);
+            const backups = await settingsBackupService.getAll();
+            setSavedBackups(backups);
+        } catch (error) {
+            console.error('Erro ao carregar backups salvos:', error);
+        } finally {
+            setIsLoadingBackups(false);
+        }
+    };
+
+    useEffect(() => {
+        loadSavedBackups();
+    }, []);
+
+    const saveSnapshotToServer = async (name?: string) => {
+        const backupName = name || `Backup ${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+        await settingsBackupService.create({
+            name: backupName,
+            version: appVersion,
+            data: allData,
+        });
+        await loadSavedBackups();
+    };
+
     const handleExportData = () => {
         const dataToExport: AllDataBackup = { version: appVersion, ...allData };
         const jsonData = JSON.stringify(dataToExport, null, 2);
@@ -39,6 +115,17 @@ const SettingsView: React.FC<SettingsViewProps> = ({ allData, setAllData }) => {
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
+    };
+
+    const handleSaveBackup = async () => {
+        setImportMessage(null);
+        try {
+            await saveSnapshotToServer();
+            setImportMessage({ type: 'success', text: 'Backup salvo no servidor com sucesso!' });
+        } catch (error) {
+            console.error('Erro ao salvar backup:', error);
+            setImportMessage({ type: 'error', text: 'Não foi possível salvar o backup no servidor.' });
+        }
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -58,14 +145,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ allData, setAllData }) => {
                 if (typeof text !== 'string') throw new Error("File content is not a string.");
                 const parsedData = JSON.parse(text) as AllDataBackup;
                 
-                if (parsedData.version !== appVersion) {
-                    throw new Error("Versão do arquivo de backup incompatível.");
-                }
-
-                const requiredKeys: (keyof AllDataBackup)[] = ['legalOrganizations', 'organizations', 'departments', 'executives', 'secretaries', 'users', 'events', 'tasks', 'contacts', 'expenses', 'expenseCategories', 'eventTypes', 'contactTypes', 'documents', 'documentCategories'];
-                const hasAllKeys = requiredKeys.every(key => Array.isArray(parsedData[key]));
-
-                if (!hasAllKeys) {
+                if (!isValidBackup(parsedData)) {
                     throw new Error("O arquivo de backup é inválido ou está corrompido.");
                 }
 
@@ -82,28 +162,58 @@ const SettingsView: React.FC<SettingsViewProps> = ({ allData, setAllData }) => {
         reader.readAsText(fileToImport);
     };
 
-    const confirmImport = () => {
+    const confirmImport = async () => {
         if (!dataToImport) return;
-        setAllData.setLegalOrganizations(dataToImport.legalOrganizations);
-        setAllData.setOrganizations(dataToImport.organizations);
-        setAllData.setDepartments(dataToImport.departments);
-        setAllData.setExecutives(dataToImport.executives);
-        setAllData.setSecretaries(dataToImport.secretaries);
-        setAllData.setUsers(dataToImport.users);
-        setAllData.setEventTypes(dataToImport.eventTypes);
-        setAllData.setEvents(dataToImport.events);
-        setAllData.setContactTypes(dataToImport.contactTypes);
-        setAllData.setContacts(dataToImport.contacts);
-        setAllData.setExpenses(dataToImport.expenses);
-        setAllData.setExpenseCategories(dataToImport.expenseCategories);
-        setAllData.setTasks(dataToImport.tasks);
-        setAllData.setDocumentCategories(dataToImport.documentCategories);
-        setAllData.setDocuments(dataToImport.documents);
-        
-        setImportConfirmOpen(false);
-        setDataToImport(null);
-        setFileToImport(null);
-        setImportMessage({ type: 'success', text: 'Dados importados com sucesso!' });
+        setImportMessage(null);
+        try {
+            const { version: _v, ...rest } = dataToImport;
+            await settingsBackupService.restore(rest);
+            applyBackupData(rest);
+            await onAfterRestore?.({ secretariesForUsers: rest.secretaries });
+            setImportConfirmOpen(false);
+            setDataToImport(null);
+            setFileToImport(null);
+            setImportMessage({ type: 'success', text: 'Dados importados e gravados no servidor com sucesso!' });
+        } catch (error) {
+            console.error('Erro ao importar/restaurar no servidor:', error);
+            setImportMessage({ type: 'error', text: 'Não foi possível gravar o backup no banco de dados.' });
+            throw error;
+        }
+    };
+
+    const confirmRestoreFromServer = async () => {
+        if (!backupToRestore) return;
+        const backupData = { version: backupToRestore.version, ...backupToRestore.data } as AllDataBackup;
+        if (!isValidBackup(backupData)) {
+            setImportMessage({ type: 'error', text: 'O backup salvo está incompatível com a versão atual.' });
+            setBackupToRestore(null);
+            return;
+        }
+        setImportMessage(null);
+        try {
+            await settingsBackupService.restore(backupToRestore.data);
+            applyBackupData(backupToRestore.data);
+            await onAfterRestore?.({ secretariesForUsers: backupToRestore.data.secretaries });
+            setBackupToRestore(null);
+            setImportMessage({ type: 'success', text: 'Backup restaurado no banco de dados com sucesso!' });
+        } catch (error) {
+            console.error('Erro ao restaurar backup no servidor:', error);
+            setImportMessage({ type: 'error', text: 'Não foi possível restaurar o backup no banco de dados.' });
+            throw error;
+        }
+    };
+
+    const confirmDeleteServerBackup = async () => {
+        if (!backupToDelete) return;
+        try {
+            await settingsBackupService.delete(backupToDelete.id);
+            await loadSavedBackups();
+            setBackupToDelete(null);
+            setImportMessage({ type: 'success', text: 'Backup excluído com sucesso.' });
+        } catch (error) {
+            console.error('Erro ao excluir backup salvo:', error);
+            setImportMessage({ type: 'error', text: 'Não foi possível excluir o backup salvo.' });
+        }
     };
 
 
@@ -125,6 +235,10 @@ const SettingsView: React.FC<SettingsViewProps> = ({ allData, setAllData }) => {
                         <button onClick={handleExportData} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md shadow-sm hover:bg-blue-700 transition">
                             <DownloadIcon />
                             Exportar Dados
+                        </button>
+                        <button onClick={handleSaveBackup} className="mt-3 flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-md shadow-sm hover:bg-indigo-700 transition">
+                            <UploadIcon />
+                            Salvar Backup no Servidor
                         </button>
                     </div>
                     {/* Import Section */}
@@ -153,6 +267,36 @@ const SettingsView: React.FC<SettingsViewProps> = ({ allData, setAllData }) => {
                 </div>
             </div>
 
+            <div className="bg-white p-6 rounded-xl shadow-md">
+                <div className="flex items-center justify-between mb-4 border-b border-slate-200 pb-3">
+                    <h3 className="text-xl font-bold text-slate-700">Backups Salvos no Servidor</h3>
+                    {isLoadingBackups && <span className="text-sm text-slate-500">Carregando...</span>}
+                </div>
+                <div className="space-y-2 max-h-72 overflow-y-auto">
+                    {savedBackups.map((backup) => (
+                        <div key={backup.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                            <div>
+                                <p className="font-medium text-slate-800">{backup.name}</p>
+                                <p className="text-xs text-slate-500">
+                                    Versão {backup.version} - {new Date(backup.createdAt).toLocaleString('pt-BR')}
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button onClick={() => setBackupToRestore(backup)} className="px-3 py-1 text-sm bg-indigo-100 text-indigo-700 rounded-md hover:bg-indigo-200 transition">
+                                    Restaurar
+                                </button>
+                                <button onClick={() => setBackupToDelete(backup)} className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded-md hover:bg-red-200 transition">
+                                    Excluir
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                    {savedBackups.length === 0 && (
+                        <p className="text-sm text-slate-500 text-center py-4">Nenhum backup salvo no servidor.</p>
+                    )}
+                </div>
+            </div>
+
             {isImportConfirmOpen && (
                  <ConfirmationModal
                     isOpen={isImportConfirmOpen}
@@ -160,6 +304,26 @@ const SettingsView: React.FC<SettingsViewProps> = ({ allData, setAllData }) => {
                     onConfirm={confirmImport}
                     title="Confirmar Importação de Dados"
                     message="Tem certeza que deseja importar este arquivo? Todos os dados atuais na aplicação serão substituídos permanentemente. Esta ação não pode ser desfeita."
+                />
+            )}
+
+            {backupToRestore && (
+                <ConfirmationModal
+                    isOpen={!!backupToRestore}
+                    onClose={() => setBackupToRestore(null)}
+                    onConfirm={confirmRestoreFromServer}
+                    title="Confirmar Restauração de Backup"
+                    message={`Deseja restaurar o backup "${backupToRestore.name}"? Os dados atuais da aplicação serão substituídos.`}
+                />
+            )}
+
+            {backupToDelete && (
+                <ConfirmationModal
+                    isOpen={!!backupToDelete}
+                    onClose={() => setBackupToDelete(null)}
+                    onConfirm={confirmDeleteServerBackup}
+                    title="Confirmar Exclusão de Backup"
+                    message={`Deseja excluir o backup "${backupToDelete.name}" do servidor?`}
                 />
             )}
         </div>

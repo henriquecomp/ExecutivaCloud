@@ -6,11 +6,12 @@ import ConfirmationModal from './ConfirmationModal';
 import Pagination from './Pagination';
 import ViewSwitcher from './ViewSwitcher';
 import { EditIcon, DeleteIcon, PlusIcon, RecurrenceIcon } from './Icons';
+import { taskService } from '../services/taskService';
 
 interface TasksViewProps {
   tasks: Task[];
-  setTasks: React.Dispatch<React.SetStateAction<Task[]>>;
   executiveId: string;
+  onRefresh: () => Promise<void>;
 }
 
 const TaskForm: React.FC<{ task: Partial<Task>, onSave: (task: Partial<Task>, recurrence: RecurrenceRule | null) => void, onCancel: () => void }> = ({ task, onSave, onCancel }) => {
@@ -51,7 +52,9 @@ const TaskForm: React.FC<{ task: Partial<Task>, onSave: (task: Partial<Task>, re
             finalRecurrence = { ...recurrence };
             if (endType === 'after') {
                 delete finalRecurrence.endDate;
-                if (!finalRecurrence.count) finalRecurrence.count = 1;
+                const raw = recurrence.count;
+                const n = typeof raw === 'number' && Number.isFinite(raw) ? raw : parseInt(String(raw ?? ''), 10);
+                finalRecurrence.count = Number.isFinite(n) && n >= 1 ? n : 1;
             } else {
                 delete finalRecurrence.count;
                 if (!finalRecurrence.endDate) finalRecurrence.endDate = new Date().toISOString().split('T')[0];
@@ -145,7 +148,10 @@ const TaskForm: React.FC<{ task: Partial<Task>, onSave: (task: Partial<Task>, re
                                     <input type="radio" id="end-after" name="endType" value="after" checked={endType === 'after'} onChange={e => setEndType(e.target.value)} className="h-4 w-4 text-indigo-600"/>
                                     <label htmlFor="end-after" className="ml-3 flex items-center gap-2 text-sm text-slate-600">
                                         <span>Após</span>
-                                        <input type="number" disabled={endType !== 'after'} value={recurrence.count || ''} onChange={e => handleRecurrenceChange('count', parseInt(e.target.value))} min="1" className="w-16 px-2 py-1 bg-white border border-slate-300 rounded-md shadow-sm sm:text-sm"/>
+                                        <input type="number" disabled={endType !== 'after'} value={recurrence.count ?? ''} onChange={e => {
+                                            const v = e.target.value;
+                                            handleRecurrenceChange('count', v === '' ? undefined : parseInt(v, 10));
+                                        }} min="1" className="w-16 px-2 py-1 bg-white border border-slate-300 rounded-md shadow-sm sm:text-sm"/>
                                         <span>ocorrências</span>
                                     </label>
                                 </div>
@@ -171,28 +177,30 @@ const TaskForm: React.FC<{ task: Partial<Task>, onSave: (task: Partial<Task>, re
 };
 
 // Helper to generate recurring tasks
-const generateRecurringTasks = (baseTask: Partial<Task>, rule: RecurrenceRule, recurrenceId: string): Task[] => {
-    const newTasks: Task[] = [];
+const generateRecurringTasks = (baseTask: Partial<Task>, rule: RecurrenceRule, recurrenceId: string): Partial<Task>[] => {
+    const newTasks: Partial<Task>[] = [];
     const { frequency, interval, daysOfWeek, count, endDate } = rule;
     const { title, description, priority, status, executiveId } = baseTask;
 
     if (!baseTask.dueDate || !executiveId) return [];
 
+    if (frequency === 'weekly' && (!daysOfWeek || daysOfWeek.length === 0)) {
+        return [];
+    }
+
     let currentDate = new Date(baseTask.dueDate + 'T00:00:00'); // Use UTC to avoid timezone issues
     const finalDate = endDate ? new Date(endDate + 'T23:59:59') : null;
 
     let occurrences = 0;
-    const maxOccurrences = count || 100; // Safety limit
+    const maxOccurrences = count != null && Number.isFinite(count) && count >= 1 ? count : 100; // Safety limit
 
     while (occurrences < maxOccurrences && (!finalDate || currentDate <= finalDate)) {
         if (frequency === 'weekly') {
-            if (!daysOfWeek || daysOfWeek.length === 0) break;
             // Iterate through days to find the next valid one
             while (true) {
                 if (daysOfWeek.includes(currentDate.getUTCDay())) {
                      if ((!finalDate || currentDate <= finalDate)) {
                         newTasks.push({
-                            id: `task_${recurrenceId}_${newTasks.length}`,
                             title: title!,
                             dueDate: currentDate.toISOString().split('T')[0],
                             priority: priority!,
@@ -214,7 +222,6 @@ const generateRecurringTasks = (baseTask: Partial<Task>, rule: RecurrenceRule, r
             }
         } else {
              newTasks.push({
-                id: `task_${recurrenceId}_${occurrences}`,
                 title: title!,
                 dueDate: currentDate.toISOString().split('T')[0],
                 priority: priority!,
@@ -234,12 +241,12 @@ const generateRecurringTasks = (baseTask: Partial<Task>, rule: RecurrenceRule, r
         }
         if (newTasks.length >= maxOccurrences) break;
     }
-    
-    return newTasks.slice(0, count);
+
+    return count != null && Number.isFinite(count) && count >= 1 ? newTasks.slice(0, count) : newTasks;
 };
 
 
-const TasksView: React.FC<TasksViewProps> = ({ tasks, setTasks, executiveId }) => {
+const TasksView: React.FC<TasksViewProps> = ({ tasks, executiveId, onRefresh }) => {
     const [isModalOpen, setModalOpen] = useState(false);
     const [editingTask, setEditingTask] = useState<Partial<Task> | null>(null);
     const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
@@ -268,75 +275,115 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, setTasks, executiveId }) =
         }
     };
     
-    const confirmDelete = () => {
+    const confirmDelete = async () => {
         if (!taskToDelete) return;
-        setTasks(allTasks => allTasks.filter(t => t.id !== taskToDelete.id));
-        setTaskToDelete(null);
+        try {
+            await taskService.delete(taskToDelete.id);
+            await onRefresh();
+            setTaskToDelete(null);
+        } catch (error) {
+            console.error('Erro ao excluir tarefa:', error);
+            alert('Nao foi possivel excluir a tarefa.');
+        }
     };
     
-    const executeRecurrenceDelete = (type: 'one' | 'all' | 'future') => {
+    const executeRecurrenceDelete = async (type: 'one' | 'all' | 'future') => {
         if (!taskToDelete) return;
-
-        setTasks(allTasks => {
+        try {
             if (type === 'one') {
-                return allTasks.filter(t => t.id !== taskToDelete.id);
+                await taskService.delete(taskToDelete.id);
+            } else if (taskToDelete.recurrenceId) {
+                await taskService.deleteByRecurrence(
+                    taskToDelete.recurrenceId,
+                    type === 'future' ? taskToDelete.dueDate : undefined,
+                );
             }
-            if (type === 'all') {
-                return allTasks.filter(t => t.recurrenceId !== taskToDelete.recurrenceId);
-            }
-            if (type === 'future') {
-                const seriesId = taskToDelete.recurrenceId;
-                const taskDate = new Date(taskToDelete.dueDate);
-                return allTasks.filter(t => {
-                    if (t.recurrenceId !== seriesId) return true;
-                    const tDate = new Date(t.dueDate);
-                    return tDate < taskDate;
-                });
-            }
-            return allTasks;
-        });
-
-        setShowRecurrenceDeleteModal(false);
-        setTaskToDelete(null);
+            await onRefresh();
+            setShowRecurrenceDeleteModal(false);
+            setTaskToDelete(null);
+        } catch (error) {
+            console.error('Erro ao excluir recorrencia:', error);
+            alert('Nao foi possivel excluir a recorrencia da tarefa.');
+        }
     };
 
-    const handleSaveTask = (taskData: Partial<Task>, recurrenceRule: RecurrenceRule | null) => {
+    const handleSaveTask = async (taskData: Partial<Task>, recurrenceRule: RecurrenceRule | null) => {
         const fullTaskData = { ...taskData, executiveId };
+        const editingRow = fullTaskData.id ? tasks.find((t) => t.id === fullTaskData.id) : undefined;
+        const oldRecurrenceId = editingRow?.recurrenceId;
 
-        setTasks(allTasks => {
-            // Find the original task being edited to check if it was part of a series.
-            const originalTask = editingTask?.id ? allTasks.find(t => t.id === editingTask.id) : null;
-            const originalRecurrenceId = originalTask?.recurrenceId;
+        const normalizeRecurrenceForApi = (rule: RecurrenceRule): RecurrenceRule => {
+            const out: RecurrenceRule = {
+                frequency: rule.frequency,
+                interval: Number.isFinite(rule.interval) && rule.interval >= 1 ? rule.interval : 1,
+            };
+            if (rule.daysOfWeek?.length) {
+                out.daysOfWeek = [...rule.daysOfWeek].sort((a, b) => a - b);
+            }
+            if (rule.endDate) {
+                out.endDate = rule.endDate;
+            }
+            if (rule.count != null && Number.isFinite(rule.count) && rule.count >= 1) {
+                out.count = rule.count;
+            }
+            return out;
+        };
 
-            // Start with a base set of tasks, removing the old series if it exists.
-            let baseTasks = originalRecurrenceId
-                ? allTasks.filter(t => t.recurrenceId !== originalRecurrenceId)
-                : allTasks;
+        const toPayload = (task: Partial<Task>) => {
+            const { id: _id, ...rest } = task;
+            const payload = { ...rest } as Partial<Task>;
+            if (payload.recurrence) {
+                payload.recurrence = normalizeRecurrenceForApi(payload.recurrence);
+            }
+            return payload;
+        };
 
+        try {
             if (recurrenceRule) {
-                // If it's a recurring task (new or an edited series).
-                // Use the old recurrence ID to maintain consistency, or create a new one.
-                const recurrenceId = originalRecurrenceId || `recur_${new Date().getTime()}`;
-                const newSeries = generateRecurringTasks(fullTaskData, recurrenceRule, recurrenceId);
-                return [...baseTasks, ...newSeries];
+                const normalizedRule = normalizeRecurrenceForApi(recurrenceRule);
+                if (normalizedRule.frequency === 'weekly' && (!normalizedRule.daysOfWeek || normalizedRule.daysOfWeek.length === 0)) {
+                    alert('Para recorrência semanal, selecione pelo menos um dia da semana.');
+                    return;
+                }
+                const newRecurrenceId = `recur_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+                const newSeries = generateRecurringTasks(fullTaskData, normalizedRule, newRecurrenceId);
+
+                if (newSeries.length === 0) {
+                    alert('Não foi possível gerar ocorrências com a recorrência e datas informadas. Ajuste o período ou a data final.');
+                    return;
+                }
+
+                await taskService.createBulk(newSeries.map(toPayload));
+
+                if (oldRecurrenceId) {
+                    await taskService.deleteByRecurrence(oldRecurrenceId);
+                } else if (fullTaskData.id) {
+                    await taskService.delete(fullTaskData.id);
+                }
             } else {
-                // If it's a single, non-recurring task.
-                if (fullTaskData.id) {
-                    // This is an edit. Ensure the old version (if not part of the deleted series) is removed.
-                    const tasksWithoutOld = baseTasks.filter(t => t.id !== fullTaskData.id);
-                    // Add the updated task, ensuring recurrence properties are cleared.
-                    const updatedTask = { ...fullTaskData, recurrenceId: undefined, recurrence: undefined } as Task;
-                    return [...tasksWithoutOld, updatedTask];
+                const singlePayload = {
+                    ...fullTaskData,
+                    recurrenceId: undefined,
+                    recurrence: undefined,
+                };
+
+                if (oldRecurrenceId) {
+                    await taskService.create(toPayload(singlePayload));
+                    await taskService.deleteByRecurrence(oldRecurrenceId);
+                } else if (fullTaskData.id) {
+                    await taskService.update(fullTaskData.id, singlePayload);
                 } else {
-                    // This is a new single task.
-                    const newId = `single_${new Date().getTime()}`;
-                    return [...baseTasks, { ...fullTaskData, id: newId, recurrenceId: undefined, recurrence: undefined } as Task];
+                    await taskService.create(toPayload(singlePayload));
                 }
             }
-        });
 
-        setModalOpen(false);
-        setEditingTask(null);
+            await onRefresh();
+            setModalOpen(false);
+            setEditingTask(null);
+        } catch (error) {
+            console.error('Erro ao salvar tarefa:', error);
+            alert('Nao foi possivel salvar a tarefa.');
+        }
     };
 
     const filteredTasks = useMemo(() => {

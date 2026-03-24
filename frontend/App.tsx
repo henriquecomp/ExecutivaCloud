@@ -48,6 +48,7 @@ import { documentCategoryService } from './services/documentCategoryService';
 import { documentService } from './services/documentService';
 import { contactTypeService } from './services/contactTypeService';
 import { contactService } from './services/contactService';
+import { taskService } from './services/taskService';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('dashboard');
@@ -102,7 +103,7 @@ const App: React.FC = () => {
   const [notifiedEventIds, setNotifiedEventIds] = useState<Set<string>>(new Set());
 
   // --- CARREGAR DADOS DO BACKEND ---
-  const loadBackendData = useCallback(async () => {
+  const loadBackendData = useCallback(async (options?: { secretariesForUsers?: Secretary[] }) => {
     try {
       const legalOrgsRes = await legalOrganizationService.getAll();
       setLegalOrganizations(legalOrgsRes);
@@ -123,11 +124,12 @@ const App: React.FC = () => {
       const executivesData = await executiveService.getAll(0, 1000);
       setExecutives(executivesData);
 
-      const [eventTypesData, eventsData, contactTypesData, contactsData, documentCategoriesData, documentsData] = await Promise.all([
+      const [eventTypesData, eventsData, contactTypesData, contactsData, tasksData, documentCategoriesData, documentsData] = await Promise.all([
         eventTypeService.getAll(),
         eventService.getAll(),
         contactTypeService.getAll(),
         contactService.getAll(),
+        taskService.getAll(),
         documentCategoryService.getAll(),
         documentService.getAll(),
       ]);
@@ -135,6 +137,7 @@ const App: React.FC = () => {
       setEvents(eventsData);
       setContactTypes(contactTypesData);
       setContacts(contactsData);
+      setTasks(tasksData);
       setDocumentCategories(documentCategoriesData);
       setDocuments(documentsData);
 
@@ -161,7 +164,8 @@ const App: React.FC = () => {
         executiveId: e.id,
       }));
 
-      const secUsers = secretaries.map(s => ({
+      const secsForLogin = options?.secretariesForUsers ?? secretaries;
+      const secUsers = secsForLogin.map(s => ({
         id: `user_sec_${s.id}`,
         fullName: s.fullName,
         role: 'secretary' as UserRole,
@@ -182,6 +186,7 @@ const App: React.FC = () => {
     setEvents,
     setContactTypes,
     setContacts,
+    setTasks,
     setDocumentCategories,
     setDocuments,
   ]);
@@ -412,7 +417,11 @@ const App: React.FC = () => {
       case 'finances':
         return <FinancesView expenses={filteredFinances} setExpenses={setExpenses} expenseCategories={expenseCategories} setExpenseCategories={setExpenseCategories} executiveId={selectedExecutiveId!} />;
       case 'tasks':
-        return <TasksView tasks={filteredTasks} setTasks={setTasks} executiveId={selectedExecutiveId!} />;
+        return <TasksView
+          tasks={filteredTasks}
+          executiveId={selectedExecutiveId!}
+          onRefresh={loadBackendData}
+        />;
       case 'documents':
         return <DocumentsView
           documents={filteredDocuments}
@@ -428,6 +437,7 @@ const App: React.FC = () => {
         return <SettingsView
           allData={{ legalOrganizations, organizations, departments, executives, secretaries, users, eventTypes, events, contactTypes, contacts, expenses, expenseCategories, tasks, documentCategories, documents }}
           setAllData={{ setLegalOrganizations, setOrganizations, setDepartments, setExecutives, setSecretaries, setUsers, setEventTypes, setEvents, setContactTypes, setContacts, setExpenses, setExpenseCategories, setTasks, setDocumentCategories, setDocuments }}
+          onAfterRestore={loadBackendData}
         />;
       default:
         return <Dashboard

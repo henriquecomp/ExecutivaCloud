@@ -45,6 +45,9 @@ from app.models import document_category_model
 from app.models import document_model
 from app.models import contact_type_model
 from app.models import contact_model
+from app.models import task_model
+from app.models import report_model
+from app.models import settings_backup_model
 
 # Adicione imports para quaisquer outros modelos que criar no futuro
 

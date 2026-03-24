@@ -16,6 +16,9 @@ from app.routers import (
     document,
     contact_type,
     contact,
+    task,
+    report,
+    settings_backup,
 )
 
 app = FastAPI(title="Executiva Cloud API", description="Executiva Cloud API")
@@ -48,6 +51,9 @@ app.include_router(document_category.router)
 app.include_router(document.router)
 app.include_router(contact_type.router)
 app.include_router(contact.router)
+app.include_router(task.router)
+app.include_router(report.router)
+app.include_router(settings_backup.router)
 
 
 # Rota raiz simples para verificação

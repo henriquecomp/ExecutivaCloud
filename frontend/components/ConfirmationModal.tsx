@@ -1,16 +1,29 @@
-import React from 'react';
+import React, { useState } from 'react';
 import Modal from './Modal';
 
 interface ConfirmationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm: () => void | Promise<void>;
   title: string;
   message: string;
 }
 
 const ConfirmationModal: React.FC<ConfirmationModalProps> = ({ isOpen, onClose, onConfirm, title, message }) => {
+  const [pending, setPending] = useState(false);
+
   if (!isOpen) return null;
+
+  const handleConfirm = async () => {
+    if (pending) return;
+    setPending(true);
+    try {
+      await Promise.resolve(onConfirm());
+      onClose();
+    } finally {
+      setPending(false);
+    }
+  };
 
   return (
     <Modal isOpen={isOpen} title={title} onClose={onClose}>
@@ -20,19 +33,18 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({ isOpen, onClose, 
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 bg-slate-200 text-slate-800 rounded-md hover:bg-slate-300 transition"
+            disabled={pending}
+            className="px-4 py-2 bg-slate-200 text-slate-800 rounded-md hover:bg-slate-300 transition disabled:opacity-50"
           >
             Cancelar
           </button>
           <button
             type="button"
-            onClick={() => {
-              onConfirm();
-              onClose();
-            }}
-            className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition"
+            onClick={() => void handleConfirm()}
+            disabled={pending}
+            className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition disabled:opacity-50"
           >
-            Confirmar
+            {pending ? 'Aguarde…' : 'Confirmar'}
           </button>
         </div>
       </div>

@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Executive, Event, Expense, Task, Contact } from '../types';
+import { reportService, SavedReport } from '../services/reportService';
 
 interface ReportsViewProps {
   executives: Executive[];
@@ -31,6 +32,9 @@ const ReportsView: React.FC<ReportsViewProps> = ({ executives, events, expenses,
     const [fullReport, setFullReport] = useState<ReportData[]>([]);
     const [displayReport, setDisplayReport] = useState<ReportData[]>([]);
     const [reportGenerated, setReportGenerated] = useState(false);
+    const [savedReports, setSavedReports] = useState<SavedReport[]>([]);
+    const [isSavingReport, setIsSavingReport] = useState(false);
+    const [isLoadingSavedReports, setIsLoadingSavedReports] = useState(false);
 
     const dataTypeLabels: { [key: string]: string } = {
         events: 'Eventos',
@@ -51,7 +55,23 @@ const ReportsView: React.FC<ReportsViewProps> = ({ executives, events, expenses,
         setDataTypes(prev => ({...prev, [type]: !prev[type] }));
     };
 
-    const handleGenerateReport = () => {
+    const loadSavedReports = async () => {
+        try {
+            setIsLoadingSavedReports(true);
+            const saved = await reportService.getAll();
+            setSavedReports(saved);
+        } catch (error) {
+            console.error('Erro ao carregar relatórios salvos:', error);
+        } finally {
+            setIsLoadingSavedReports(false);
+        }
+    };
+
+    useEffect(() => {
+        loadSavedReports();
+    }, []);
+
+    const handleGenerateReport = async () => {
         const execsToReport = selectedExecIds.length > 0 
             ? executives.filter(e => selectedExecIds.includes(e.id)) 
             : executives;
@@ -163,6 +183,50 @@ const ReportsView: React.FC<ReportsViewProps> = ({ executives, events, expenses,
         setFullReport(finalReportData);
         setDisplayReport(finalReportData.slice(-50));
         setReportGenerated(true);
+
+        try {
+            setIsSavingReport(true);
+            const now = new Date();
+            const reportName = `Relatório ${now.toLocaleDateString('pt-BR')} ${now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+            await reportService.create({
+                name: reportName,
+                selectedExecutiveIds: selectedExecIds,
+                startDate: startDate || undefined,
+                endDate: endDate || undefined,
+                includeEvents: dataTypes.events,
+                includeExpenses: dataTypes.expenses,
+                includeTasks: dataTypes.tasks,
+                includeContacts: dataTypes.contacts,
+                totalRecords: finalReportData.length,
+                generatedData: finalReportData,
+            });
+            await loadSavedReports();
+        } catch (error) {
+            console.error('Erro ao salvar relatório:', error);
+            alert('Relatório gerado, mas não foi possível salvar no backend.');
+        } finally {
+            setIsSavingReport(false);
+        }
+    };
+
+    const handleLoadSavedReport = (report: SavedReport) => {
+        const rows = (report.generatedData || []) as ReportData[];
+        setFullReport(rows);
+        setDisplayReport(rows.slice(-50));
+        setReportGenerated(true);
+    };
+
+    const handleDeleteSavedReport = async (reportId: string) => {
+        const shouldDelete = window.confirm('Deseja realmente excluir este relatório salvo?');
+        if (!shouldDelete) return;
+
+        try {
+            await reportService.delete(reportId);
+            await loadSavedReports();
+        } catch (error) {
+            console.error('Erro ao excluir relatório salvo:', error);
+            alert('Não foi possível excluir o relatório salvo.');
+        }
     };
     
     const convertToCSV = (data: ReportData[]) => {
@@ -264,9 +328,39 @@ const ReportsView: React.FC<ReportsViewProps> = ({ executives, events, expenses,
                     </div>
                 </div>
                 <div className="mt-6 pt-6 border-t border-slate-200 flex justify-end">
-                    <button onClick={handleGenerateReport} className="px-6 py-2 bg-indigo-600 text-white rounded-md shadow-sm hover:bg-indigo-700 transition">
-                        Gerar Relatório
+                    <button onClick={handleGenerateReport} className="px-6 py-2 bg-indigo-600 text-white rounded-md shadow-sm hover:bg-indigo-700 transition disabled:bg-slate-400 disabled:cursor-not-allowed" disabled={isSavingReport}>
+                        {isSavingReport ? 'Salvando...' : 'Gerar Relatório'}
                     </button>
+                </div>
+            </div>
+
+            <div className="bg-white p-4 rounded-xl shadow-md">
+                <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-xl font-bold text-slate-700">Relatórios Salvos</h3>
+                    {isLoadingSavedReports && <span className="text-sm text-slate-500">Carregando...</span>}
+                </div>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {savedReports.slice(0, 20).map((report) => (
+                        <div key={report.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                            <div>
+                                <p className="font-medium text-slate-800">{report.name}</p>
+                                <p className="text-xs text-slate-500">
+                                    {new Date(report.generatedAt).toLocaleString('pt-BR')} - {report.totalRecords} registro(s)
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button onClick={() => handleLoadSavedReport(report)} className="px-3 py-1 text-sm bg-indigo-100 text-indigo-700 rounded-md hover:bg-indigo-200 transition">
+                                    Abrir
+                                </button>
+                                <button onClick={() => handleDeleteSavedReport(report.id)} className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded-md hover:bg-red-200 transition">
+                                    Excluir
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                    {savedReports.length === 0 && (
+                        <p className="text-sm text-slate-500 text-center py-3">Nenhum relatório salvo ainda.</p>
+                    )}
                 </div>
             </div>
 
