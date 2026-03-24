@@ -4,10 +4,10 @@
 #   git clone https://github.com/henriquecomp/executivacloud.git && cd executivacloud
 #   docker compose up --build
 #
-# Acesse o front em http://localhost:8080 e a API em http://localhost:8000/docs
+# Acesse o front em http://localhost:8080 e a API em http://localhost:8098/docs
 #
 # Em servidor público, antes do build defina a URL da API para o navegador:
-#   export VITE_API_URL=http://SEU_IP_OU_DOMINIO:8000/
+#   export VITE_API_URL=http://SEU_IP_OU_DOMINIO:8098/
 #   docker compose build --no-cache web
 # E ajuste CORS_ORIGINS abaixo para a origem do front (ex.: https://app.seudominio.com).
 
@@ -18,7 +18,7 @@ services:
       dockerfile: Dockerfile
     container_name: executivacloud-api
     ports:
-      - "8000:8000"
+      - "8098:8000"
     environment:
       DATABASE_URL: sqlite:////app/data/sql_app.db
       CORS_ORIGINS: http://localhost:8080,http://127.0.0.1:8080,http://localhost:80,http://127.0.0.1:80
@@ -31,7 +31,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000/}
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8098/}
     container_name: executivacloud-web
     ports:
       - "8080:80"
