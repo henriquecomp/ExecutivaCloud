@@ -1,10 +1,11 @@
+import os
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 from typing import Generator
 
-# URL de Conexão: Usaremos SQLite para simplificar no desenvolvimento
-# Se fosse PostgreSQL: "postgresql://user:password@host:port/dbname"
-DATABASE_URL = "sqlite:///./sql_app.db"
+# Padrão: SQLite local. Em Docker, use DATABASE_URL (ex.: sqlite:////app/data/sql_app.db).
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./sql_app.db")
 
 # A engine é o ponto de comunicação com o banco de dados
 # check_same_thread é apenas para SQLite, pois ele não lida com múltiplos threads

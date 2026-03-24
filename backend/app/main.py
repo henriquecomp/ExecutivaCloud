@@ -1,4 +1,6 @@
 # main.py
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -23,11 +25,18 @@ from app.routers import (
 
 app = FastAPI(title="Executiva Cloud API", description="Executiva Cloud API")
 
-origins = [
-    "http://localhost:3000",
-    "http://localhost:3001",  # Exemplo de um frontend React/Vue/Angular em desenvolvimento
-    # Adicione outras origens aqui, se necessário
-]
+_cors = os.getenv("CORS_ORIGINS", "").strip()
+if _cors:
+    origins = [o.strip() for o in _cors.split(",") if o.strip()]
+else:
+    origins = [
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://localhost:80",
+        "http://127.0.0.1:80",
+        "http://localhost:8080",
+        "http://127.0.0.1:8080",
+    ]
 
 app.add_middleware(
     CORSMiddleware,
