@@ -1,21 +1,12 @@
 from sqlalchemy.orm import Session
 from fastapi import Depends
-from passlib.context import CryptContext
+
+from app.core.database import get_db
+from app.core.security import hash_password
 from app.repositories.user_repository import UserRepository
 from app.schemas import user_schema as schemas
 from app.models import user_model as models
-from app.core.database import get_db
 from typing import Optional, List
-
-# Contexto para hash de senha (Mantido como utilidade fora da classe)
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
-
-# A função verify_password não é usada no CRUD de criação, mas é útil
-# def verify_password(plain_password: str, hashed_password: str) -> bool:
-#     return pwd_context.verify(plain_password, hashed_password)
 
 
 class UserService:
@@ -52,10 +43,10 @@ class UserService:
         # 2. Lógica de Negócio: Hash da senha
         hashed_pass = hash_password(user_data.password)
 
-        # 3. Prepara o dicionário para o Repository
-        user_dict = user_data.model_dump(exclude_unset=True)
+        # 3. Prepara o dicionário para o Repository (nomes de coluna no banco)
+        user_dict = user_data.model_dump(exclude_unset=True, by_alias=False)
         user_dict["hashed_password"] = hashed_pass
-        user_dict.pop("password", None) # Remove a senha não hasheada
+        user_dict.pop("password", None)
 
         # 4. Persistência (Delega ao Repository)
         return self.repository.create(user_dict)

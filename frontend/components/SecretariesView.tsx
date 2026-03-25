@@ -68,7 +68,6 @@ interface SecretariesViewProps {
   secretaries: Secretary[];
   setSecretaries: React.Dispatch<React.SetStateAction<Secretary[]>>;
   executives: Executive[];
-  setUsers: React.Dispatch<React.SetStateAction<User[]>>;
   currentUser: User;
   organizations: Organization[];
   departments: Department[];
@@ -508,7 +507,7 @@ const SecretaryForm: React.FC<{
     );
 };
 
-const SecretariesView: React.FC<SecretariesViewProps> = ({ secretaries, setSecretaries, executives, setUsers, currentUser, organizations, departments }) => {
+const SecretariesView: React.FC<SecretariesViewProps> = ({ secretaries, setSecretaries, executives, currentUser, organizations, departments }) => {
     const [isModalOpen, setModalOpen] = useState(false);
     const [editingSecretary, setEditingSecretary] = useState<Partial<Secretary> | null>(null);
     const [secretaryToDelete, setSecretaryToDelete] = useState<Secretary | null>(null);
@@ -584,7 +583,6 @@ const SecretariesView: React.FC<SecretariesViewProps> = ({ secretaries, setSecre
     const confirmDelete = () => {
         if(secretaryToDelete) {
             setSecretaries(prev => prev.filter(s => s.id !== secretaryToDelete.id));
-            setUsers(prev => prev.filter(u => u.secretaryId !== secretaryToDelete.id));
             setSecretaryToDelete(null);
         }
     };
@@ -592,15 +590,8 @@ const SecretariesView: React.FC<SecretariesViewProps> = ({ secretaries, setSecre
     const handleSaveSecretary = (secretary: Secretary) => {
         if (editingSecretary && editingSecretary.id) {
             setSecretaries(prev => prev.map(s => s.id === secretary.id ? secretary : s));
-            setUsers(users => users.map(u => u.secretaryId === secretary.id ? { ...u, fullName: secretary.fullName } : u));
         } else {
             setSecretaries(prev => [...prev, secretary]);
-            setUsers(users => [...users, {
-                id: `user_sec_${secretary.id}`,
-                fullName: secretary.fullName,
-                role: 'secretary',
-                secretaryId: secretary.id,
-            }]);
         }
         setModalOpen(false);
         setEditingSecretary(null);

@@ -15,7 +15,6 @@ import {
   Department, 
   Secretary, 
   User, 
-  UserRole, 
   Document, 
   DocumentCategory, 
   ExpenseCategory, 
@@ -34,6 +33,7 @@ import SettingsView from './components/SettingsView';
 import TasksView from './components/TasksView';
 import SecretariesView from './components/SecretariesView';
 import LoginView from './components/LoginView';
+import RegisterOrganizationView from './components/RegisterOrganizationView';
 import ReportsView from './components/ReportsView';
 import UserMenu from './components/UserMenu';
 import DocumentsView from './components/DocumentsView';
@@ -49,6 +49,12 @@ import { documentService } from './services/documentService';
 import { contactTypeService } from './services/contactTypeService';
 import { contactService } from './services/contactService';
 import { taskService } from './services/taskService';
+import {
+  fetchMe,
+  hydrateAuthHeader,
+  logoutAuth,
+  mapApiUserToAppUser,
+} from './services/authService';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('dashboard');
@@ -62,7 +68,9 @@ const App: React.FC = () => {
 
   // --- STATE MANAGEMENT (LocalStorage / Mock) ---
   // Dados que ainda não possuem backend completo ou são específicos de sessão/mock.
-  const [currentUser, setCurrentUser] = useLocalStorage<User | null>('currentUser', null);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [sessionReady, setSessionReady] = useState(false);
+  const [authScreen, setAuthScreen] = useState<'login' | 'register'>('login');
   const [selectedExecutiveId, setSelectedExecutiveId] = useLocalStorage<string | null>('selectedExecutiveId', null);
 
   // Dummies inicias para dados que ainda não tem backend
@@ -90,7 +98,6 @@ const App: React.FC = () => {
   // States com LocalStorage
   const [executives, setExecutives] = useLocalStorage<Executive[]>('executives', initialExecutives);
   const [secretaries, setSecretaries] = useLocalStorage<Secretary[]>('secretaries', initialSecretaries);
-  const [users, setUsers] = useLocalStorage<User[]>('users', []); 
   const [eventTypes, setEventTypes] = useLocalStorage<EventType[]>('eventTypes', initialEventTypes);
   const [events, setEvents] = useLocalStorage<Event[]>('events', []);
   const [contactTypes, setContactTypes] = useLocalStorage<ContactType[]>('contactTypes', initialContactTypes);
@@ -102,13 +109,16 @@ const App: React.FC = () => {
   const [documents, setDocuments] = useLocalStorage<Document[]>('documents', []);
   const [notifiedEventIds, setNotifiedEventIds] = useState<Set<string>>(new Set());
 
-  // --- CARREGAR DADOS DO BACKEND ---
-  const loadBackendData = useCallback(async (options?: { secretariesForUsers?: Secretary[] }) => {
+  /** Núcleo: organizações jurídicas, empresas, departamentos e executivos. */
+  const loadCoreData = useCallback(async (isStale?: () => boolean) => {
+    const stale = () => isStale?.() ?? false;
     try {
       const legalOrgsRes = await legalOrganizationService.getAll();
+      if (stale()) return;
       setLegalOrganizations(legalOrgsRes);
 
       const orgsRes = await organizationService.getAll();
+      if (stale()) return;
       setOrganizations(orgsRes);
 
       let allDepts: Department[] = [];
@@ -119,20 +129,34 @@ const App: React.FC = () => {
           allDepts = [...allDepts, ...res];
         });
       }
+      if (stale()) return;
       setDepartments(allDepts);
 
       const executivesData = await executiveService.getAll(0, 1000);
+      if (stale()) return;
       setExecutives(executivesData);
+    } catch (error) {
+      if (!stale()) {
+        console.error('Erro ao carregar núcleo (organizações/executivos):', error);
+      }
+    }
+  }, []);
 
-      const [eventTypesData, eventsData, contactTypesData, contactsData, tasksData, documentCategoriesData, documentsData] = await Promise.all([
-        eventTypeService.getAll(),
-        eventService.getAll(),
-        contactTypeService.getAll(),
-        contactService.getAll(),
-        taskService.getAll(),
-        documentCategoryService.getAll(),
-        documentService.getAll(),
-      ]);
+  /** Tudo que é listado globalmente na API (relatórios completos, backup em configurações). */
+  const loadAllSecondaryLists = useCallback(async (isStale?: () => boolean) => {
+    const stale = () => isStale?.() ?? false;
+    try {
+      const [eventTypesData, eventsData, contactTypesData, contactsData, tasksData, documentCategoriesData, documentsData] =
+        await Promise.all([
+          eventTypeService.getAll(),
+          eventService.getAll(),
+          contactTypeService.getAll(),
+          contactService.getAll(),
+          taskService.getAll(),
+          documentCategoryService.getAll(),
+          documentService.getAll(),
+        ]);
+      if (stale()) return;
       setEventTypes(eventTypesData);
       setEvents(eventsData);
       setContactTypes(contactTypesData);
@@ -140,71 +164,180 @@ const App: React.FC = () => {
       setTasks(tasksData);
       setDocumentCategories(documentCategoriesData);
       setDocuments(documentsData);
-
-      const masterUser: User = { id: 'user_master', fullName: 'Usuário Master', role: 'master' };
-      
-      const orgAdmins = orgsRes.map((org) => ({
-        id: `user_admin_${org.id}`,
-        fullName: `Admin ${org.name}`,
-        role: 'admin' as UserRole,
-        organizationId: org.id,
-      }));
-
-      const legalOrgAdmins = legalOrgsRes.map((lo) => ({
-        id: `user_admin_legal_${lo.id}`,
-        fullName: `Admin ${lo.name}`,
-        role: 'admin' as UserRole,
-        legalOrganizationId: lo.id
-      }));
-
-      const execUsers = executivesData.map((e) => ({
-        id: `user_exec_${e.id}`,
-        fullName: e.fullName,
-        role: 'executive' as UserRole,
-        executiveId: e.id,
-      }));
-
-      const secsForLogin = options?.secretariesForUsers ?? secretaries;
-      const secUsers = secsForLogin.map(s => ({
-        id: `user_sec_${s.id}`,
-        fullName: s.fullName,
-        role: 'secretary' as UserRole,
-        secretaryId: s.id,
-      }));
-
-      // Mescla usuários gerados dinamicamente com usuários persistidos
-      setUsers([masterUser, ...legalOrgAdmins, ...orgAdmins, ...execUsers, ...secUsers]);
-
     } catch (error) {
-      console.error("Erro ao carregar dados do backend:", error);
+      if (!stale()) {
+        console.error('Erro ao carregar listas secundárias:', error);
+      }
     }
-  }, [
-    secretaries,
-    setUsers,
-    setExecutives,
-    setEventTypes,
-    setEvents,
-    setContactTypes,
-    setContacts,
-    setTasks,
-    setDocumentCategories,
-    setDocuments,
-  ]);
+  }, []);
 
-  // Efeito inicial
+  /** Somente eventos, tarefas e contatos sem filtro (relatórios). */
+  const loadReportsSlice = useCallback(async (isStale?: () => boolean) => {
+    const stale = () => isStale?.() ?? false;
+    try {
+      const [eventsData, contactsData, tasksData] = await Promise.all([
+        eventService.getAll(),
+        contactService.getAll(),
+        taskService.getAll(),
+      ]);
+      if (stale()) return;
+      setEvents(eventsData);
+      setContacts(contactsData);
+      setTasks(tasksData);
+    } catch (error) {
+      if (!stale()) {
+        console.error('Erro ao carregar dados para relatórios:', error);
+      }
+    }
+  }, []);
+
+  /** Dados específicos da tela atual (e do executivo selecionado, quando aplicável). */
+  const loadViewDataset = useCallback(
+    async (view: View, executiveId: string | null, isStale?: () => boolean) => {
+      const stale = () => isStale?.() ?? false;
+      try {
+        switch (view) {
+          case 'dashboard': {
+            if (executiveId) {
+              const ev = await eventService.getAll({ executiveId });
+              if (!stale()) setEvents(ev);
+            } else if (!stale()) {
+              setEvents([]);
+            }
+            break;
+          }
+          case 'agenda': {
+            const eventTypesData = await eventTypeService.getAll();
+            if (stale()) return;
+            setEventTypes(eventTypesData);
+            if (executiveId) {
+              const ev = await eventService.getAll({ executiveId });
+              if (!stale()) setEvents(ev);
+            } else if (!stale()) {
+              setEvents([]);
+            }
+            break;
+          }
+          case 'contacts': {
+            const contactTypesData = await contactTypeService.getAll();
+            if (stale()) return;
+            setContactTypes(contactTypesData);
+            if (executiveId) {
+              const list = await contactService.getAll({ executiveId });
+              if (!stale()) setContacts(list);
+            } else if (!stale()) {
+              setContacts([]);
+            }
+            break;
+          }
+          case 'tasks': {
+            if (executiveId) {
+              const list = await taskService.getAll({ executiveId });
+              if (!stale()) setTasks(list);
+            } else if (!stale()) {
+              setTasks([]);
+            }
+            break;
+          }
+          case 'documents': {
+            const cats = await documentCategoryService.getAll();
+            if (stale()) return;
+            setDocumentCategories(cats);
+            if (executiveId) {
+              const list = await documentService.getAll({ executiveId });
+              if (!stale()) setDocuments(list);
+            } else if (!stale()) {
+              setDocuments([]);
+            }
+            break;
+          }
+          case 'reports':
+            await loadReportsSlice(isStale);
+            break;
+          case 'settings':
+            await loadAllSecondaryLists(isStale);
+            break;
+          default:
+            break;
+        }
+      } catch (error) {
+        if (!stale()) {
+          console.error('Erro ao carregar dados da tela:', error);
+        }
+      }
+    },
+    [loadAllSecondaryLists, loadReportsSlice],
+  );
+
+  /** Após mutações (salvar no formulário): atualiza núcleo + recarrega só o contexto da tela atual. */
+  const refreshAfterMutation = useCallback(async () => {
+    const stale = () => false;
+    await loadCoreData(stale);
+    await loadViewDataset(currentView, selectedExecutiveId, stale);
+  }, [currentView, selectedExecutiveId, loadCoreData, loadViewDataset]);
+
+  /** Pós-restauração de backup: alinhar tudo com o servidor. */
+  const refreshAfterRestore = useCallback(async () => {
+    const stale = () => false;
+    await loadCoreData(stale);
+    await loadAllSecondaryLists(stale);
+  }, [loadCoreData, loadAllSecondaryLists]);
+
   useEffect(() => {
-    loadBackendData();
-  }, [loadBackendData]);
+    let cancelled = false;
+    (async () => {
+      hydrateAuthHeader();
+      const token = typeof localStorage !== 'undefined' ? localStorage.getItem('accessToken') : null;
+      if (!token) {
+        if (!cancelled) setSessionReady(true);
+        return;
+      }
+      try {
+        const apiUser = await fetchMe();
+        if (!cancelled) setCurrentUser(mapApiUserToAppUser(apiUser));
+      } catch {
+        logoutAuth();
+        if (!cancelled) setCurrentUser(null);
+      } finally {
+        if (!cancelled) setSessionReady(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    const stale = () => cancelled;
+    const run = async () => {
+      if (!currentUser) return;
+      await loadCoreData(stale);
+      if (stale()) return;
+      await loadViewDataset(currentView, selectedExecutiveId, stale);
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser, currentView, selectedExecutiveId, loadCoreData, loadViewDataset]);
+
+  const noopSetUsers = useCallback<React.Dispatch<React.SetStateAction<User[]>>>(() => {}, []);
 
   // --- LOGIN & AUTH ---
-  const handleLogin = (user: User) => {
+  const handleAuthSuccess = (user: User) => {
     setCurrentUser(user);
+    setAuthScreen('login');
     if (user.role === 'secretary') {
       setCurrentView('executives');
     } else {
       setCurrentView('dashboard');
     }
+  };
+
+  const handleLogout = () => {
+    logoutAuth();
+    setCurrentUser(null);
   };
 
   // --- USER PERMISSIONS & DATA FILTERING ---
@@ -352,8 +485,7 @@ const App: React.FC = () => {
           setExpenses={setExpenses}
           setTasks={setTasks}
           setDocuments={setDocuments}
-          setUsers={setUsers}
-          onRefresh={loadBackendData} // Função de refresh
+          onRefresh={refreshAfterMutation}
         />;
       case 'executives':
         return <ExecutivesView
@@ -370,7 +502,6 @@ const App: React.FC = () => {
           setExpenses={setExpenses}
           setTasks={setTasks}
           setDocuments={setDocuments}
-          setUsers={setUsers}
         />;
       case 'organizations':
         return <OrganizationsView
@@ -384,16 +515,14 @@ const App: React.FC = () => {
           setExpenses={setExpenses}
           setTasks={setTasks}
           setDocuments={setDocuments}
-          setUsers={setUsers}
           legalOrganizations={legalOrganizations} // Passando a lista atualizada
-          onRefresh={loadBackendData} // Passando função de refresh
+          onRefresh={refreshAfterMutation}
         />;
       case 'secretaries':
         return <SecretariesView
           secretaries={secretaries}
           setSecretaries={setSecretaries}
           executives={executives}
-          setUsers={setUsers}
           currentUser={currentUser}
           organizations={organizations}
           departments={departments}
@@ -405,14 +534,14 @@ const App: React.FC = () => {
           eventTypes={eventTypes}
           setEventTypes={setEventTypes}
           executiveId={selectedExecutiveId!}
-          onRefresh={loadBackendData}
+          onRefresh={refreshAfterMutation}
         />;
       case 'contacts':
         return <ContactsView
           contacts={filteredContacts}
           contactTypes={contactTypes}
           executiveId={selectedExecutiveId!}
-          onRefresh={loadBackendData}
+          onRefresh={refreshAfterMutation}
         />;
       case 'finances':
         return <FinancesView expenses={filteredFinances} setExpenses={setExpenses} expenseCategories={expenseCategories} setExpenseCategories={setExpenseCategories} executiveId={selectedExecutiveId!} />;
@@ -420,7 +549,7 @@ const App: React.FC = () => {
         return <TasksView
           tasks={filteredTasks}
           executiveId={selectedExecutiveId!}
-          onRefresh={loadBackendData}
+          onRefresh={refreshAfterMutation}
         />;
       case 'documents':
         return <DocumentsView
@@ -429,15 +558,15 @@ const App: React.FC = () => {
           documentCategories={documentCategories}
           setDocumentCategories={setDocumentCategories}
           executiveId={selectedExecutiveId!}
-          onRefresh={loadBackendData}
+          onRefresh={refreshAfterMutation}
         />;
       case 'reports':
         return <ReportsView executives={executives} events={events} expenses={expenses} tasks={tasks} contacts={contacts} />;
       case 'settings':
         return <SettingsView
-          allData={{ legalOrganizations, organizations, departments, executives, secretaries, users, eventTypes, events, contactTypes, contacts, expenses, expenseCategories, tasks, documentCategories, documents }}
-          setAllData={{ setLegalOrganizations, setOrganizations, setDepartments, setExecutives, setSecretaries, setUsers, setEventTypes, setEvents, setContactTypes, setContacts, setExpenses, setExpenseCategories, setTasks, setDocumentCategories, setDocuments }}
-          onAfterRestore={loadBackendData}
+          allData={{ legalOrganizations, organizations, departments, executives, secretaries, users: currentUser ? [currentUser] : [], eventTypes, events, contactTypes, contacts, expenses, expenseCategories, tasks, documentCategories, documents }}
+          setAllData={{ setLegalOrganizations, setOrganizations, setDepartments, setExecutives, setSecretaries, setUsers: noopSetUsers, setEventTypes, setEvents, setContactTypes, setContacts, setExpenses, setExpenseCategories, setTasks, setDocumentCategories, setDocuments }}
+          onAfterRestore={refreshAfterRestore}
         />;
       default:
         return <Dashboard
@@ -458,8 +587,24 @@ const App: React.FC = () => {
     </svg>
   );
 
+  if (!sessionReady) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-100 text-slate-600">
+        Carregando…
+      </div>
+    );
+  }
+
   if (!currentUser) {
-    return <LoginView users={users} onLogin={handleLogin} />;
+    if (authScreen === 'register') {
+      return (
+        <RegisterOrganizationView
+          onSuccess={handleAuthSuccess}
+          onBack={() => setAuthScreen('login')}
+        />
+      );
+    }
+    return <LoginView onSuccess={handleAuthSuccess} onGoRegister={() => setAuthScreen('register')} />;
   }
 
   return (
@@ -499,7 +644,7 @@ const App: React.FC = () => {
               </select>
             </div>
 
-            <UserMenu user={currentUser} onLogout={() => setCurrentUser(null)} />
+            <UserMenu user={currentUser} onLogout={handleLogout} />
           </div>
         </header>
         <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">

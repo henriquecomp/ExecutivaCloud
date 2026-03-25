@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AllDataBackup, Secretary } from '../types';
+import { AllDataBackup } from '../types';
 import Modal from './Modal';
 import ConfirmationModal from './ConfirmationModal';
 import { DownloadIcon, UploadIcon, CheckCircleIcon, ExclamationTriangleIcon } from './Icons';
@@ -9,8 +9,8 @@ import { settingsBackupService, SettingsBackup } from '../services/settingsBacku
 interface SettingsViewProps {
   allData: Omit<AllDataBackup, 'version'>;
   setAllData: { [K in keyof Omit<AllDataBackup, 'version'> as `set${Capitalize<K>}`]: React.Dispatch<React.SetStateAction<AllDataBackup[K]>> };
-  /** Após restaurar no servidor, recarrega dados da API. Passe secretárias do backup para montar usuários de login sem depender do estado ainda não atualizado. */
-  onAfterRestore?: (options?: { secretariesForUsers?: Secretary[] }) => Promise<void>;
+  /** Após restaurar no servidor, recarrega dados da API. */
+  onAfterRestore?: () => Promise<void>;
 }
 
 const SettingsView: React.FC<SettingsViewProps> = ({ allData, setAllData, onAfterRestore }) => {
@@ -65,7 +65,6 @@ const SettingsView: React.FC<SettingsViewProps> = ({ allData, setAllData, onAfte
         setAllData.setDepartments(backupData.departments);
         setAllData.setExecutives(backupData.executives);
         setAllData.setSecretaries(backupData.secretaries);
-        setAllData.setUsers(backupData.users);
         setAllData.setEventTypes(backupData.eventTypes);
         setAllData.setEvents(backupData.events);
         setAllData.setContactTypes(backupData.contactTypes);
@@ -169,7 +168,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ allData, setAllData, onAfte
             const { version: _v, ...rest } = dataToImport;
             await settingsBackupService.restore(rest);
             applyBackupData(rest);
-            await onAfterRestore?.({ secretariesForUsers: rest.secretaries });
+            await onAfterRestore?.();
             setImportConfirmOpen(false);
             setDataToImport(null);
             setFileToImport(null);
@@ -193,7 +192,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ allData, setAllData, onAfte
         try {
             await settingsBackupService.restore(backupToRestore.data);
             applyBackupData(backupToRestore.data);
-            await onAfterRestore?.({ secretariesForUsers: backupToRestore.data.secretaries });
+            await onAfterRestore?.();
             setBackupToRestore(null);
             setImportMessage({ type: 'success', text: 'Backup restaurado no banco de dados com sucesso!' });
         } catch (error) {

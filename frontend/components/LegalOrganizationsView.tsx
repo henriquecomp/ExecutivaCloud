@@ -62,7 +62,6 @@ interface LegalOrganizationsViewProps {
   setExpenses: React.Dispatch<React.SetStateAction<Expense[]>>;
   setTasks: React.Dispatch<React.SetStateAction<Task[]>>;
   setDocuments: React.Dispatch<React.SetStateAction<Document[]>>;
-  setUsers: React.Dispatch<React.SetStateAction<User[]>>;
   onRefresh: () => void;
 }
 

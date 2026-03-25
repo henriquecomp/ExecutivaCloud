@@ -1,41 +1,63 @@
-from pydantic import BaseModel, EmailStr, Field, model_validator, AliasChoices
-from typing import Optional
+from typing import Literal, Optional
+
+from pydantic import BaseModel, EmailStr, Field, model_validator, ConfigDict
+
 
 class UsuarioBase(BaseModel):
-    name: str = Field(..., min_length=2, max_length=100)
+    model_config = ConfigDict(populate_by_name=True)
+
+    name: str = Field(..., alias="fullName", min_length=2, max_length=100)
     email: EmailStr
     phone: Optional[str] = None
 
-# Input: Criação de Usuário (precisa da senha não hasheada)
+
+UserRoleLiteral = Literal[
+    "master",
+    "admin_legal_organization",
+    "admin_company",
+    "executive",
+    "secretary",
+]
+
+
 class UsuarioCreate(UsuarioBase):
     password: str = Field(..., min_length=6)
+    role: UserRoleLiteral = "admin_company"
+    legal_organization_id: Optional[int] = Field(None, alias="legalOrganizationId")
+    organization_id: Optional[int] = Field(None, alias="organizationId")
+    executive_id: Optional[int] = Field(None, alias="executiveId")
+    secretary_external_id: Optional[str] = Field(None, alias="secretaryId")
 
-# Input/Output: Atualização de Usuário (todos os campos opcionais)
-class UsuarioUpdate(UsuarioBase):
-    name: Optional[str] = None
+
+class UsuarioUpdate(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    name: Optional[str] = Field(None, alias="fullName", min_length=2, max_length=100)
     email: Optional[EmailStr] = None
     phone: Optional[str] = None
-    password: Optional[str] = None # Se for atualizar a senha
-    
-    # Adicionamos um validador para garantir que pelo menos um campo seja enviado na atualização
-    @model_validator(mode='before')
+    password: Optional[str] = None
+    role: Optional[UserRoleLiteral] = None
+    legal_organization_id: Optional[int] = Field(None, alias="legalOrganizationId")
+    organization_id: Optional[int] = Field(None, alias="organizationId")
+    executive_id: Optional[int] = Field(None, alias="executiveId")
+    secretary_external_id: Optional[str] = Field(None, alias="secretaryId")
+
+    @model_validator(mode="before")
+    @classmethod
     def check_at_least_one_field(cls, values):
-        if not any(values.values()):
+        if isinstance(values, dict) and not any(v is not None for v in values.values()):
             raise ValueError("Pelo menos um campo deve ser fornecido para a atualização.")
         return values
 
-# Output: Resposta da API (não inclui a senha hasheada)
+
 class Usuario(UsuarioBase):
-    id: int # O id é gerado pelo banco
+    id: int
     is_active: bool
-    name: str = Field(
-        alias='fullName', 
-        validation_alias=AliasChoices('name'), 
-        min_length=2, 
-        max_length=100
-    )
+    role: UserRoleLiteral
+    legal_organization_id: Optional[int] = Field(None, alias="legalOrganizationId")
+    organization_id: Optional[int] = Field(None, alias="organizationId")
+    executive_id: Optional[int] = Field(None, alias="executiveId")
+    secretary_external_id: Optional[str] = Field(None, alias="secretaryId")
 
-
-    # Configuração crucial para ler dados de objetos ORM (SQLAlchemy)
     class Config:
         from_attributes = True

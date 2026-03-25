@@ -1,6 +1,17 @@
 import { User, View } from '../../types';
 import { SidebarNavItem } from './SidebarNavItem';
 
+/** Módulos permitidos para executivo e secretária (sem configurações administrativas). */
+const staffOnlyViews: View[] = [
+  'dashboard',
+  'agenda',
+  'tasks',
+  'documents',
+  'contacts',
+  'finances',
+  'reports',
+];
+
 export function getVisibleNavItems(
   currentUser: User | null,
   allNavItems: SidebarNavItem[],
@@ -8,29 +19,19 @@ export function getVisibleNavItems(
   if (!currentUser) return [];
 
   switch (currentUser.role) {
-    case 'executive': {
-      const executiveViews: View[] = [
-        'dashboard',
-        'agenda',
-        'documents',
-        'contacts',
-        'finances',
-        'tasks',
-        'reports',
-        'settings',
-      ];
-      return allNavItems.filter((item) => executiveViews.includes(item.view));
-    }
-    case 'secretary': {
-      const secretaryHiddenViews: View[] = ['organizations', 'legalOrganizations'];
-      return allNavItems.filter((item) => !secretaryHiddenViews.includes(item.view));
-    }
-    case 'admin':
+    case 'executive':
+    case 'secretary':
+      return allNavItems.filter((item) => staffOnlyViews.includes(item.view));
+    case 'admin': {
       if (currentUser.organizationId) {
-        const adminHiddenViews: View[] = ['legalOrganizations'];
-        return allNavItems.filter((item) => !adminHiddenViews.includes(item.view));
+        const hidden: View[] = ['legalOrganizations', 'organizations'];
+        return allNavItems.filter((item) => !hidden.includes(item.view));
+      }
+      if (currentUser.legalOrganizationId) {
+        return allNavItems.filter((item) => item.view !== 'legalOrganizations');
       }
       return allNavItems;
+    }
     case 'master':
     default:
       return allNavItems;

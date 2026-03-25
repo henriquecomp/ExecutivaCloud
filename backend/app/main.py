@@ -1,13 +1,19 @@
 # main.py
 import os
+from pathlib import Path
 
+from dotenv import load_dotenv
 from fastapi import FastAPI
+
+_env_path = Path(__file__).resolve().parents[2] / ".env"
+if _env_path.is_file():
+    load_dotenv(_env_path)
 from fastapi.middleware.cors import CORSMiddleware
 
 # Importa o roteador de usuários que acabamos de criar
 from app.routers import (
     user,
-    login,
+    auth,
     legal_organization,
     organization,
     department,
@@ -49,7 +55,7 @@ app.add_middleware(
 # Inclui as rotas do módulo 'user' na aplicação principal
 # Todas as rotas em user.py serão acessíveis. Ex: /users/, /users/1, etc.
 app.include_router(user.router)
-app.include_router(login.router)
+app.include_router(auth.router)
 app.include_router(legal_organization.router)
 app.include_router(organization.router)
 app.include_router(department.router)

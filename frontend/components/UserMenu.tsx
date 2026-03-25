@@ -64,6 +64,9 @@ const UserMenu: React.FC<UserMenuProps> = ({ user, onLogout }) => {
                 {getInitials(user.fullName)}
              </div>
             <h3 className="font-bold text-slate-800 text-lg">Olá, {user.fullName}!</h3>
+            {user.email && (
+              <p className="text-xs text-slate-500 mt-1 break-all">{user.email}</p>
+            )}
             <p className="text-sm text-slate-500 capitalize mt-1">{user.role}</p>
           </div>
           <div className="p-2">

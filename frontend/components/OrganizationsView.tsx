@@ -74,7 +74,6 @@ interface OrganizationsViewProps {
   setExpenses: React.Dispatch<React.SetStateAction<Expense[]>>;
   setTasks: React.Dispatch<React.SetStateAction<Task[]>>;
   setDocuments: React.Dispatch<React.SetStateAction<Document[]>>;
-  setUsers: React.Dispatch<React.SetStateAction<User[]>>;
   legalOrganizations: LegalOrganization[];
   onRefresh: () => Promise<void>; 
 }
@@ -380,7 +379,7 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
     executives, setExecutives, 
     secretaries, setSecretaries,
     setEvents, setContacts, setExpenses, setTasks,
-    setDocuments, setUsers, 
+    setDocuments,
     legalOrganizations,
     onRefresh
 }) => {

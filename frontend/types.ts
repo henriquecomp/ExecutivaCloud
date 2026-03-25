@@ -148,6 +148,7 @@ export type UserRole = 'master' | 'admin' | 'secretary' | 'executive';
 export interface User {
   id: string;
   fullName: string;
+  email?: string;
   role: UserRole;
   organizationId?: string; // for admin of a specific company
   legalOrganizationId?: string; // for admin of a legal organization
