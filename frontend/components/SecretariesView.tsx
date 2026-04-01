@@ -1,10 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Secretary, Executive, User, Organization, Department } from '../types';
-import Modal from './Modal';
-import ConfirmationModal from './ConfirmationModal';
-import { EditIcon, DeleteIcon, PlusIcon, ChevronDownIcon, ExclamationTriangleIcon } from './Icons';
-import { secretaryService } from '@/services/secretaryService';
-
+import { ChevronDownIcon, ExclamationTriangleIcon } from './Icons';
 // --- Helper Functions ---
 /**
  * Validates a Brazilian CPF number.
@@ -67,7 +63,7 @@ const civilStatusOptions = ['Solteiro(a)', 'Casado(a)', 'Separado(a)', 'Divorcia
 
 interface SecretariesViewProps {
   secretaries: Secretary[];
-  setSecretaries: React.Dispatch<React.SetStateAction<Secretary[]>>;
+  setSecretaries?: React.Dispatch<React.SetStateAction<Secretary[]>>;
   executives: Executive[];
   currentUser: User;
   organizations: Organization[];
@@ -101,7 +97,7 @@ const SensitiveDataWarning: React.FC<{ message?: string }> = ({ message }) => (
     </div>
 );
 
-const SecretaryForm: React.FC<{
+export const SecretaryForm: React.FC<{
     secretary: Partial<Secretary>, 
     onSave: (secretary: Secretary) => void | Promise<void>, 
     onCancel: () => void, 
@@ -109,7 +105,9 @@ const SecretaryForm: React.FC<{
     departments: Department[],
     executives: Executive[],
     currentUser: User;
-}> = ({ secretary, onSave, onCancel, organizations, departments, executives, currentUser }) => {
+    /** Primeiro acesso: permite escolher executivos vinculados. */
+    profileCompletion?: boolean;
+}> = ({ secretary, onSave, onCancel, organizations, departments, executives, currentUser, profileCompletion = false }) => {
     const [openSections, setOpenSections] = useState<string[]>(['principal', 'org']);
     const toggleSection = (section: string) => setOpenSections(prev => prev.includes(section) ? prev.filter(s => s !== section) : [...prev, section]);
 
@@ -424,10 +422,10 @@ const SecretaryForm: React.FC<{
                                     id={`exec-${exec.id}`}
                                     checked={selectedExecutiveIds.includes(exec.id)}
                                     onChange={() => handleExecutiveToggle(exec.id)}
-                                    disabled={isSecretaryUser}
+                                    disabled={isSecretaryUser && !profileCompletion}
                                     className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:text-slate-400"
                                 />
-                                <label htmlFor={`exec-${exec.id}`} className={`ml-3 block text-sm ${isSecretaryUser ? 'text-slate-500' : 'text-slate-600'}`}>
+                                <label htmlFor={`exec-${exec.id}`} className={`ml-3 block text-sm ${isSecretaryUser && !profileCompletion ? 'text-slate-500' : 'text-slate-600'}`}>
                                     {getExecutiveDetails(exec)}
                                 </label>
                             </div>
@@ -502,8 +500,12 @@ const SecretaryForm: React.FC<{
             </CollapsibleSection>
 
             <div className="flex justify-end space-x-3 pt-4">
-                <button type="button" onClick={onCancel} className="px-4 py-2 bg-slate-200 text-slate-800 rounded-md hover:bg-slate-300 transition">Cancelar</button>
-                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition">Salvar Secretária</button>
+                {!profileCompletion && (
+                    <button type="button" onClick={onCancel} className="px-4 py-2 bg-slate-200 text-slate-800 rounded-md hover:bg-slate-300 transition">Cancelar</button>
+                )}
+                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition">
+                    {profileCompletion ? 'Concluir cadastro' : 'Salvar Secretária'}
+                </button>
             </div>
         </form>
     );
@@ -511,19 +513,9 @@ const SecretaryForm: React.FC<{
 
 const SecretariesView: React.FC<SecretariesViewProps> = ({
     secretaries,
-    setSecretaries,
     executives,
     currentUser,
-    organizations,
-    departments,
-    onRefresh,
 }) => {
-    const [isModalOpen, setModalOpen] = useState(false);
-    const [editingSecretary, setEditingSecretary] = useState<Partial<Secretary> | null>(null);
-    const [secretaryToDelete, setSecretaryToDelete] = useState<Secretary | null>(null);
-    const [formError, setFormError] = useState<string | null>(null);
-    const [deleteError, setDeleteError] = useState<string | null>(null);
-
     const isSecretaryUser = currentUser.role === 'secretary';
     const isAdminForLegalOrg = currentUser.role === 'admin' && !!currentUser.legalOrganizationId;
     const isOrgAdmin = currentUser.role === 'admin' && !!currentUser.organizationId;
@@ -574,68 +566,6 @@ const SecretariesView: React.FC<SecretariesViewProps> = ({
         adminScopedOrganizationIds,
     ]);
 
-    const handleAddSecretary = () => {
-        setFormError(null);
-        setEditingSecretary(
-            isOrgAdmin && currentUser.organizationId
-                ? { organizationId: currentUser.organizationId }
-                : {},
-        );
-        setModalOpen(true);
-    };
-
-    const handleEditSecretary = (secretary: Secretary) => {
-        setFormError(null);
-        setEditingSecretary(secretary);
-        setModalOpen(true);
-    };
-
-    const handleDeleteSecretary = (secretary: Secretary) => {
-        setDeleteError(null);
-        setSecretaryToDelete(secretary);
-    };
-
-    const confirmDelete = async () => {
-        if (!secretaryToDelete || !/^\d+$/.test(String(secretaryToDelete.id))) {
-            setSecretaryToDelete(null);
-            return;
-        }
-        setDeleteError(null);
-        try {
-            await secretaryService.delete(String(secretaryToDelete.id));
-            setSecretaries((prev) => prev.filter((s) => s.id !== secretaryToDelete.id));
-            setSecretaryToDelete(null);
-            await onRefresh?.();
-        } catch (e: unknown) {
-            const ax = e as { response?: { data?: { detail?: string } } };
-            const d = ax.response?.data?.detail;
-            setDeleteError(typeof d === 'string' ? d : 'Não foi possível excluir.');
-            throw e;
-        }
-    };
-
-    const handleSaveSecretary = async (incoming: Secretary) => {
-        setFormError(null);
-        const existingId =
-            editingSecretary?.id && /^\d+$/.test(String(editingSecretary.id))
-                ? String(editingSecretary.id)
-                : null;
-        const payload: Partial<Secretary> = { ...incoming };
-        if (payload.id && !/^\d+$/.test(String(payload.id))) {
-            delete payload.id;
-        }
-        if (existingId) {
-            const updated = await secretaryService.update(existingId, payload);
-            setSecretaries((prev) => prev.map((s) => (s.id === existingId ? updated : s)));
-        } else {
-            const created = await secretaryService.create(payload);
-            setSecretaries((prev) => [...prev, created]);
-        }
-        setModalOpen(false);
-        setEditingSecretary(null);
-        await onRefresh?.();
-    };
-
     const getExecutiveNames = (executiveIds: string[]): string => {
         return executiveIds
             .map(id => executives.find(exec => exec.id === id)?.fullName)
@@ -647,17 +577,13 @@ const SecretariesView: React.FC<SecretariesViewProps> = ({
         <div className="space-y-6 animate-fade-in">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
-                    <h2 className="text-3xl font-bold text-slate-800">{isSecretaryUser ? 'Meu Perfil' : 'Gerenciar Secretárias'}</h2>
-                    <p className="text-slate-500 mt-1">{isSecretaryUser ? 'Visualize e edite suas informações.' : 'Adicione e associe secretárias aos executivos.'}</p>
+                    <h2 className="text-3xl font-bold text-slate-800">Secretárias</h2>
+                    <p className="text-slate-500 mt-1">
+                        {isSecretaryUser
+                            ? 'Visualização dos vínculos com executivos.'
+                            : 'Listagem somente leitura. Novos acessos são criados em Convidar usuário.'}
+                    </p>
                 </div>
-                <button 
-                    onClick={handleAddSecretary} 
-                    disabled={isSecretaryUser}
-                    className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-md shadow-sm hover:bg-indigo-700 transition duration-150 disabled:bg-slate-300 disabled:cursor-not-allowed"
-                >
-                    <PlusIcon />
-                    Nova Secretária
-                </button>
             </div>
 
             <div className="bg-white p-4 rounded-xl shadow-md">
@@ -669,7 +595,6 @@ const SecretariesView: React.FC<SecretariesViewProps> = ({
                                 <th className="p-3 hidden md:table-cell">Cargo</th>
                                 <th className="p-3 hidden lg:table-cell">E-mail</th>
                                 <th className="p-3">Executivos Atendidos</th>
-                                <th className="p-3 text-right">Ações</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -679,21 +604,6 @@ const SecretariesView: React.FC<SecretariesViewProps> = ({
                                     <td className="p-3 hidden md:table-cell text-slate-600">{sec.jobTitle || '-'}</td>
                                     <td className="p-3 hidden lg:table-cell text-slate-600">{sec.workEmail || '-'}</td>
                                     <td className="p-3 text-slate-600 text-sm">{getExecutiveNames(sec.executiveIds) || '-'}</td>
-                                    <td className="p-3 text-right">
-                                        <div className="flex justify-end items-center gap-2">
-                                            <button onClick={() => handleEditSecretary(sec)} className="p-2 text-slate-500 hover:text-indigo-600 rounded-full hover:bg-slate-200 transition" aria-label="Editar secretária">
-                                                <EditIcon />
-                                            </button>
-                                            <button 
-                                                onClick={() => handleDeleteSecretary(sec)} 
-                                                disabled={isSecretaryUser}
-                                                className="p-2 text-slate-500 hover:text-red-600 rounded-full hover:bg-slate-200 transition disabled:text-slate-300 disabled:hover:text-slate-300 disabled:cursor-not-allowed" 
-                                                aria-label="Excluir secretária"
-                                            >
-                                                <DeleteIcon />
-                                            </button>
-                                        </div>
-                                    </td>
                                 </tr>
                             ))}
                         </tbody>
@@ -702,52 +612,6 @@ const SecretariesView: React.FC<SecretariesViewProps> = ({
                 </div>
             </div>
 
-            {isModalOpen && (
-                <Modal
-                    isOpen={isModalOpen}
-                    title={editingSecretary?.id ? 'Editar Perfil' : 'Nova Secretária'}
-                    onClose={() => { setModalOpen(false); setEditingSecretary(null); setFormError(null); }}
-                >
-                    {formError && (
-                        <div className="mb-4 bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded text-sm" role="alert">
-                            {formError}
-                        </div>
-                    )}
-                    <SecretaryForm
-                        secretary={editingSecretary || {}} 
-                        onSave={async (sec) => {
-                            try {
-                                await handleSaveSecretary(sec);
-                            } catch (e: unknown) {
-                                const ax = e as { response?: { data?: { detail?: string } } };
-                                const d = ax.response?.data?.detail;
-                                setFormError(typeof d === 'string' ? d : 'Não foi possível salvar.');
-                                throw e;
-                            }
-                        }} 
-                        onCancel={() => { setModalOpen(false); setEditingSecretary(null); setFormError(null); }}
-                        executives={executives}
-                        currentUser={currentUser}
-                        organizations={organizations}
-                        departments={departments}
-                    />
-                </Modal>
-            )}
-
-            {secretaryToDelete && (
-                 <ConfirmationModal
-                    isOpen={!!secretaryToDelete}
-                    onClose={() => { setSecretaryToDelete(null); setDeleteError(null); }}
-                    onConfirm={confirmDelete}
-                    title="Confirmar Exclusão"
-                    message={`Tem certeza que deseja excluir a secretária ${secretaryToDelete.fullName}? Se existir usuário de login vinculado, a exclusão será bloqueada até você removê-lo ou alterar o vínculo.`}
-                    secondaryContent={
-                        deleteError ? (
-                            <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-3">{deleteError}</p>
-                        ) : undefined
-                    }
-                />
-            )}
         </div>
     );
 };

@@ -12,6 +12,7 @@ export interface ApiCurrentUser {
   organizationId?: number | null;
   executiveId?: number | null;
   secretaryId?: string | null;
+  needsProfileCompletion?: boolean;
 }
 
 export interface TokenPayload {
@@ -36,7 +37,12 @@ export interface RegisterOrganizationPayload {
 
 export function mapApiUserToAppUser(apiUser: ApiCurrentUser): User {
   const id = String(apiUser.id);
-  const base = { id, fullName: apiUser.fullName, email: apiUser.email };
+  const base = {
+    id,
+    fullName: apiUser.fullName,
+    email: apiUser.email,
+    needsProfileCompletion: Boolean(apiUser.needsProfileCompletion),
+  };
   switch (apiUser.role) {
     case 'master':
       return { ...base, role: 'master' };
@@ -105,6 +111,55 @@ export async function registerOrganization(
 
 export function logoutAuth() {
   persistToken(null);
+}
+
+export async function fetchInviteStatus(token: string): Promise<{ valid: boolean }> {
+  const { data } = await api.get<{ valid: boolean }>('/auth/invite-status', { params: { token } });
+  return data;
+}
+
+export async function completeInvite(
+  token: string,
+  password: string,
+  passwordConfirm: string,
+): Promise<TokenPayload> {
+  const { data } = await api.post<TokenPayload>('/auth/complete-invite', {
+    token,
+    password,
+    passwordConfirm,
+  });
+  persistToken(data.accessToken);
+  return data;
+}
+
+export async function inviteUser(payload: {
+  fullName: string;
+  email: string;
+  emailConfirm: string;
+  invitedRole: 'admin_company' | 'executive' | 'secretary';
+  organizationId?: string | number | null;
+}): Promise<{ userId: number; message: string }> {
+  const { data } = await api.post<{ userId: number; message: string }>('/auth/invite-user', {
+    fullName: payload.fullName,
+    email: payload.email,
+    emailConfirm: payload.emailConfirm,
+    invitedRole: payload.invitedRole,
+    organizationId:
+      payload.organizationId != null && String(payload.organizationId).trim() !== ''
+        ? Number(payload.organizationId)
+        : undefined,
+  });
+  return data;
+}
+
+export async function completeExecutiveProfile(body: Record<string, unknown>): Promise<ApiCurrentUser> {
+  const { data } = await api.post<ApiCurrentUser>('/auth/complete-profile/executive', body);
+  return data;
+}
+
+export async function completeSecretaryProfile(body: Record<string, unknown>): Promise<ApiCurrentUser> {
+  const { data } = await api.post<ApiCurrentUser>('/auth/complete-profile/secretary', body);
+  return data;
 }
 
 /** Hidrata axios com token já salvo (importar uma vez no arranque da app). */

@@ -154,6 +154,8 @@ export interface User {
   legalOrganizationId?: string; // for admin of a legal organization
   executiveId?: string;    // for executive
   secretaryId?: string;    // for secretary
+  /** Primeiro acesso: completar cadastro de executivo/secretária */
+  needsProfileCompletion?: boolean;
 }
 
 export interface EventType {
@@ -235,7 +237,7 @@ export interface Expense {
 }
 
 // Views correspond to navigation items in the sidebar
-export type View = 'dashboard' | 'executives' | 'agenda' | 'contacts' | 'finances' | 'legalOrganizations' | 'organizations' | 'settings' | 'tasks' | 'secretaries' | 'reports' | 'documents';
+export type View = 'dashboard' | 'executives' | 'agenda' | 'contacts' | 'finances' | 'legalOrganizations' | 'organizations' | 'settings' | 'tasks' | 'secretaries' | 'reports' | 'documents' | 'inviteUser';
 
 export enum Priority {
   High = 'Alta',

@@ -23,6 +23,7 @@ services:
       - .env
     environment:
       DATABASE_URL: sqlite:////app/data/sql_app.db
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost:8080}
       CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000,http://localhost:8080,http://127.0.0.1:8080,http://localhost:80,http://127.0.0.1:80,https://executiva.smarth.my,https://apiexecutiva.smarth.my/
     volumes:
       - api_data:/app/data

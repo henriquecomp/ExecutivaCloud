@@ -12,6 +12,11 @@ const mapExecutive = (item: any): Executive => ({
 });
 
 export const executiveService = {
+  getById: async (id: string) => {
+    const response = await api.get<any>(`/executives/${Number(id)}`);
+    return mapExecutive(response.data);
+  },
+
   // Ajustado default para 1000 para permitir paginação no frontend fluida
   getAll: async (skip: number = 0, limit: number = 1000) => {
     const response = await api.get<any[]>(

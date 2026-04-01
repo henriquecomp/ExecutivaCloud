@@ -27,6 +27,7 @@ import FinancesView from './components/ExpensesView';
 import SettingsView from './components/SettingsView';
 import TasksView from './components/TasksView';
 import SecretariesView from './components/SecretariesView';
+import InviteUserView from './components/InviteUserView';
 import ReportsView from './components/ReportsView';
 import UserMenu from './components/UserMenu';
 import DocumentsView from './components/DocumentsView';
@@ -360,6 +361,7 @@ const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout }) 
     organizations: 'Empresas',
     executives: 'Executivos',
     secretaries: 'Secretárias',
+    inviteUser: 'Convidar usuário',
     agenda: 'Agenda',
     contacts: 'Contatos',
     finances: 'Finanças',
@@ -449,6 +451,8 @@ const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout }) 
             onRefresh={refreshAfterMutation}
           />
         );
+      case 'inviteUser':
+        return <InviteUserView currentUser={currentUser} organizations={organizations} />;
       case 'agenda':
         return (
           <AgendaView
