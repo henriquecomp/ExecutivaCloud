@@ -1,11 +1,13 @@
-from typing import Optional
+from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Body, Depends, Header, HTTPException, status
 
 from app.api.deps import get_current_user
 from app.models import user_model as user_models
 from app.schemas import auth_schema as schemas
+from app.schemas.executive_schema import ExecutiveCreate
 from app.services.auth_service import AuthService, _user_to_public
+from app.services.invite_service import InviteService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -40,3 +42,50 @@ def bootstrap_master(
 @router.get("/me", response_model=schemas.CurrentUserOut)
 def me(current: user_models.Usuario = Depends(get_current_user)):
     return _user_to_public(current)
+
+
+@router.post("/invite-user", response_model=schemas.InviteUserResponse, status_code=status.HTTP_201_CREATED)
+def invite_user(
+    body: schemas.InviteUserRequest,
+    current: user_models.Usuario = Depends(get_current_user),
+    service: InviteService = Depends(InviteService),
+):
+    return service.invite_user(current, body)
+
+
+@router.get("/invite-status", response_model=schemas.InviteTokenStatusResponse)
+def invite_status(token: str, service: InviteService = Depends(InviteService)):
+    return service.invite_token_status(token)
+
+
+@router.post("/complete-invite", response_model=schemas.TokenResponse)
+def complete_invite(body: schemas.CompleteInviteRequest, service: InviteService = Depends(InviteService)):
+    return service.complete_invite(body)
+
+
+@router.post("/complete-profile/executive", response_model=schemas.CurrentUserOut)
+def complete_profile_executive(
+    body: ExecutiveCreate,
+    current: user_models.Usuario = Depends(get_current_user),
+    service: InviteService = Depends(InviteService),
+):
+    if not current.needs_profile_completion:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="O perfil deste usuário já foi concluído.",
+        )
+    return service.complete_executive_profile(current, body)
+
+
+@router.post("/complete-profile/secretary", response_model=schemas.CurrentUserOut)
+def complete_profile_secretary(
+    body: dict[str, Any] = Body(...),
+    current: user_models.Usuario = Depends(get_current_user),
+    service: InviteService = Depends(InviteService),
+):
+    if not current.needs_profile_completion:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="O perfil deste usuário já foi concluído.",
+        )
+    return service.complete_secretary_profile(current, body)

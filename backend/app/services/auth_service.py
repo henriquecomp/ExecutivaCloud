@@ -22,6 +22,7 @@ def _user_to_public(u: user_models.Usuario) -> auth_schemas.CurrentUserOut:
         organizationId=u.organization_id,
         executiveId=u.executive_id,
         secretaryId=u.secretary_external_id,
+        needsProfileCompletion=bool(getattr(u, "needs_profile_completion", False)),
     )
 
 
@@ -75,6 +76,7 @@ class AuthService:
                 "phone": None,
                 "hashed_password": hashed,
                 "is_active": True,
+                "needs_profile_completion": False,
                 "role": "admin_legal_organization",
                 "legal_organization_id": lo.id,
                 "organization_id": None,
@@ -115,6 +117,7 @@ class AuthService:
                 "phone": None,
                 "hashed_password": hash_password(body.password),
                 "is_active": True,
+                "needs_profile_completion": False,
                 "role": "master",
                 "legal_organization_id": None,
                 "organization_id": None,

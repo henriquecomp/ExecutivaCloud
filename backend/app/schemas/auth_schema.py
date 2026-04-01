@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
 
@@ -28,6 +28,8 @@ class RegisterOrganizationRequest(BaseModel):
 
 
 class CurrentUserOut(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     id: int
     fullName: str
     email: str
@@ -36,6 +38,7 @@ class CurrentUserOut(BaseModel):
     organizationId: Optional[int] = None
     executiveId: Optional[int] = None
     secretaryId: Optional[str] = None
+    needsProfileCompletion: bool = False
 
 
 class TokenResponse(BaseModel):
@@ -50,3 +53,33 @@ class BootstrapMasterRequest(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=6)
     fullName: str = Field(..., min_length=2, max_length=100)
+
+
+InvitedRoleLiteral = Literal["admin_company", "executive", "secretary"]
+
+
+class InviteUserRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    full_name: str = Field(..., alias="fullName", min_length=2, max_length=100)
+    email: EmailStr
+    email_confirm: EmailStr = Field(..., alias="emailConfirm")
+    invited_role: InvitedRoleLiteral = Field(..., alias="invitedRole")
+    organization_id: Optional[int] = Field(None, alias="organizationId")
+
+
+class InviteUserResponse(BaseModel):
+    userId: int
+    message: str
+
+
+class CompleteInviteRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    token: str = Field(..., min_length=10)
+    password: str = Field(..., min_length=6)
+    password_confirm: str = Field(..., alias="passwordConfirm", min_length=6)
+
+
+class InviteTokenStatusResponse(BaseModel):
+    valid: bool

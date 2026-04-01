@@ -11,6 +11,7 @@ from app.models import department_model  # noqa: F401
 from app.models import secretary_model  # noqa: F401 — antes de executive (secretary_executives)
 from app.models import executive_model  # noqa: F401
 from app.models import user_model  # noqa: F401
+from app.models import user_invite_token_model  # noqa: F401 — após user (FK users)
 from app.models import event_type_model  # noqa: F401
 from app.models import event_model  # noqa: F401
 from app.models import document_category_model  # noqa: F401

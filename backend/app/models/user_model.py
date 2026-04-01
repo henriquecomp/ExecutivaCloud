@@ -13,6 +13,7 @@ class Usuario(Base):
     phone = Column(String, index=True, nullable=True)
     hashed_password = Column(String, nullable=False)
     is_active = Column(Boolean, default=True)
+    needs_profile_completion = Column(Boolean, nullable=False, default=False)
 
     # master | admin_legal_organization | admin_company | executive | secretary
     role = Column(String(40), nullable=False, default="admin_company")
@@ -25,3 +26,8 @@ class Usuario(Base):
     legal_organization = relationship("LegalOrganization", foreign_keys=[legal_organization_id])
     organization = relationship("Organization", foreign_keys=[organization_id])
     executive = relationship("Executive", foreign_keys=[executive_id])
+    invite_tokens = relationship(
+        "UserInviteToken",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
