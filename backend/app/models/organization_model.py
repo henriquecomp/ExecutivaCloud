@@ -27,5 +27,4 @@ class Organization(Base):
         "LegalOrganization", back_populates="organizations"
     )
     departments = relationship("Department", back_populates="organization")
-    # Adicione aqui o relacionamento com Executivos quando o modelo for criado
     executives = relationship("Executive", back_populates="organization")

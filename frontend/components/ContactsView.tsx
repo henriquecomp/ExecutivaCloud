@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Contact, ContactType, LayoutView } from '../types';
-import { useLocalStorage } from '../hooks/useLocalStorage';
 import Modal from './Modal';
 import ConfirmationModal from './ConfirmationModal';
 import Pagination from './Pagination';
@@ -221,8 +220,8 @@ const ContactsView: React.FC<ContactsViewProps> = ({ contacts, contactTypes, exe
     const [isSettingsModalOpen, setSettingsModalOpen] = useState(false);
     const [filterType, setFilterType] = useState<string>('all');
 
-    const [layout, setLayout] = useLocalStorage<LayoutView>('contactsViewLayout', 'card');
-    const [limit, setLimit] = useLocalStorage('contactsViewLimit', 10);
+    const [layout, setLayout] = useState<LayoutView>('card');
+    const [limit, setLimit] = useState(10);
     const [currentPage, setCurrentPage] = useState(1);
 
     const getTypeById = (contactTypeId?: string) => {

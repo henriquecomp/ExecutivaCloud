@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Task, Priority, Status, RecurrenceRule, LayoutView } from '../types';
-import { useLocalStorage } from '../hooks/useLocalStorage';
 import Modal from './Modal';
 import ConfirmationModal from './ConfirmationModal';
 import Pagination from './Pagination';
@@ -254,8 +253,8 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, executiveId, onRefresh }) 
     const [filter, setFilter] = useState<Status | 'all'>('all');
     const [priorityFilter, setPriorityFilter] = useState<Priority | 'all'>('all');
     
-    const [layout, setLayout] = useLocalStorage<LayoutView>('tasksViewLayout', 'table');
-    const [limit, setLimit] = useLocalStorage('tasksViewLimit', 10);
+    const [layout, setLayout] = useState<LayoutView>('table');
+    const [limit, setLimit] = useState(10);
     const [currentPage, setCurrentPage] = useState(1);
 
     const handleAddTask = () => {

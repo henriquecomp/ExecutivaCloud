@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Event, EventType, RecurrenceRule } from '../types';
-import { useLocalStorage } from '../hooks/useLocalStorage';
 import Modal from './Modal';
 import ConfirmationModal from './ConfirmationModal';
 import Pagination from './Pagination';
@@ -439,7 +438,7 @@ const AgendaView: React.FC<AgendaViewProps> = ({ events, setEvents, eventTypes, 
     const [showRecurrenceDeleteModal, setShowRecurrenceDeleteModal] = useState(false);
     const [isSettingsModalOpen, setSettingsModalOpen] = useState(false);
 
-    const [limit, setLimit] = useLocalStorage('agendaViewLimit', 10);
+    const [limit, setLimit] = useState(10);
     const [currentPage, setCurrentPage] = useState(1);
     
     const sortedEvents = useMemo(() => 

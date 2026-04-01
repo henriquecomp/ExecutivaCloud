@@ -3,6 +3,7 @@ import { Secretary, Executive, User, Organization, Department } from '../types';
 import Modal from './Modal';
 import ConfirmationModal from './ConfirmationModal';
 import { EditIcon, DeleteIcon, PlusIcon, ChevronDownIcon, ExclamationTriangleIcon } from './Icons';
+import { secretaryService } from '@/services/secretaryService';
 
 // --- Helper Functions ---
 /**
@@ -71,6 +72,7 @@ interface SecretariesViewProps {
   currentUser: User;
   organizations: Organization[];
   departments: Department[];
+  onRefresh?: () => Promise<void>;
 }
 
 const CollapsibleSection: React.FC<{ title: string; children: React.ReactNode; isOpen: boolean; onToggle: () => void }> = ({ title, children, isOpen, onToggle }) => (
@@ -101,7 +103,7 @@ const SensitiveDataWarning: React.FC<{ message?: string }> = ({ message }) => (
 
 const SecretaryForm: React.FC<{
     secretary: Partial<Secretary>, 
-    onSave: (secretary: Secretary) => void, 
+    onSave: (secretary: Secretary) => void | Promise<void>, 
     onCancel: () => void, 
     organizations: Organization[],
     departments: Department[],
@@ -263,7 +265,7 @@ const SecretaryForm: React.FC<{
     };
 
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (birthDateError || rgIssueDateError || hireDateError) {
             return;
@@ -282,8 +284,8 @@ const SecretaryForm: React.FC<{
         const validExecutiveIds = selectedExecutiveIds.filter((id, idx, arr) =>
             id && arr.indexOf(id) === idx && assignableExecutives.some((exec) => exec.id === id),
         );
-        onSave({
-            id: secretary.id || `sec_${new Date().getTime()}`,
+        await onSave({
+            ...(secretary.id && /^\d+$/.test(String(secretary.id)) ? { id: secretary.id } : {}),
             executiveIds: validExecutiveIds,
             fullName: normalize(fullName) || '',
             jobTitle: normalize(jobTitle),
@@ -326,7 +328,7 @@ const SecretaryForm: React.FC<{
     };
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
             <CollapsibleSection title="Informações Principais" isOpen={openSections.includes('principal')} onToggle={() => toggleSection('principal')}>
                 <div>
                     <label htmlFor="fullName" className="block text-sm font-medium text-slate-700">Nome Completo</label>
@@ -507,10 +509,20 @@ const SecretaryForm: React.FC<{
     );
 };
 
-const SecretariesView: React.FC<SecretariesViewProps> = ({ secretaries, setSecretaries, executives, currentUser, organizations, departments }) => {
+const SecretariesView: React.FC<SecretariesViewProps> = ({
+    secretaries,
+    setSecretaries,
+    executives,
+    currentUser,
+    organizations,
+    departments,
+    onRefresh,
+}) => {
     const [isModalOpen, setModalOpen] = useState(false);
     const [editingSecretary, setEditingSecretary] = useState<Partial<Secretary> | null>(null);
     const [secretaryToDelete, setSecretaryToDelete] = useState<Secretary | null>(null);
+    const [formError, setFormError] = useState<string | null>(null);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
 
     const isSecretaryUser = currentUser.role === 'secretary';
     const isAdminForLegalOrg = currentUser.role === 'admin' && !!currentUser.legalOrganizationId;
@@ -563,6 +575,7 @@ const SecretariesView: React.FC<SecretariesViewProps> = ({ secretaries, setSecre
     ]);
 
     const handleAddSecretary = () => {
+        setFormError(null);
         setEditingSecretary(
             isOrgAdmin && currentUser.organizationId
                 ? { organizationId: currentUser.organizationId }
@@ -572,29 +585,55 @@ const SecretariesView: React.FC<SecretariesViewProps> = ({ secretaries, setSecre
     };
 
     const handleEditSecretary = (secretary: Secretary) => {
+        setFormError(null);
         setEditingSecretary(secretary);
         setModalOpen(true);
     };
 
     const handleDeleteSecretary = (secretary: Secretary) => {
+        setDeleteError(null);
         setSecretaryToDelete(secretary);
     };
-    
-    const confirmDelete = () => {
-        if(secretaryToDelete) {
-            setSecretaries(prev => prev.filter(s => s.id !== secretaryToDelete.id));
+
+    const confirmDelete = async () => {
+        if (!secretaryToDelete || !/^\d+$/.test(String(secretaryToDelete.id))) {
             setSecretaryToDelete(null);
+            return;
+        }
+        setDeleteError(null);
+        try {
+            await secretaryService.delete(String(secretaryToDelete.id));
+            setSecretaries((prev) => prev.filter((s) => s.id !== secretaryToDelete.id));
+            setSecretaryToDelete(null);
+            await onRefresh?.();
+        } catch (e: unknown) {
+            const ax = e as { response?: { data?: { detail?: string } } };
+            const d = ax.response?.data?.detail;
+            setDeleteError(typeof d === 'string' ? d : 'Não foi possível excluir.');
+            throw e;
         }
     };
-    
-    const handleSaveSecretary = (secretary: Secretary) => {
-        if (editingSecretary && editingSecretary.id) {
-            setSecretaries(prev => prev.map(s => s.id === secretary.id ? secretary : s));
+
+    const handleSaveSecretary = async (incoming: Secretary) => {
+        setFormError(null);
+        const existingId =
+            editingSecretary?.id && /^\d+$/.test(String(editingSecretary.id))
+                ? String(editingSecretary.id)
+                : null;
+        const payload: Partial<Secretary> = { ...incoming };
+        if (payload.id && !/^\d+$/.test(String(payload.id))) {
+            delete payload.id;
+        }
+        if (existingId) {
+            const updated = await secretaryService.update(existingId, payload);
+            setSecretaries((prev) => prev.map((s) => (s.id === existingId ? updated : s)));
         } else {
-            setSecretaries(prev => [...prev, secretary]);
+            const created = await secretaryService.create(payload);
+            setSecretaries((prev) => [...prev, created]);
         }
         setModalOpen(false);
         setEditingSecretary(null);
+        await onRefresh?.();
     };
 
     const getExecutiveNames = (executiveIds: string[]): string => {
@@ -667,12 +706,26 @@ const SecretariesView: React.FC<SecretariesViewProps> = ({ secretaries, setSecre
                 <Modal
                     isOpen={isModalOpen}
                     title={editingSecretary?.id ? 'Editar Perfil' : 'Nova Secretária'}
-                    onClose={() => { setModalOpen(false); setEditingSecretary(null); }}
+                    onClose={() => { setModalOpen(false); setEditingSecretary(null); setFormError(null); }}
                 >
+                    {formError && (
+                        <div className="mb-4 bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded text-sm" role="alert">
+                            {formError}
+                        </div>
+                    )}
                     <SecretaryForm
                         secretary={editingSecretary || {}} 
-                        onSave={handleSaveSecretary} 
-                        onCancel={() => { setModalOpen(false); setEditingSecretary(null); }}
+                        onSave={async (sec) => {
+                            try {
+                                await handleSaveSecretary(sec);
+                            } catch (e: unknown) {
+                                const ax = e as { response?: { data?: { detail?: string } } };
+                                const d = ax.response?.data?.detail;
+                                setFormError(typeof d === 'string' ? d : 'Não foi possível salvar.');
+                                throw e;
+                            }
+                        }} 
+                        onCancel={() => { setModalOpen(false); setEditingSecretary(null); setFormError(null); }}
                         executives={executives}
                         currentUser={currentUser}
                         organizations={organizations}
@@ -684,10 +737,15 @@ const SecretariesView: React.FC<SecretariesViewProps> = ({ secretaries, setSecre
             {secretaryToDelete && (
                  <ConfirmationModal
                     isOpen={!!secretaryToDelete}
-                    onClose={() => setSecretaryToDelete(null)}
+                    onClose={() => { setSecretaryToDelete(null); setDeleteError(null); }}
                     onConfirm={confirmDelete}
                     title="Confirmar Exclusão"
-                    message={`Tem certeza que deseja excluir a secretária ${secretaryToDelete.fullName}? O usuário associado também será removido.`}
+                    message={`Tem certeza que deseja excluir a secretária ${secretaryToDelete.fullName}? Se existir usuário de login vinculado, a exclusão será bloqueada até você removê-lo ou alterar o vínculo.`}
+                    secondaryContent={
+                        deleteError ? (
+                            <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-3">{deleteError}</p>
+                        ) : undefined
+                    }
                 />
             )}
         </div>

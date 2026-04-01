@@ -1,10 +1,23 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from fastapi import Depends
 from app.repositories.legal_organization_repository import LegalOrganizationRepository
 from app.schemas import legal_organization_schema as schemas
 from app.models import legal_organization_model as models
+from app.models.executive_model import Executive
+from app.models.organization_model import Organization
+from app.models.secretary_model import Secretary
+from app.models.user_model import Usuario
 from app.core.database import get_db
 from typing import List, Optional
+
+
+class LegalOrganizationDeletionBlocked(Exception):
+    """Impede exclusão da matriz enquanto houver vínculos; use `.detail` no HTTP 409."""
+
+    def __init__(self, detail: dict):
+        self.detail = detail
+        super().__init__(detail.get("message", "Exclusão bloqueada."))
+
 
 class LegalOrganizationService:
     def __init__(self, db: Session = Depends(get_db)):
@@ -44,10 +57,85 @@ class LegalOrganizationService:
         db_org = self.repository.get_by_id(org_id)
         if not db_org:
             raise ValueError("Organização não encontrada.")
-        
-        # Lógica de Negócio: Verificar se há empresas (organizations) filhas
-        if db_org.organizations:
-             raise ValueError("Não é possível excluir. Esta organização possui empresas vinculadas.")
-        
+
+        child_orgs = (
+            self.db.query(Organization)
+            .filter(Organization.legalOrganizationId == org_id)
+            .options(
+                selectinload(Organization.departments),
+                selectinload(Organization.executives),
+            )
+            .all()
+        )
+
+        organizations_payload = []
+        for co in child_orgs:
+            departments = co.departments or []
+            executives = co.executives or []
+            organizations_payload.append(
+                {
+                    "id": co.id,
+                    "name": co.name,
+                    "departmentCount": len(departments),
+                    "executiveCount": len(executives),
+                }
+            )
+
+        users_rows = (
+            self.db.query(Usuario)
+            .filter(Usuario.legal_organization_id == org_id)
+            .all()
+        )
+        users_payload = [
+            {
+                "id": u.id,
+                "email": u.email,
+                "fullName": u.name,
+                "role": u.role,
+            }
+            for u in users_rows
+        ]
+
+        org_id_list = [co.id for co in child_orgs]
+        merged_secretaries: dict[int, Secretary] = {}
+        if org_id_list:
+            for s in (
+                self.db.query(Secretary)
+                .filter(Secretary.organization_id.in_(org_id_list))
+                .all()
+            ):
+                merged_secretaries[s.id] = s
+            for s in (
+                self.db.query(Secretary)
+                .join(Secretary.executives)
+                .filter(Executive.organization_id.in_(org_id_list))
+                .distinct()
+                .all()
+            ):
+                merged_secretaries[s.id] = s
+        secretaries_payload = [
+            {
+                "id": s.id,
+                "fullName": s.full_name,
+                "workEmail": s.work_email or "",
+            }
+            for s in merged_secretaries.values()
+        ]
+
+        if organizations_payload or users_payload or secretaries_payload:
+            raise LegalOrganizationDeletionBlocked(
+                {
+                    "message": (
+                        "Não é possível excluir esta organização jurídica enquanto existirem vínculos. "
+                        "Remova ou transfira os itens abaixo antes de tentar novamente."
+                    ),
+                    "blockers": {
+                        "organizations": organizations_payload,
+                        "users": users_payload,
+                        "secretaries": secretaries_payload,
+                    },
+                }
+            )
+
         self.repository.delete(db_org)
         return {"message": "Organização deletada com sucesso"}

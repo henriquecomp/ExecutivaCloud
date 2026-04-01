@@ -45,6 +45,64 @@ const maskCEP = (value: string) => {
     return value.replace(/\D/g, '').replace(/(\d{5})(\d)/, '$1-$2').replace(/(-\d{3})\d+?$/, '$1');
 };
 
+interface LegalOrgDeleteBlockerOrg {
+    id: number;
+    name: string;
+    departmentCount: number;
+    executiveCount: number;
+}
+
+interface LegalOrgDeleteBlockerUser {
+    id: number;
+    email: string;
+    fullName: string;
+    role: string;
+}
+
+interface LegalOrgDeleteBlockerSecretary {
+    id: number;
+    fullName: string;
+    workEmail: string;
+}
+
+interface LegalOrgDeleteBlockers {
+    message: string;
+    blockers: {
+        organizations: LegalOrgDeleteBlockerOrg[];
+        users: LegalOrgDeleteBlockerUser[];
+        secretaries: LegalOrgDeleteBlockerSecretary[];
+    };
+}
+
+function parseLegalOrgDeleteDetail(detail: unknown): LegalOrgDeleteBlockers | null {
+    if (!detail || typeof detail !== 'object' || Array.isArray(detail)) return null;
+    const d = detail as Record<string, unknown>;
+    if (typeof d.message !== 'string' || !d.blockers || typeof d.blockers !== 'object') return null;
+    const b = d.blockers as Record<string, unknown>;
+    const orgs = Array.isArray(b.organizations) ? b.organizations : [];
+    const users = Array.isArray(b.users) ? b.users : [];
+    const secs = Array.isArray(b.secretaries) ? b.secretaries : [];
+    return {
+        message: d.message,
+        blockers: {
+            organizations: orgs as LegalOrgDeleteBlockerOrg[],
+            users: users as LegalOrgDeleteBlockerUser[],
+            secretaries: secs as LegalOrgDeleteBlockerSecretary[],
+        },
+    };
+}
+
+const userRoleLabel = (role: string): string => {
+    const map: Record<string, string> = {
+        master: 'Administrador geral',
+        admin_legal_organization: 'Administrador da organização',
+        admin_company: 'Administrador da empresa',
+        executive: 'Executivo',
+        secretary: 'Secretária',
+    };
+    return map[role] || role;
+};
+
 interface LegalOrganizationsViewProps {
   currentUser: User;
   legalOrganizations: LegalOrganization[];
@@ -296,6 +354,7 @@ const LegalOrganizationsView: React.FC<LegalOrganizationsViewProps> = ({
     const [isModalOpen, setModalOpen] = useState(false);
     const [editingLegalOrg, setEditingLegalOrg] = useState<Partial<LegalOrganization> | null>(null);
     const [legalOrgToDelete, setLegalOrgToDelete] = useState<LegalOrganization | null>(null);
+    const [legalOrgDeleteBlockers, setLegalOrgDeleteBlockers] = useState<LegalOrgDeleteBlockers | null>(null);
     const [isCompanyModalOpen, setCompanyModalOpen] = useState(false);
     const [editingCompany, setEditingCompany] = useState<Partial<Organization> | null>(null);
     const [companyToDelete, setCompanyToDelete] = useState<Organization | null>(null);
@@ -311,7 +370,17 @@ const LegalOrganizationsView: React.FC<LegalOrganizationsViewProps> = ({
     // Limpa erro ao abrir modais
     const openAddModal = () => { setApiError(null); setEditingLegalOrg({}); setModalOpen(true); };
     const openEditModal = (lo: LegalOrganization) => { setApiError(null); setEditingLegalOrg(lo); setModalOpen(true); };
-    const openDeleteModal = (lo: LegalOrganization) => { setApiError(null); setLegalOrgToDelete(lo); };
+    const openDeleteModal = (lo: LegalOrganization) => {
+        setApiError(null);
+        setLegalOrgDeleteBlockers(null);
+        setLegalOrgToDelete(lo);
+    };
+
+    const closeDeleteLegalOrgModal = () => {
+        setLegalOrgToDelete(null);
+        setLegalOrgDeleteBlockers(null);
+        setApiError(null);
+    };
 
     const handleSave = async (legalOrgData: LegalOrganizationCreate | LegalOrganization) => {
         try {
@@ -334,15 +403,28 @@ const LegalOrganizationsView: React.FC<LegalOrganizationsViewProps> = ({
 
     const confirmDelete = async () => {
         if (!legalOrgToDelete) return;
+        setApiError(null);
+        setLegalOrgDeleteBlockers(null);
         try {
-            setApiError(null);
             await legalOrganizationService.delete(legalOrgToDelete.id);
             setLegalOrganizations(prev => prev.filter(lo => lo.id !== legalOrgToDelete.id));
             if (onRefresh) onRefresh();
-            setLegalOrgToDelete(null);
+            closeDeleteLegalOrgModal();
         } catch (error: any) {
-            setApiError(error.response?.data?.detail || "Erro ao excluir. Verifique se há empresas vinculadas.");
-            // NÃO fecha o modal para mostrar o erro
+            const detail = error.response?.data?.detail;
+            const parsed = parseLegalOrgDeleteDetail(detail);
+            if (parsed) {
+                setLegalOrgDeleteBlockers(parsed);
+            } else {
+                const msg =
+                    typeof detail === 'string'
+                        ? detail
+                        : Array.isArray(detail)
+                          ? detail.map((x: { msg?: string }) => x?.msg).filter(Boolean).join(' ')
+                          : 'Erro ao excluir a organização.';
+                setApiError(msg);
+            }
+            throw error;
         }
     };
 
@@ -447,12 +529,75 @@ const LegalOrganizationsView: React.FC<LegalOrganizationsViewProps> = ({
             )}
 
             {legalOrgToDelete && (
-                <ConfirmationModal 
-                    isOpen={!!legalOrgToDelete} 
-                    onClose={() => setLegalOrgToDelete(null)} 
-                    onConfirm={confirmDelete} 
-                    title="Confirmar Exclusão" 
-                    message={apiError ? `ERRO: ${apiError}` : `Deseja excluir ${legalOrgToDelete.name}?`} 
+                <ConfirmationModal
+                    isOpen={!!legalOrgToDelete}
+                    onClose={closeDeleteLegalOrgModal}
+                    onConfirm={confirmDelete}
+                    title={legalOrgDeleteBlockers || apiError ? 'Não foi possível excluir' : 'Confirmar exclusão'}
+                    message={
+                        legalOrgDeleteBlockers
+                            ? legalOrgDeleteBlockers.message
+                            : apiError
+                              ? apiError
+                              : `Deseja excluir a organização jurídica «${legalOrgToDelete.name}»? Esta ação não pode ser desfeita.`
+                    }
+                    secondaryContent={
+                        legalOrgDeleteBlockers ? (
+                            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-slate-800 space-y-4 max-h-72 overflow-y-auto">
+                                {legalOrgDeleteBlockers.blockers.organizations.length > 0 && (
+                                    <div>
+                                        <p className="font-semibold text-slate-900 mb-2">
+                                            Empresas vinculadas (exclua-as primeiro ou remova executivos/departamentos conforme a política do sistema)
+                                        </p>
+                                        <ul className="list-disc pl-5 space-y-1">
+                                            {legalOrgDeleteBlockers.blockers.organizations.map((o) => (
+                                                <li key={o.id}>
+                                                    <span className="font-medium">{o.name}</span>
+                                                    <span className="text-slate-600">
+                                                        {' '}
+                                                        — {o.departmentCount} departamento(s), {o.executiveCount} executivo(s)
+                                                    </span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
+                                {legalOrgDeleteBlockers.blockers.users.length > 0 && (
+                                    <div>
+                                        <p className="font-semibold text-slate-900 mb-2">
+                                            Usuários vinculados a esta organização (remova ou altere o vínculo antes)
+                                        </p>
+                                        <ul className="list-disc pl-5 space-y-1">
+                                            {legalOrgDeleteBlockers.blockers.users.map((u) => (
+                                                <li key={u.id}>
+                                                    <span className="font-medium">{u.fullName}</span>
+                                                    <span className="text-slate-600"> ({u.email})</span>
+                                                    <span className="text-slate-500"> — {userRoleLabel(u.role)}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
+                                {legalOrgDeleteBlockers.blockers.secretaries.length > 0 && (
+                                    <div>
+                                        <p className="font-semibold text-slate-900 mb-2">
+                                            Secretárias cadastradas no sistema vinculadas a empresas desta matriz (exclua ou realoque antes)
+                                        </p>
+                                        <ul className="list-disc pl-5 space-y-1">
+                                            {legalOrgDeleteBlockers.blockers.secretaries.map((s) => (
+                                                <li key={s.id}>
+                                                    <span className="font-medium">{s.fullName}</span>
+                                                    {s.workEmail ? (
+                                                        <span className="text-slate-600"> ({s.workEmail})</span>
+                                                    ) : null}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
+                            </div>
+                        ) : undefined
+                    }
                 />
             )}
             

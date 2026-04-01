@@ -1,5 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from app.services.legal_organization_service import LegalOrganizationService
+from app.services.legal_organization_service import (
+    LegalOrganizationDeletionBlocked,
+    LegalOrganizationService,
+)
 from app.schemas import legal_organization_schema as schemas
 from typing import List, Dict, Any
 
@@ -73,8 +76,12 @@ def delete_legal_organization(
     """
     try:
         return service.delete_legal_organization(org_id)
+    except LegalOrganizationDeletionBlocked as e:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=e.detail,
+        )
     except ValueError as e:
         if "não encontrada" in str(e):
              raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-        # Ex: Erro por ter empresas filhas
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))

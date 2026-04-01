@@ -1,5 +1,6 @@
 """Restaura dados de backup JSON nas tabelas de negócio (SQLite)."""
 
+import json
 from typing import Dict
 
 from fastapi import Depends
@@ -15,6 +16,7 @@ from app.models.document_model import Document
 from app.models.event_model import Event
 from app.models.event_type_model import EventType
 from app.models.executive_model import Executive
+from app.models.secretary_model import Secretary
 from app.models.legal_organization_model import LegalOrganization
 from app.models.organization_model import Organization
 from app.models.report_model import Report
@@ -62,6 +64,7 @@ class DatabaseRestoreService:
         self.db.execute(delete(Event))
         self.db.execute(delete(Contact))
         self.db.execute(delete(Document))
+        self.db.execute(delete(Secretary))
         self.db.execute(update(Executive).values(reports_to_executive_id=None))
         self.db.execute(delete(Executive))
         self.db.execute(delete(Department))
@@ -193,6 +196,45 @@ class DatabaseRestoreService:
                 row = self.db.get(Executive, new_exec_id)
                 if row:
                     row.reports_to_executive_id = new_reports_to
+            self.db.flush()
+
+            for sec in data.secretaries:
+                body = {k: v for k, v in sec.items() if k not in ("id", "executiveIds")}
+                oid = body.get("organizationId")
+                if oid is not None and str(oid).strip() != "":
+                    mid = _map_key(org_map, oid)
+                    body["organizationId"] = mid
+                else:
+                    body["organizationId"] = None
+                full_name = (body.get("fullName") or "—").strip() or "—"
+                work_email = body.get("workEmail")
+                if work_email is not None:
+                    work_email = str(work_email).strip() or None
+                job_title = body.get("jobTitle")
+                if job_title is not None:
+                    job_title = str(job_title).strip() or None
+                profile_keys = frozenset(
+                    {"fullName", "workEmail", "jobTitle", "organizationId"},
+                )
+                extra = {k: v for k, v in body.items() if k not in profile_keys}
+                profile_json = json.dumps(extra, ensure_ascii=False) if extra else None
+                row = Secretary(
+                    full_name=full_name,
+                    organization_id=body.get("organizationId"),
+                    work_email=work_email,
+                    job_title=job_title,
+                    profile_json=profile_json,
+                )
+                self.db.add(row)
+                self.db.flush()
+                for raw_eid in sec.get("executiveIds") or []:
+                    new_eid = _map_key(exec_map, raw_eid)
+                    if new_eid is None:
+                        continue
+                    ex_row = self.db.get(Executive, new_eid)
+                    if ex_row:
+                        row.executives.append(ex_row)
+
             self.db.flush()
 
             for ev in data.events:

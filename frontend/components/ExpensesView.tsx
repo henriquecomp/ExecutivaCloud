@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Expense, ExpenseStatus, LayoutView, ExpenseCategory, ExpenseType, ExpenseEntityType } from '../types';
-import { useLocalStorage } from '../hooks/useLocalStorage';
 import Modal from './Modal';
 import ConfirmationModal from './ConfirmationModal';
 import Pagination from './Pagination';
@@ -223,8 +222,8 @@ const FinancesView: React.FC<FinancesViewProps> = ({ expenses, setExpenses, expe
     const [filterEntityType, setFilterEntityType] = useState<ExpenseEntityType | 'all'>('all');
     const [filterCategory, setFilterCategory] = useState<string>('all');
     
-    const [layout, setLayout] = useLocalStorage<LayoutView>('financesViewLayout', 'table');
-    const [limit, setLimit] = useLocalStorage('financesViewLimit', 10);
+    const [layout, setLayout] = useState<LayoutView>('table');
+    const [limit, setLimit] = useState(10);
     const [currentPage, setCurrentPage] = useState(1);
 
     const filteredExpensesForTable = useMemo(() => {

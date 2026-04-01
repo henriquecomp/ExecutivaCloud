@@ -1,6 +1,8 @@
 from sqlalchemy import Column, Integer, String, Date, Text, ForeignKey
 from sqlalchemy.orm import relationship
+
 from app.core.database import Base
+from app.models.secretary_model import secretary_executives
 
 
 class Executive(Base):
@@ -53,3 +55,8 @@ class Executive(Base):
     # Relationships
     organization = relationship("Organization", back_populates="executives")
     department = relationship("Department", back_populates="executives")
+    secretaries = relationship(
+        "Secretary",
+        secondary=secretary_executives,
+        back_populates="executives",
+    )

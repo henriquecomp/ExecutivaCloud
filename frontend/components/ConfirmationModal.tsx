@@ -7,9 +7,18 @@ interface ConfirmationModalProps {
   onConfirm: () => void | Promise<void>;
   title: string;
   message: string;
+  /** Conteúdo extra entre a mensagem e os botões (ex.: lista de vínculos que impedem exclusão). */
+  secondaryContent?: React.ReactNode;
 }
 
-const ConfirmationModal: React.FC<ConfirmationModalProps> = ({ isOpen, onClose, onConfirm, title, message }) => {
+const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
+  isOpen,
+  onClose,
+  onConfirm,
+  title,
+  message,
+  secondaryContent,
+}) => {
   const [pending, setPending] = useState(false);
 
   if (!isOpen) return null;
@@ -18,7 +27,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({ isOpen, onClose, 
     if (pending) return;
     setPending(true);
     try {
-      await Promise.resolve(onConfirm());
+      await onConfirm();
       onClose();
     } finally {
       setPending(false);
@@ -28,7 +37,8 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({ isOpen, onClose, 
   return (
     <Modal isOpen={isOpen} title={title} onClose={onClose}>
       <div className="space-y-6">
-        <p className="text-slate-600">{message}</p>
+        <p className="text-slate-600 whitespace-pre-line">{message}</p>
+        {secondaryContent}
         <div className="flex justify-end space-x-3">
           <button
             type="button"

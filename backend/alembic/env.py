@@ -34,22 +34,9 @@ except ImportError:
 # Mesmo que seu editor diga que "não estão sendo usados",
 # esta importação é ESSENCIAL para que os modelos
 # se registrem no 'Base.metadata'.
-from app.models import user_model
-from app.models import legal_organization_model
-from app.models import organization_model
-from app.models import department_model
-from app.models import executive_model
-from app.models import event_type_model
-from app.models import event_model
-from app.models import document_category_model
-from app.models import document_model
-from app.models import contact_type_model
-from app.models import contact_model
-from app.models import task_model
-from app.models import report_model
-from app.models import settings_backup_model
+import app.models  # noqa: F401 — mesma ordem que app/models/__init__.py
 
-# Adicione imports para quaisquer outros modelos que criar no futuro
+# Adicione imports para quaisquer outros modelos que criar no futuro (e inclua em app/models/__init__.py)
 
 # 3. Atribua o metadata da sua Base
 target_metadata = Base.metadata
