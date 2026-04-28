@@ -33,12 +33,23 @@ class CurrentUserOut(BaseModel):
     id: int
     fullName: str
     email: str
+    phone: Optional[str] = None
     role: str
     legalOrganizationId: Optional[int] = None
     organizationId: Optional[int] = None
     executiveId: Optional[int] = None
     secretaryId: Optional[str] = None
     needsProfileCompletion: bool = False
+
+
+class MeProfileUpdate(BaseModel):
+    """Atualização dos dados cadastrais do próprio utilizador autenticado."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    full_name: Optional[str] = Field(None, alias="fullName", min_length=2, max_length=100)
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
 
 
 class TokenResponse(BaseModel):

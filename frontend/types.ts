@@ -149,6 +149,7 @@ export interface User {
   id: string;
   fullName: string;
   email?: string;
+  phone?: string;
   role: UserRole;
   organizationId?: string; // for admin of a specific company
   legalOrganizationId?: string; // for admin of a legal organization
@@ -237,7 +238,7 @@ export interface Expense {
 }
 
 // Views correspond to navigation items in the sidebar
-export type View = 'dashboard' | 'executives' | 'agenda' | 'contacts' | 'finances' | 'legalOrganizations' | 'organizations' | 'settings' | 'tasks' | 'secretaries' | 'reports' | 'documents' | 'inviteUser';
+export type View = 'dashboard' | 'executives' | 'agenda' | 'contacts' | 'finances' | 'legalOrganizations' | 'organizations' | 'settings' | 'tasks' | 'secretaries' | 'reports' | 'documents' | 'userManagement';
 
 export enum Priority {
   High = 'Alta',

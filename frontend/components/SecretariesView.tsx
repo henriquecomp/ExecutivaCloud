@@ -107,7 +107,22 @@ export const SecretaryForm: React.FC<{
     currentUser: User;
     /** Primeiro acesso: permite escolher executivos vinculados. */
     profileCompletion?: boolean;
-}> = ({ secretary, onSave, onCancel, organizations, departments, executives, currentUser, profileCompletion = false }) => {
+    /** Secretária editando o próprio cadastro fora do primeiro acesso: habilita alterar executivos vinculados. */
+    allowSelfExecutiveSelection?: boolean;
+    /** Texto do botão de envio (ex.: modal “Meu perfil”). */
+    submitButtonLabel?: string;
+}> = ({
+    secretary,
+    onSave,
+    onCancel,
+    organizations,
+    departments,
+    executives,
+    currentUser,
+    profileCompletion = false,
+    allowSelfExecutiveSelection = false,
+    submitButtonLabel,
+}) => {
     const [openSections, setOpenSections] = useState<string[]>(['principal', 'org']);
     const toggleSection = (section: string) => setOpenSections(prev => prev.includes(section) ? prev.filter(s => s !== section) : [...prev, section]);
 
@@ -186,9 +201,22 @@ export const SecretaryForm: React.FC<{
         return executives.filter(e => e.organizationId === organizationId);
     }, [executives, organizationId]);
     
+    /** Escopo de empresa para secretária em primeiro acesso ou edição do próprio vínculo (executiveIds pode estar vazio no convite). */
+    const secretarySelectableOrgId =
+        currentUser.organizationId ||
+        (secretary.organizationId != null && String(secretary.organizationId).trim() !== ''
+            ? String(secretary.organizationId)
+            : undefined);
+
     const adminScopedExecutives = useMemo(() => {
         if (isSecretaryUser) {
-            return executives.filter(exec => (secretary.executiveIds || []).includes(exec.id));
+            if (profileCompletion || allowSelfExecutiveSelection) {
+                if (secretarySelectableOrgId) {
+                    return executives.filter((e) => e.organizationId === secretarySelectableOrgId);
+                }
+                return [];
+            }
+            return executives.filter((exec) => (secretary.executiveIds || []).includes(exec.id));
         }
         if (isAdminForLegalOrg) {
             const orgIds = organizations.filter(o => o.legalOrganizationId === currentUser.legalOrganizationId).map(o => o.id);
@@ -198,17 +226,35 @@ export const SecretaryForm: React.FC<{
             return executives.filter(e => e.organizationId === currentUser.organizationId);
         }
         return executives;
-    }, [executives, organizations, currentUser, secretary.executiveIds, isSecretaryUser, isAdminForLegalOrg, isOrgAdmin]);
+    }, [
+        executives,
+        organizations,
+        currentUser,
+        secretary.executiveIds,
+        secretary.organizationId,
+        secretarySelectableOrgId,
+        isSecretaryUser,
+        isAdminForLegalOrg,
+        isOrgAdmin,
+        profileCompletion,
+        allowSelfExecutiveSelection,
+    ]);
 
     const assignableExecutives = useMemo(() => {
         if (isSecretaryUser) {
+            if (profileCompletion || allowSelfExecutiveSelection) {
+                if (organizationId) {
+                    return adminScopedExecutives.filter((exec) => exec.organizationId === organizationId);
+                }
+                return [];
+            }
             return adminScopedExecutives;
         }
         if (organizationId) {
             return adminScopedExecutives.filter(exec => exec.organizationId === organizationId);
         }
         return [];
-    }, [adminScopedExecutives, organizationId, isSecretaryUser]);
+    }, [adminScopedExecutives, organizationId, isSecretaryUser, profileCompletion, allowSelfExecutiveSelection]);
 
     useEffect(() => {
         const assignableIds = new Set(assignableExecutives.map(e => e.id));
@@ -422,10 +468,10 @@ export const SecretaryForm: React.FC<{
                                     id={`exec-${exec.id}`}
                                     checked={selectedExecutiveIds.includes(exec.id)}
                                     onChange={() => handleExecutiveToggle(exec.id)}
-                                    disabled={isSecretaryUser && !profileCompletion}
+                                    disabled={isSecretaryUser && !profileCompletion && !allowSelfExecutiveSelection}
                                     className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:text-slate-400"
                                 />
-                                <label htmlFor={`exec-${exec.id}`} className={`ml-3 block text-sm ${isSecretaryUser && !profileCompletion ? 'text-slate-500' : 'text-slate-600'}`}>
+                                <label htmlFor={`exec-${exec.id}`} className={`ml-3 block text-sm ${isSecretaryUser && !profileCompletion && !allowSelfExecutiveSelection ? 'text-slate-500' : 'text-slate-600'}`}>
                                     {getExecutiveDetails(exec)}
                                 </label>
                             </div>
@@ -504,7 +550,7 @@ export const SecretaryForm: React.FC<{
                     <button type="button" onClick={onCancel} className="px-4 py-2 bg-slate-200 text-slate-800 rounded-md hover:bg-slate-300 transition">Cancelar</button>
                 )}
                 <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition">
-                    {profileCompletion ? 'Concluir cadastro' : 'Salvar Secretária'}
+                    {submitButtonLabel ?? (profileCompletion ? 'Concluir cadastro' : 'Salvar Secretária')}
                 </button>
             </div>
         </form>
@@ -515,6 +561,7 @@ const SecretariesView: React.FC<SecretariesViewProps> = ({
     secretaries,
     executives,
     currentUser,
+    organizations,
 }) => {
     const isSecretaryUser = currentUser.role === 'secretary';
     const isAdminForLegalOrg = currentUser.role === 'admin' && !!currentUser.legalOrganizationId;
@@ -581,7 +628,7 @@ const SecretariesView: React.FC<SecretariesViewProps> = ({
                     <p className="text-slate-500 mt-1">
                         {isSecretaryUser
                             ? 'Visualização dos vínculos com executivos.'
-                            : 'Listagem somente leitura. Novos acessos são criados em Convidar usuário.'}
+                            : 'Listagem somente leitura. Novos acessos são criados em Usuários (convite).'}
                     </p>
                 </div>
             </div>

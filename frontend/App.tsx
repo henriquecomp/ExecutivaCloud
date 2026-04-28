@@ -110,7 +110,14 @@ const App: React.FC = () => {
     );
   }
 
-  return <MainAppLayout key={currentUser.id} currentUser={currentUser} onLogout={handleLogout} />;
+  return (
+    <MainAppLayout
+      key={currentUser.id}
+      currentUser={currentUser}
+      onLogout={handleLogout}
+      onUserUpdated={(u) => setCurrentUser(u)}
+    />
+  );
 };
 
 export default App;

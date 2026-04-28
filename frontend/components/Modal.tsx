@@ -6,9 +6,11 @@ interface ModalProps {
   title: string;
   onClose: () => void;
   children: React.ReactNode;
+  /** Classes extra no painel branco (ex.: max-w-4xl). */
+  panelClassName?: string;
 }
 
-const Modal: React.FC<ModalProps> = ({ isOpen, title, onClose, children }) => {
+const Modal: React.FC<ModalProps> = ({ isOpen, title, onClose, children, panelClassName }) => {
   const modalRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -35,7 +37,7 @@ const Modal: React.FC<ModalProps> = ({ isOpen, title, onClose, children }) => {
     >
       <div
         ref={modalRef}
-        className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col"
+        className={`bg-white rounded-xl shadow-2xl w-full max-h-[90vh] flex flex-col ${panelClassName ?? 'max-w-2xl'}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"

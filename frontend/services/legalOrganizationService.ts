@@ -13,7 +13,7 @@ const mapLegalOrganization = (item: any): LegalOrganization => ({
 export const legalOrganizationService = {
   getAll: async () => {
     const response = await api.get<any[]>(
-      "/legal-organizations/",
+      "/legal-organizations/?skip=0&limit=1000",
     );
     return response.data.map(mapLegalOrganization);
   },

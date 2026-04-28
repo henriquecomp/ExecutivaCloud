@@ -27,9 +27,11 @@ import FinancesView from './components/ExpensesView';
 import SettingsView from './components/SettingsView';
 import TasksView from './components/TasksView';
 import SecretariesView from './components/SecretariesView';
-import InviteUserView from './components/InviteUserView';
+import UserManagementView from './components/UserManagementView';
 import ReportsView from './components/ReportsView';
 import UserMenu from './components/UserMenu';
+import ExecutiveProfileModal from './components/ExecutiveProfileModal';
+import SecretaryProfileModal from './components/SecretaryProfileModal';
 import DocumentsView from './components/DocumentsView';
 import LegalOrganizationsView from './components/LegalOrganizationsView';
 import { legalOrganizationService } from './services/legalOrganizationService';
@@ -48,9 +50,12 @@ import { secretaryService } from './services/secretaryService';
 export interface MainAppLayoutProps {
   currentUser: User;
   onLogout: () => void;
+  onUserUpdated?: (user: User) => void;
 }
 
-const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout }) => {
+const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout, onUserUpdated }) => {
+  const [executiveProfileOpen, setExecutiveProfileOpen] = useState(false);
+  const [secretaryProfileOpen, setSecretaryProfileOpen] = useState(false);
   const [currentView, setCurrentView] = useState<View>(() =>
     currentUser.role === 'secretary' ? 'executives' : 'dashboard',
   );
@@ -361,7 +366,7 @@ const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout }) 
     organizations: 'Empresas',
     executives: 'Executivos',
     secretaries: 'Secretárias',
-    inviteUser: 'Convidar usuário',
+    userManagement: 'Usuários',
     agenda: 'Agenda',
     contacts: 'Contatos',
     finances: 'Finanças',
@@ -451,8 +456,14 @@ const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout }) 
             onRefresh={refreshAfterMutation}
           />
         );
-      case 'inviteUser':
-        return <InviteUserView currentUser={currentUser} organizations={organizations} />;
+      case 'userManagement':
+        return (
+          <UserManagementView
+            currentUser={currentUser}
+            organizations={organizations}
+            legalOrganizations={legalOrganizations}
+          />
+        );
       case 'agenda':
         return (
           <AgendaView
@@ -596,11 +607,29 @@ const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout }) 
               </select>
             </div>
 
-            <UserMenu user={currentUser} onLogout={onLogout} />
+            <UserMenu
+              user={currentUser}
+              onLogout={onLogout}
+              onOpenExecutiveProfile={() => setExecutiveProfileOpen(true)}
+              onOpenSecretaryProfile={() => setSecretaryProfileOpen(true)}
+            />
           </div>
         </header>
         <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">{renderView()}</div>
       </main>
+
+      <ExecutiveProfileModal
+        isOpen={executiveProfileOpen}
+        onClose={() => setExecutiveProfileOpen(false)}
+        currentUser={currentUser}
+        onUserUpdated={onUserUpdated}
+      />
+      <SecretaryProfileModal
+        isOpen={secretaryProfileOpen}
+        onClose={() => setSecretaryProfileOpen(false)}
+        currentUser={currentUser}
+        onUserUpdated={onUserUpdated}
+      />
     </div>
   );
 };

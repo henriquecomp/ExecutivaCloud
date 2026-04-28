@@ -7,6 +7,7 @@ export interface ApiCurrentUser {
   id: number;
   fullName: string;
   email: string;
+  phone?: string | null;
   role: string;
   legalOrganizationId?: number | null;
   organizationId?: number | null;
@@ -41,6 +42,7 @@ export function mapApiUserToAppUser(apiUser: ApiCurrentUser): User {
     id,
     fullName: apiUser.fullName,
     email: apiUser.email,
+    phone: apiUser.phone != null && String(apiUser.phone).trim() !== '' ? String(apiUser.phone) : undefined,
     needsProfileCompletion: Boolean(apiUser.needsProfileCompletion),
   };
   switch (apiUser.role) {
@@ -70,6 +72,8 @@ export function mapApiUserToAppUser(apiUser: ApiCurrentUser): User {
         ...base,
         role: 'secretary',
         secretaryId: apiUser.secretaryId ?? undefined,
+        organizationId:
+          apiUser.organizationId != null ? String(apiUser.organizationId) : undefined,
       };
     default:
       return { ...base, role: 'executive' };
@@ -98,6 +102,15 @@ export async function loginRequest(email: string, password: string): Promise<Tok
 
 export async function fetchMe(): Promise<ApiCurrentUser> {
   const { data } = await api.get<ApiCurrentUser>('/auth/me');
+  return data;
+}
+
+export async function updateMeProfile(body: {
+  fullName?: string;
+  email?: string;
+  phone?: string | null;
+}): Promise<ApiCurrentUser> {
+  const { data } = await api.patch<ApiCurrentUser>('/auth/me', body);
   return data;
 }
 

@@ -6,6 +6,8 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import create_access_token, hash_password, verify_password
+from app.models.executive_model import Executive
+from app.models.secretary_model import Secretary
 from app.models import user_model as user_models
 from app.repositories.legal_organization_repository import LegalOrganizationRepository
 from app.repositories.user_repository import UserRepository
@@ -17,6 +19,7 @@ def _user_to_public(u: user_models.Usuario) -> auth_schemas.CurrentUserOut:
         id=u.id,
         fullName=u.name,
         email=u.email,
+        phone=u.phone,
         role=u.role,
         legalOrganizationId=u.legal_organization_id,
         organizationId=u.organization_id,
@@ -127,3 +130,57 @@ class AuthService:
         )
         token = create_access_token(str(db_user.id))
         return auth_schemas.TokenResponse(accessToken=token, tokenType="bearer", user=_user_to_public(db_user))
+
+    def update_me_profile(
+        self,
+        current: user_models.Usuario,
+        body: auth_schemas.MeProfileUpdate,
+    ) -> auth_schemas.CurrentUserOut:
+        data = body.model_dump(exclude_unset=True, by_alias=False)
+        updates: dict = {}
+        if "full_name" in data and data["full_name"] is not None:
+            updates["name"] = data["full_name"].strip()
+        if "email" in data and data["email"] is not None:
+            new_email = str(data["email"]).lower().strip()
+            if new_email != current.email.lower():
+                if self.users.get_by_email(new_email):
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Este e-mail já está em uso.",
+                    )
+            updates["email"] = new_email
+        if "phone" in data:
+            updates["phone"] = data["phone"]
+
+        if not updates:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Nenhum dado para atualizar.",
+            )
+
+        db_user = self.users.update(current, updates)
+
+        new_email = updates.get("email")
+        touched = False
+        if new_email and db_user.executive_id:
+            ex = self.db.query(Executive).filter(Executive.id == db_user.executive_id).first()
+            if ex:
+                ex.work_email = new_email
+                self.db.add(ex)
+                touched = True
+        if new_email and db_user.secretary_external_id:
+            try:
+                sid = int(db_user.secretary_external_id)
+            except ValueError:
+                sid = None
+            if sid is not None:
+                sec = self.db.query(Secretary).filter(Secretary.id == sid).first()
+                if sec:
+                    sec.work_email = new_email
+                    self.db.add(sec)
+                    touched = True
+        if touched:
+            self.db.commit()
+            self.db.refresh(db_user)
+
+        return _user_to_public(db_user)

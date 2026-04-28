@@ -18,6 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 # Importa o roteador de usuários que acabamos de criar
 from app.routers import (
+    user_management,
     user,
     auth,
     legal_organization,
@@ -82,6 +83,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Rotas literais /users/management/* antes de /users/{user_id:int}
+app.include_router(user_management.router)
 # Inclui as rotas do módulo 'user' na aplicação principal
 # Todas as rotas em user.py serão acessíveis. Ex: /users/, /users/1, etc.
 app.include_router(user.router)

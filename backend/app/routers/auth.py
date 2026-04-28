@@ -44,6 +44,16 @@ def me(current: user_models.Usuario = Depends(get_current_user)):
     return _user_to_public(current)
 
 
+@router.patch("/me", response_model=schemas.CurrentUserOut)
+def patch_me(
+    body: schemas.MeProfileUpdate,
+    current: user_models.Usuario = Depends(get_current_user),
+    service: AuthService = Depends(AuthService),
+):
+    """Atualiza nome, e-mail e telefone do utilizador autenticado."""
+    return service.update_me_profile(current, body)
+
+
 @router.post("/invite-user", response_model=schemas.InviteUserResponse, status_code=status.HTTP_201_CREATED)
 def invite_user(
     body: schemas.InviteUserRequest,

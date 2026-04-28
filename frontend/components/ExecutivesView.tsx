@@ -6,7 +6,7 @@ import { Executive, Organization, Department } from '../types';
 import { Search } from 'lucide-react';
 import Pagination from './Pagination';
 
-/** Listagem somente leitura. Novos executivos são criados em Convidar usuário. */
+/** Listagem somente leitura. Novos executivos são criados em Usuários (convite). */
 const ExecutivesView: React.FC = () => {
   const [executives, setExecutives] = useState<Executive[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,7 +63,7 @@ const ExecutivesView: React.FC = () => {
         <div>
           <h2 className="text-2xl font-bold text-gray-800">Executivos</h2>
           <p className="text-gray-500 text-sm mt-1">
-            Listagem somente leitura. Novos acessos são criados em Convidar usuário.
+            Listagem somente leitura. Novos acessos são criados em Usuários (convite).
           </p>
         </div>
       </div>
