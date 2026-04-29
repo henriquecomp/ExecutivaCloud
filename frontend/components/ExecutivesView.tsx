@@ -4,7 +4,6 @@ import { organizationService } from '../services/organizationService';
 import { departmentService } from '../services/departmentService';
 import { Executive, Organization, Department, LayoutView } from '../types';
 import Pagination from './Pagination';
-import ViewSwitcher from './ViewSwitcher';
 import { PrinterIcon } from './Icons';
 import { downloadCsv, todayStamp } from '../utils/csvDownload';
 import AppButton from './ui/AppButton';
@@ -13,8 +12,10 @@ import AppSelect from './ui/AppSelect';
 import ToolbarPanel from './ui/ToolbarPanel';
 import { DataTable, DataTableBody, DataTableEmptyRow, DataTableHead, DataTableRow, DataTableTd, DataTableTh } from './ui/DataTable';
 
+interface ExecutivesViewProps { layout: LayoutView; }
+
 /** Listagem somente leitura. Novos executivos são criados em Usuários (convite). */
-const ExecutivesView: React.FC = () => {
+const ExecutivesView: React.FC<ExecutivesViewProps> = ({ layout }) => {
   const [executives, setExecutives] = useState<Executive[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -22,7 +23,6 @@ const ExecutivesView: React.FC = () => {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
 
-  const [layout, setLayout] = useState<LayoutView>('table');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
@@ -163,32 +163,29 @@ const ExecutivesView: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <ToolbarPanel className="flex flex-col gap-4 sm:flex-row sm:items-center">
-        <div className="min-w-0 flex-1">
-          <AppSearchInput
-            type="text"
-            placeholder="Buscar por nome ou email..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <ViewSwitcher layout={layout} setLayout={setLayout} />
-          <AppSelect
-            id="limit-exec"
-            value={itemsPerPage}
-            onChange={(e) => setItemsPerPage(Number(e.target.value))}
-            className="w-auto min-w-[5rem]"
-            aria-label="Itens por página"
-          >
-            <option value={10}>10</option>
-            <option value={30}>30</option>
-            <option value={50}>50</option>
-          </AppSelect>
-          <AppButton type="button" variant="ghost" className="!p-2" title="Exportar resultados para CSV" aria-label="Exportar resultados para CSV" onClick={handleExportCsv}>
-            <PrinterIcon />
-          </AppButton>
-        </div>
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <AppSelect
+          id="limit-exec"
+          value={itemsPerPage}
+          onChange={(e) => setItemsPerPage(Number(e.target.value))}
+          className="w-auto min-w-[5rem]"
+          aria-label="Itens por página"
+        >
+          <option value={10}>10</option>
+          <option value={30}>30</option>
+          <option value={50}>50</option>
+        </AppSelect>
+        <AppButton type="button" variant="ghost" className="!p-2" title="Exportar resultados para CSV" aria-label="Exportar resultados para CSV" onClick={handleExportCsv}>
+          <PrinterIcon />
+        </AppButton>
+      </div>
+      <ToolbarPanel>
+        <AppSearchInput
+          type="text"
+          placeholder="Buscar por nome ou email..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
       </ToolbarPanel>
 
       {layout === 'table' && renderTableView()}

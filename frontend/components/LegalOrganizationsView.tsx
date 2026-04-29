@@ -3,7 +3,6 @@ import { LegalOrganization, Organization, Department, Executive, Secretary, Even
 import Modal from './Modal';
 import ConfirmationModal from './ConfirmationModal';
 import { EditIcon, DeleteIcon, PlusIcon, PrinterIcon } from './Icons';
-import ViewSwitcher from './ViewSwitcher';
 import { downloadCsv, todayStamp } from '../utils/csvDownload';
 import AppButton from './ui/AppButton';
 import {
@@ -134,6 +133,7 @@ interface LegalOrganizationsViewProps {
   setTasks: React.Dispatch<React.SetStateAction<Task[]>>;
   setDocuments: React.Dispatch<React.SetStateAction<Document[]>>;
   onRefresh: () => void;
+  layout: LayoutView;
 }
 
 const LegalOrganizationForm: React.FC<{ 
@@ -362,7 +362,7 @@ const OrganizationForm: React.FC<{
 };
 
 const LegalOrganizationsView: React.FC<LegalOrganizationsViewProps> = ({
-    currentUser, legalOrganizations, setLegalOrganizations, organizations, setOrganizations, onRefresh
+    currentUser, legalOrganizations, setLegalOrganizations, organizations, setOrganizations, onRefresh, layout
 }) => {
     const [isModalOpen, setModalOpen] = useState(false);
     const [editingLegalOrg, setEditingLegalOrg] = useState<Partial<LegalOrganization> | null>(null);
@@ -380,7 +380,6 @@ const LegalOrganizationsView: React.FC<LegalOrganizationsViewProps> = ({
         return legalOrganizations;
     }, [legalOrganizations, currentUser, isAdminForLegalOrg]);
 
-    const [layout, setLayout] = useState<LayoutView>('card');
     const [loLimit, setLoLimit] = useState(6);
     const [loCurrentPage, setLoCurrentPage] = useState(1);
 
@@ -491,7 +490,6 @@ const LegalOrganizationsView: React.FC<LegalOrganizationsViewProps> = ({
     return (
         <div className="space-y-6 animate-fade-in">
             <div className="flex flex-wrap items-center justify-end gap-2">
-                <ViewSwitcher layout={layout} setLayout={setLayout} />
                 <AppSelect id="limit-lo" value={loLimit} onChange={(e) => setLoLimit(Number(e.target.value))} className="w-auto min-w-[5rem]" aria-label="Itens por página">
                     <option value={4}>4</option>
                     <option value={6}>6</option>

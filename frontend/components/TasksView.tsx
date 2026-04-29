@@ -3,7 +3,6 @@ import { Task, Priority, Status, RecurrenceRule, LayoutView } from '../types';
 import Modal from './Modal';
 import ConfirmationModal from './ConfirmationModal';
 import Pagination from './Pagination';
-import ViewSwitcher from './ViewSwitcher';
 import { EditIcon, DeleteIcon, PlusIcon, RecurrenceIcon, PrinterIcon } from './Icons';
 import { downloadCsv, todayStamp } from '../utils/csvDownload';
 import { FormDangerAlert } from './ui/FormDangerAlert';
@@ -31,6 +30,7 @@ interface TasksViewProps {
   tasks: Task[];
   executiveId: string;
   onRefresh: () => Promise<void>;
+  layout: LayoutView;
 }
 
 const TaskForm: React.FC<{ task: Partial<Task>, onSave: (task: Partial<Task>, recurrence: RecurrenceRule | null) => void | Promise<void>, onCancel: () => void }> = ({ task, onSave, onCancel }) => {
@@ -283,7 +283,7 @@ const generateRecurringTasks = (baseTask: Partial<Task>, rule: RecurrenceRule, r
 };
 
 
-const TasksView: React.FC<TasksViewProps> = ({ tasks, executiveId, onRefresh }) => {
+const TasksView: React.FC<TasksViewProps> = ({ tasks, executiveId, onRefresh, layout }) => {
     const [isModalOpen, setModalOpen] = useState(false);
     const [editingTask, setEditingTask] = useState<Partial<Task> | null>(null);
     const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
@@ -292,7 +292,6 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, executiveId, onRefresh }) 
     const [filter, setFilter] = useState<Status | 'all'>('all');
     const [priorityFilter, setPriorityFilter] = useState<Priority | 'all'>('all');
     
-    const [layout, setLayout] = useState<LayoutView>('table');
     const [limit, setLimit] = useState(10);
     const [currentPage, setCurrentPage] = useState(1);
 
@@ -571,7 +570,6 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, executiveId, onRefresh }) 
         <div className="space-y-6 animate-fade-in">
             <FormDangerAlert message={listActionError} />
             <div className="flex flex-wrap items-center justify-end gap-2">
-                <ViewSwitcher layout={layout} setLayout={setLayout} />
                 <AppSelect id="limit-tasks" value={limit} onChange={(e) => setLimit(Number(e.target.value))} className="w-auto min-w-[5rem]" aria-label="Itens por página">
                     <option value={10}>10</option>
                     <option value={30}>30</option>

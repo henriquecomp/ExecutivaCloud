@@ -16,7 +16,9 @@ import {
   DocumentCategory,
   ExpenseCategory,
   LegalOrganization,
+  LayoutView,
 } from './types';
+import ViewSwitcher from './components/ViewSwitcher';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import ExecutivesView from './components/ExecutivesView';
@@ -61,6 +63,7 @@ const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout, on
     currentUser.role === 'secretary' ? 'executives' : 'dashboard',
   );
   const [isSidebarOpen, setSidebarOpen] = useState(false);
+  const [layout, setLayout] = useState<LayoutView>('table');
 
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -420,6 +423,7 @@ const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout, on
       case 'legalOrganizations':
         return (
           <LegalOrganizationsView
+            layout={layout}
             currentUser={currentUser}
             legalOrganizations={legalOrganizations}
             setLegalOrganizations={setLegalOrganizations}
@@ -440,10 +444,11 @@ const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout, on
           />
         );
       case 'executives':
-        return <ExecutivesView />;
+        return <ExecutivesView layout={layout} />;
       case 'organizations':
         return (
           <OrganizationsView
+            layout={layout}
             currentUser={currentUser}
             organizations={organizations}
             setOrganizations={setOrganizations}
@@ -465,6 +470,7 @@ const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout, on
       case 'secretaries':
         return (
           <SecretariesView
+            layout={layout}
             secretaries={secretaries}
             setSecretaries={setSecretaries}
             executives={executives}
@@ -477,6 +483,7 @@ const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout, on
       case 'userManagement':
         return (
           <UserManagementView
+            layout={layout}
             currentUser={currentUser}
             organizations={organizations}
             legalOrganizations={legalOrganizations}
@@ -485,6 +492,7 @@ const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout, on
       case 'agenda':
         return (
           <AgendaView
+            layout={layout}
             events={filteredEvents}
             setEvents={setEvents}
             eventTypes={eventTypes}
@@ -496,6 +504,7 @@ const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout, on
       case 'contacts':
         return (
           <ContactsView
+            layout={layout}
             contacts={filteredContacts}
             contactTypes={contactTypes}
             executiveId={selectedExecutiveId!}
@@ -505,6 +514,7 @@ const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout, on
       case 'finances':
         return (
           <FinancesView
+            layout={layout}
             expenses={filteredFinances}
             expenseCategories={expenseCategories}
             executiveId={selectedExecutiveId!}
@@ -513,11 +523,12 @@ const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout, on
         );
       case 'tasks':
         return (
-          <TasksView tasks={filteredTasks} executiveId={selectedExecutiveId!} onRefresh={refreshAfterMutation} />
+          <TasksView layout={layout} tasks={filteredTasks} executiveId={selectedExecutiveId!} onRefresh={refreshAfterMutation} />
         );
       case 'documents':
         return (
           <DocumentsView
+            layout={layout}
             documents={filteredDocuments}
             setDocuments={setDocuments}
             documentCategories={documentCategories}
@@ -599,7 +610,10 @@ const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout, on
             <h1 className="text-xl font-bold text-slate-700 capitalize hidden sm:block">{viewTitles[currentView]}</h1>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            {!['dashboard', 'settings'].includes(currentView) && (
+              <ViewSwitcher layout={layout} setLayout={setLayout} />
+            )}
             <div className="w-full sm:max-w-xs md:max-w-sm">
               <select
                 aria-label="Selecionar Executivo"

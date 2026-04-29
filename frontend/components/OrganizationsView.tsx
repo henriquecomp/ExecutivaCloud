@@ -3,8 +3,8 @@ import { Organization, Department, Executive, User, Secretary, Event, Contact, E
 import Modal from './Modal';
 import ConfirmationModal from './ConfirmationModal';
 import { EditIcon, DeleteIcon, PlusIcon, PrinterIcon } from './Icons';
-import ViewSwitcher from './ViewSwitcher';
 import { downloadCsv, todayStamp } from '../utils/csvDownload';
+import AppSearchInput from './ui/AppSearchInput';
 import {
   DataTable,
   DataTableBody,
@@ -89,7 +89,8 @@ interface OrganizationsViewProps {
   setTasks: React.Dispatch<React.SetStateAction<Task[]>>;
   setDocuments: React.Dispatch<React.SetStateAction<Document[]>>;
   legalOrganizations: LegalOrganization[];
-  onRefresh: () => Promise<void>; 
+  onRefresh: () => Promise<void>;
+  layout: LayoutView;
 }
 
 const OrganizationForm: React.FC<{
@@ -395,7 +396,8 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
     setEvents, setContacts, setExpenses, setTasks,
     setDocuments,
     legalOrganizations,
-    onRefresh
+    onRefresh,
+    layout,
 }) => {
     const [isOrgModalOpen, setOrgModalOpen] = useState(false);
     const [editingOrganization, setEditingOrganization] = useState<Partial<Organization> | null>(null);
@@ -421,18 +423,27 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
         return organizations;
     }, [organizations, currentUser, isOrgAdmin]);
 
-    const [layout, setLayout] = useState<LayoutView>('card');
+    const [searchTerm, setSearchTerm] = useState('');
     const [orgPageLimit, setOrgPageLimit] = useState(6);
     const [orgCurrentPage, setOrgCurrentPage] = useState(1);
 
+    const filteredOrganizations = useMemo(() => {
+        if (!searchTerm.trim()) return visibleOrganizations;
+        const term = searchTerm.toLowerCase();
+        return visibleOrganizations.filter(o =>
+            o.name.toLowerCase().includes(term) ||
+            (o.cnpj && o.cnpj.toLowerCase().includes(term))
+        );
+    }, [visibleOrganizations, searchTerm]);
+
     const paginatedOrganizations = useMemo(() => {
         const start = (orgCurrentPage - 1) * orgPageLimit;
-        return visibleOrganizations.slice(start, start + orgPageLimit);
-    }, [visibleOrganizations, orgCurrentPage, orgPageLimit]);
+        return filteredOrganizations.slice(start, start + orgPageLimit);
+    }, [filteredOrganizations, orgCurrentPage, orgPageLimit]);
 
     useEffect(() => {
         setOrgCurrentPage(1);
-    }, [organizations, orgPageLimit, currentUser.role, currentUser.legalOrganizationId, currentUser.organizationId]);
+    }, [organizations, orgPageLimit, searchTerm, currentUser.role, currentUser.legalOrganizationId, currentUser.organizationId]);
 
     // Handlers ajustados para prevenir propagação e submits acidentais
     const handleAddOrganization = (e: React.MouseEvent) => {
@@ -570,7 +581,6 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
             )}
 
             <div className="flex flex-wrap items-center justify-end gap-2">
-                <ViewSwitcher layout={layout} setLayout={setLayout} />
                 <AppSelect
                     id="limit-orgs"
                     value={orgPageLimit}
@@ -589,7 +599,7 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
                     title="Exportar resultados para CSV"
                     aria-label="Exportar resultados para CSV"
                     onClick={() => {
-                        const rows = visibleOrganizations.map(o => ({
+                        const rows = filteredOrganizations.map(o => ({
                             Nome: o.name,
                             CNPJ: o.cnpj ?? '',
                             'Organização Legal': legalOrganizations.find(lo => String(lo.id) === String(o.legalOrganizationId))?.name ?? '',
@@ -611,6 +621,14 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
                     <PlusIcon />
                 </AppButton>
             </div>
+            <ToolbarPanel>
+                <AppSearchInput
+                    placeholder="Buscar por nome ou CNPJ…"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    aria-label="Buscar empresas"
+                />
+            </ToolbarPanel>
 
             {(layout === 'card' || layout === 'list') && (
               <div className={layout === 'card' ? "grid grid-cols-1 lg:grid-cols-2 gap-6" : "space-y-4"}>
@@ -630,9 +648,8 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
                                     <button type="button" onClick={(e) => handleDeleteOrganization(e, org)} disabled={isOrgAdmin} className="p-2 text-slate-500 hover:text-red-600 rounded-full hover:bg-slate-100 transition disabled:text-slate-300 disabled:hover:text-slate-300 disabled:cursor-not-allowed" aria-label="Excluir empresa"><DeleteIcon /></button>
                                 </div>
                             </header>
-                            {layout === 'card' && (
-                              <div className="p-4 flex-1">
-                                {(org.street || org.city) && (
+                            <div className="p-4 flex-1">
+                                {(org.street || org.city) && layout === 'card' && (
                                     <div className="mb-4 text-sm text-slate-600 border-b border-slate-200 pb-4">
                                         <address className="not-italic">
                                             {org.street}{org.number && `, ${org.number}`}<br />
@@ -657,17 +674,14 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
                                 ) : (
                                     <p className="text-sm text-slate-500 text-center py-4">Nenhum departamento cadastrado.</p>
                                 )}
-                              </div>
-                            )}
-                            {layout === 'card' && (
-                              <footer className="p-4 border-t border-slate-200">
+                            </div>
+                            <footer className="p-4 border-t border-slate-200">
                                 <button type="button" onClick={(e) => handleAddDepartment(e, org.id)} className="flex w-full items-center justify-center rounded-md bg-slate-100 px-3 py-2 text-slate-700 transition hover:bg-slate-200" title="Adicionar departamento" aria-label="Adicionar departamento"><PlusIcon /></button>
-                              </footer>
-                            )}
+                            </footer>
                         </div>
                     );
                 })}
-                {visibleOrganizations.length === 0 && (
+                {filteredOrganizations.length === 0 && (
                     <div className="lg:col-span-2 text-center p-6 bg-white rounded-xl shadow-md"><p className="text-slate-500">Nenhuma empresa cadastrada.</p></div>
                 )}
               </div>
@@ -680,20 +694,23 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
                     <DataTableTh className="hidden md:table-cell">CNPJ</DataTableTh>
                     <DataTableTh className="hidden lg:table-cell">Organização Legal</DataTableTh>
                     <DataTableTh className="hidden lg:table-cell">Cidade / Estado</DataTableTh>
+                    <DataTableTh className="hidden lg:table-cell">Departamentos</DataTableTh>
                     <DataTableTh className="min-w-[6rem] whitespace-nowrap text-right">Ações</DataTableTh>
                   </tr>
                 </DataTableHead>
                 <DataTableBody>
-                  {visibleOrganizations.length === 0 ? (
-                    <tr><td colSpan={5} className="text-center p-6 text-slate-500">Nenhuma empresa cadastrada.</td></tr>
+                  {filteredOrganizations.length === 0 ? (
+                    <tr><td colSpan={6} className="text-center p-6 text-slate-500">Nenhuma empresa cadastrada.</td></tr>
                   ) : paginatedOrganizations.map(org => {
                     const legalOrg = legalOrganizations.find(lo => String(lo.id) === String(org.legalOrganizationId));
+                    const orgDepts = departments.filter(d => String(d.organizationId) === String(org.id));
                     return (
                       <DataTableRow key={org.id}>
                         <DataTableTd className="font-medium text-slate-800">{org.name}</DataTableTd>
                         <DataTableTd className="hidden md:table-cell text-slate-600">{org.cnpj || '-'}</DataTableTd>
                         <DataTableTd className="hidden lg:table-cell text-slate-600">{legalOrg?.name || '-'}</DataTableTd>
                         <DataTableTd className="hidden lg:table-cell text-slate-600">{[org.city, org.state].filter(Boolean).join(' / ') || '-'}</DataTableTd>
+                        <DataTableTd className="hidden lg:table-cell text-slate-600">{orgDepts.map(d => d.name).join(', ') || '-'}</DataTableTd>
                         <DataTableTd className="text-right">
                           <div className="inline-flex items-center gap-1">
                             <button type="button" onClick={(e) => handleEditOrganization(e, org)} className="p-2 text-slate-500 hover:text-indigo-600 rounded-full hover:bg-slate-100 transition" aria-label="Editar empresa"><EditIcon /></button>
@@ -707,8 +724,8 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
               </DataTable>
             )}
 
-            {visibleOrganizations.length > 0 && (
-                <Pagination currentPage={orgCurrentPage} totalItems={visibleOrganizations.length} itemsPerPage={orgPageLimit} onPageChange={setOrgCurrentPage} />
+            {filteredOrganizations.length > 0 && (
+                <Pagination currentPage={orgCurrentPage} totalItems={filteredOrganizations.length} itemsPerPage={orgPageLimit} onPageChange={setOrgCurrentPage} />
             )}
 
             {/* AQUI ESTÁ A CORREÇÃO PRINCIPAL: Passando isOpen explicitamente e removendo o && */}

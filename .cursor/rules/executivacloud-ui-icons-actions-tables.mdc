@@ -1,5 +1,5 @@
 ---
-description: Edit/Delete icons, action columns, domain icons (lock, ban, refresh), and a11y.
+description: Layout switcher, toolbar layout, CSV export, Edit/Delete icons, action columns, domain icons, and a11y.
 globs: frontend/**/*.tsx
 alwaysApply: false
 ---
@@ -8,20 +8,40 @@ alwaysApply: false
 
 **Accessible labels** (`aria-label`, `title`) should match the product language (**pt-BR**) where user-facing.
 
+## Global ViewSwitcher (card / list / table)
+
+- The `ViewSwitcher` component lives in the **main app header** (`MainAppLayout.tsx`), next to the executive selector — NOT inside individual views.
+- `MainAppLayout` owns a single `layout: LayoutView` state and passes it as a prop to every view.
+- Views accept `layout: LayoutView` in their props and render card / list / table accordingly.
+- Hidden for `dashboard` and `settings` views (no listing to switch).
+
+## Toolbar layout (per-screen)
+
+- **Row 1 (above search)**: action icons — page-size `<AppSelect>`, CSV `<PrinterIcon>`, Add `<PlusIcon>`, Settings `<CogIcon>` — in a `flex flex-wrap items-center justify-end gap-2` div.
+- **Row 2 (below icons)**: search field in a `ToolbarPanel` (e.g. `<AppSearchInput>`).
+- **Row 3 (optional)**: filter pills (type, status, priority) in a `ToolbarPanel`.
+- Page-size selects use `aria-label="Itens por página"` with **no visible label text**.
+
+## CSV export
+
+- `PrinterIcon` button (`Icons.tsx`) triggers `downloadCsv()` from `utils/csvDownload.ts`.
+- Exports **all filtered records** (not just the current page), BOM-prefixed UTF-8.
+- File names follow `<entity>_YYYY-MM-DD.csv` pattern.
+
 ## Edit / Delete
 
 - Import `typeMgmtEditIconBtn` and `typeMgmtDeleteIconBtn` from `components/ui/typeManagementStyles.ts`.
 - Stroke color comes from `EditIcon`/`DeleteIcon` (`Icons.tsx`) via `currentColor`; do not duplicate SVGs with per-screen fixed colors.
 - Pattern: `rounded-full`, `text-slate-500`, hover `bg-slate-100` + indigo/red. After standardization, avoid `text-slate-400` + `hover:bg-slate-200` for these pairs unless documented.
 
-## “Actions” column
+## "Actions" column
 
 - `inline-flex flex-row flex-nowrap items-center justify-end`, cell `whitespace-nowrap text-right`, `<th>` `text-right` and `min-w-*` so icons stay on one line.
 - Do not add informational columns without sustainable data.
 
 ## Domain-specific actions (e.g. Users)
 
-- **Refresh list**: `RefreshIcon` (`Icons.tsx`); `title` + `aria-label`; avoid an infinite spinner as the primary control.
+- **Invite**: icon-only `PlusIcon` button with `title="Convidar usuário"` and `aria-label`.
 - **Invite / password**: `LockClosedIcon`; explanatory `title`/`aria-label`; loading with `aria-busy` / opacity — do not mimic a generic loader.
 - **Deactivate**: `NoSymbolIcon` when the screen uses icon actions.
 

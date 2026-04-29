@@ -4,7 +4,6 @@ import Modal from './Modal';
 import ConfirmationModal from './ConfirmationModal';
 import Pagination from './Pagination';
 import { EditIcon, DeleteIcon, PlusIcon, BellIcon, RecurrenceIcon, CogIcon, PrinterIcon } from './Icons';
-import ViewSwitcher from './ViewSwitcher';
 import { downloadCsv, todayStamp } from '../utils/csvDownload';
 import {
   DataTable,
@@ -17,6 +16,7 @@ import {
 import { FormDangerAlert } from './ui/FormDangerAlert';
 import AppButton from './ui/AppButton';
 import AppInput from './ui/AppInput';
+import AppSearchInput from './ui/AppSearchInput';
 import AppLabel from './ui/AppLabel';
 import TypeColorFormField from './ui/TypeColorFormField';
 import TypeColorSwatch from './ui/TypeColorSwatch';
@@ -38,6 +38,7 @@ interface AgendaViewProps {
   setEventTypes: React.Dispatch<React.SetStateAction<EventType[]>>;
   executiveId: string;
   onRefresh: () => Promise<void>;
+  layout: LayoutView;
 }
 
 // --- Event Type Management Components (Moved from SettingsView) ---
@@ -560,7 +561,7 @@ const generateRecurringEvents = (baseEvent: Partial<Event>, rule: RecurrenceRule
 };
 
 
-const AgendaView: React.FC<AgendaViewProps> = ({ events, setEvents, eventTypes, setEventTypes, executiveId, onRefresh }) => {
+const AgendaView: React.FC<AgendaViewProps> = ({ events, setEvents, eventTypes, setEventTypes, executiveId, onRefresh, layout }) => {
     const [isModalOpen, setModalOpen] = useState(false);
     const [editingEvent, setEditingEvent] = useState<Partial<Event> | null>(null);
     const [eventToDelete, setEventToDelete] = useState<Event | null>(null);
@@ -568,7 +569,7 @@ const AgendaView: React.FC<AgendaViewProps> = ({ events, setEvents, eventTypes, 
     const [isSettingsModalOpen, setSettingsModalOpen] = useState(false);
     const [listActionError, setListActionError] = useState<string | null>(null);
 
-    const [layout, setLayout] = useState<LayoutView>('list');
+    const [searchTerm, setSearchTerm] = useState('');
     const [limit, setLimit] = useState(10);
     const [currentPage, setCurrentPage] = useState(1);
     
@@ -576,15 +577,24 @@ const AgendaView: React.FC<AgendaViewProps> = ({ events, setEvents, eventTypes, 
         [...events].sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()),
     [events]);
 
+    const filteredEvents = useMemo(() => {
+        if (!searchTerm.trim()) return sortedEvents;
+        const term = searchTerm.toLowerCase();
+        return sortedEvents.filter(ev =>
+            ev.title.toLowerCase().includes(term) ||
+            (ev.location && ev.location.toLowerCase().includes(term))
+        );
+    }, [sortedEvents, searchTerm]);
+
     const paginatedEvents = useMemo(() => {
         const start = (currentPage - 1) * limit;
         const end = start + limit;
-        return sortedEvents.slice(start, end);
-    }, [sortedEvents, currentPage, limit]);
+        return filteredEvents.slice(start, end);
+    }, [filteredEvents, currentPage, limit]);
 
     useEffect(() => {
         setCurrentPage(1);
-    }, [limit, events]);
+    }, [limit, events, searchTerm]);
 
 
     const handleAddEvent = () => {
@@ -706,7 +716,6 @@ const AgendaView: React.FC<AgendaViewProps> = ({ events, setEvents, eventTypes, 
         <div className="space-y-6 animate-fade-in">
             <FormDangerAlert message={listActionError} />
             <div className="flex flex-wrap items-center justify-end gap-2">
-                <ViewSwitcher layout={layout} setLayout={setLayout} />
                 <AppSelect
                     id="limit-agenda"
                     value={limit}
@@ -725,7 +734,7 @@ const AgendaView: React.FC<AgendaViewProps> = ({ events, setEvents, eventTypes, 
                     title="Exportar resultados para CSV"
                     aria-label="Exportar resultados para CSV"
                     onClick={() => {
-                        const rows = sortedEvents.map(ev => ({
+                        const rows = filteredEvents.map(ev => ({
                             Título: ev.title,
                             Início: new Date(ev.startTime).toLocaleString('pt-BR'),
                             Tipo: eventTypes.find(et => et.id === ev.eventTypeId)?.name ?? '',
@@ -758,6 +767,15 @@ const AgendaView: React.FC<AgendaViewProps> = ({ events, setEvents, eventTypes, 
                     <CogIcon />
                 </AppButton>
             </div>
+
+            <ToolbarPanel>
+                <AppSearchInput
+                    type="text"
+                    placeholder="Buscar por título ou local..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                />
+            </ToolbarPanel>
 
             {(() => {
               const renderListView = () => (
@@ -876,8 +894,8 @@ const AgendaView: React.FC<AgendaViewProps> = ({ events, setEvents, eventTypes, 
               }
             })()}
 
-            {sortedEvents.length > 0 && (
-              <Pagination currentPage={currentPage} totalItems={sortedEvents.length} itemsPerPage={limit} onPageChange={setCurrentPage} />
+            {filteredEvents.length > 0 && (
+              <Pagination currentPage={currentPage} totalItems={filteredEvents.length} itemsPerPage={limit} onPageChange={setCurrentPage} />
             )}
 
             {isModalOpen && (

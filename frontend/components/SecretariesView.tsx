@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Secretary, Executive, User, Organization, Department, LayoutView } from '../types';
 import { ChevronDownIcon, ExclamationTriangleIcon, PrinterIcon } from './Icons';
-import ViewSwitcher from './ViewSwitcher';
 import { downloadCsv, todayStamp } from '../utils/csvDownload';
 import AppButton from './ui/AppButton';
 import AppSearchInput from './ui/AppSearchInput';
@@ -76,6 +75,7 @@ interface SecretariesViewProps {
   currentUser: User;
   organizations: Organization[];
   departments: Department[];
+  layout: LayoutView;
   onRefresh?: () => Promise<void>;
 }
 
@@ -565,6 +565,7 @@ const SecretariesView: React.FC<SecretariesViewProps> = ({
     executives,
     currentUser,
     organizations,
+    layout,
 }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const isSecretaryUser = currentUser.role === 'secretary';
@@ -628,7 +629,6 @@ const SecretariesView: React.FC<SecretariesViewProps> = ({
         });
     }, [visibleSecretaries, searchTerm]);
 
-    const [layout, setLayout] = useState<LayoutView>('table');
     const [limit, setLimit] = useState(10);
     const [currentPage, setCurrentPage] = useState(1);
 
@@ -650,41 +650,38 @@ const SecretariesView: React.FC<SecretariesViewProps> = ({
 
     return (
         <div className="space-y-6 animate-fade-in">
-            <ToolbarPanel className="flex flex-col gap-4 sm:flex-row sm:items-center">
-                <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+                <AppSelect id="limit-secretaries" value={limit} onChange={(e) => setLimit(Number(e.target.value))} className="w-auto min-w-[5rem]" aria-label="Itens por página">
+                    <option value={10}>10</option>
+                    <option value={30}>30</option>
+                    <option value={50}>50</option>
+                </AppSelect>
+                <AppButton
+                    type="button"
+                    variant="ghost"
+                    className="!p-2"
+                    title="Exportar resultados para CSV"
+                    aria-label="Exportar resultados para CSV"
+                    onClick={() => {
+                        const rows = filteredSecretaries.map(s => ({
+                            Nome: s.fullName,
+                            Cargo: s.jobTitle ?? '',
+                            'E-mail': s.workEmail ?? '',
+                            'Executivos Atendidos': getExecutiveNames(s.executiveIds),
+                        }));
+                        downloadCsv(['Nome', 'Cargo', 'E-mail', 'Executivos Atendidos'], rows, `secretarias_${todayStamp()}.csv`);
+                    }}
+                >
+                    <PrinterIcon />
+                </AppButton>
+            </div>
+            <ToolbarPanel>
                 <AppSearchInput
                     type="text"
                     placeholder="Buscar por nome ou email..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                 />
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                    <ViewSwitcher layout={layout} setLayout={setLayout} />
-                    <AppSelect id="limit-secretaries" value={limit} onChange={(e) => setLimit(Number(e.target.value))} className="w-auto min-w-[5rem]" aria-label="Itens por página">
-                        <option value={10}>10</option>
-                        <option value={30}>30</option>
-                        <option value={50}>50</option>
-                    </AppSelect>
-                    <AppButton
-                        type="button"
-                        variant="ghost"
-                        className="!p-2"
-                        title="Exportar resultados para CSV"
-                        aria-label="Exportar resultados para CSV"
-                        onClick={() => {
-                            const rows = filteredSecretaries.map(s => ({
-                                Nome: s.fullName,
-                                Cargo: s.jobTitle ?? '',
-                                'E-mail': s.workEmail ?? '',
-                                'Executivos Atendidos': getExecutiveNames(s.executiveIds),
-                            }));
-                            downloadCsv(['Nome', 'Cargo', 'E-mail', 'Executivos Atendidos'], rows, `secretarias_${todayStamp()}.csv`);
-                        }}
-                    >
-                        <PrinterIcon />
-                    </AppButton>
-                </div>
             </ToolbarPanel>
 
             {layout === 'table' && (

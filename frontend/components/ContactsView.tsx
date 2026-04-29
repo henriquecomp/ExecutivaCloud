@@ -3,7 +3,6 @@ import { Contact, ContactType, LayoutView } from '../types';
 import Modal from './Modal';
 import ConfirmationModal from './ConfirmationModal';
 import Pagination from './Pagination';
-import ViewSwitcher from './ViewSwitcher';
 import { EditIcon, DeleteIcon, PlusIcon, EmailIcon, PhoneIcon, CogIcon, PrinterIcon } from './Icons';
 import { downloadCsv, todayStamp } from '../utils/csvDownload';
 import { FormDangerAlert } from './ui/FormDangerAlert';
@@ -34,6 +33,7 @@ interface ContactsViewProps {
   contactTypes: ContactType[];
   executiveId: string;
   onRefresh: () => Promise<void>;
+  layout: LayoutView;
 }
 
 // --- Contact Type Management Components (Moved from SettingsView) ---
@@ -253,7 +253,7 @@ const ContactForm: React.FC<{ contact: Partial<Contact>, onSave: (contact: Parti
     );
 };
 
-const ContactsView: React.FC<ContactsViewProps> = ({ contacts, contactTypes, executiveId, onRefresh }) => {
+const ContactsView: React.FC<ContactsViewProps> = ({ contacts, contactTypes, executiveId, onRefresh, layout }) => {
     const [isModalOpen, setModalOpen] = useState(false);
     const [editingContact, setEditingContact] = useState<Partial<Contact> | null>(null);
     const [contactToDelete, setContactToDelete] = useState<Contact | null>(null);
@@ -261,7 +261,6 @@ const ContactsView: React.FC<ContactsViewProps> = ({ contacts, contactTypes, exe
     const [filterType, setFilterType] = useState<string>('all');
     const [contactListError, setContactListError] = useState<string | null>(null);
 
-    const [layout, setLayout] = useState<LayoutView>('card');
     const [limit, setLimit] = useState(10);
     const [currentPage, setCurrentPage] = useState(1);
 
@@ -502,7 +501,6 @@ const ContactsView: React.FC<ContactsViewProps> = ({ contacts, contactTypes, exe
         <div className="space-y-6 animate-fade-in">
             <FormDangerAlert message={contactListError} />
             <div className="flex flex-wrap items-center justify-end gap-2">
-                <ViewSwitcher layout={layout} setLayout={setLayout} />
                 <AppSelect id="limit" value={limit} onChange={(e) => setLimit(Number(e.target.value))} className="w-auto min-w-[5rem]" aria-label="Itens por página">
                     <option value={10}>10</option>
                     <option value={30}>30</option>

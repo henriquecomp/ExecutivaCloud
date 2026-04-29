@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import type { LegalOrganization, Organization, User } from '../types';
+import type { LayoutView, LegalOrganization, Organization, User } from '../types';
 import Modal from './Modal';
 import ConfirmationModal from './ConfirmationModal';
 import InviteUserForm from './InviteUserForm';
-import { EditIcon, LockClosedIcon, NoSymbolIcon, PlusIcon, RefreshIcon, PrinterIcon } from './Icons';
+import { EditIcon, LockClosedIcon, NoSymbolIcon, PlusIcon, PrinterIcon } from './Icons';
 import { downloadCsv, todayStamp } from '../utils/csvDownload';
 import { typeMgmtEditIconBtn } from './ui/typeManagementStyles';
 import {
@@ -67,12 +67,14 @@ export interface UserManagementViewProps {
   currentUser: User;
   organizations: Organization[];
   legalOrganizations: LegalOrganization[];
+  layout: LayoutView;
 }
 
 const UserManagementView: React.FC<UserManagementViewProps> = ({
   currentUser,
   organizations,
   legalOrganizations,
+  layout,
 }) => {
   const [qInput, setQInput] = useState('');
   const [qApplied, setQApplied] = useState('');
@@ -252,7 +254,22 @@ const UserManagementView: React.FC<UserManagementViewProps> = ({
 
   return (
     <div className="space-y-6 animate-fade-in w-full min-w-0">
-      <div className="flex flex-wrap justify-end gap-2 shrink-0">
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <AppSelect
+          id="limit-users"
+          value={pageSize}
+          onChange={(e) => {
+            setPageSize(Number(e.target.value));
+            setCurrentPage(1);
+          }}
+          className="w-auto min-w-[5rem]"
+          disabled={loading}
+          aria-label="Itens por página"
+        >
+          <option value={10}>10</option>
+          <option value={20}>20</option>
+          <option value={50}>50</option>
+        </AppSelect>
         <button
           type="button"
           onClick={() => {
@@ -278,15 +295,6 @@ const UserManagementView: React.FC<UserManagementViewProps> = ({
         </button>
         <button
           type="button"
-          onClick={() => void refresh()}
-          className="rounded-lg border border-slate-300 bg-white p-2 text-slate-700 hover:bg-slate-50 active:scale-95 transition-transform duration-150"
-          title="Atualizar lista de usuários"
-          aria-label="Atualizar lista de usuários"
-        >
-          <RefreshIcon className="h-5 w-5" />
-        </button>
-        <button
-          type="button"
           onClick={() => setInviteOpen(true)}
           className="rounded-lg bg-indigo-600 p-2 text-white hover:bg-indigo-700 transition"
           title="Convidar usuário"
@@ -309,73 +317,166 @@ const UserManagementView: React.FC<UserManagementViewProps> = ({
             aria-label="Buscar usuários"
           />
         </div>
-        <div className="flex shrink-0 flex-wrap items-center gap-4">
-          <p className="text-sm text-slate-500">
-            {loading ? 'Carregando…' : `${total} registro(s)`}
-          </p>
-          <AppSelect
-            id="limit-users"
-            value={pageSize}
-            onChange={(e) => {
-              setPageSize(Number(e.target.value));
-              setCurrentPage(1);
-            }}
-            className="w-auto min-w-[5rem]"
-            disabled={loading}
-            aria-label="Itens por página"
-          >
-            <option value={10}>10</option>
-            <option value={20}>20</option>
-            <option value={50}>50</option>
-          </AppSelect>
-        </div>
+        <p className="text-sm text-slate-500 shrink-0">
+          {loading ? 'Carregando…' : `${total} registro(s)`}
+        </p>
       </ToolbarPanel>
 
-      <DataTable innerClassName="overflow-x-auto">
-        <DataTableHead>
-          <tr>
-            <DataTableTh>Nome</DataTableTh>
-            <DataTableTh className="hidden md:table-cell">E-mail</DataTableTh>
-            <DataTableTh className="hidden lg:table-cell">Telefone</DataTableTh>
-            <DataTableTh className="min-w-[12rem]">Organização / Empresa</DataTableTh>
-            <DataTableTh>Papel</DataTableTh>
-            <DataTableTh>Status</DataTableTh>
-            <DataTableTh className="min-w-[10rem] whitespace-nowrap text-right">Ações</DataTableTh>
-          </tr>
-        </DataTableHead>
-        <DataTableBody>
-          {loading ? (
-            <DataTableEmptyRow colSpan={7}>Carregando…</DataTableEmptyRow>
-          ) : rows.length === 0 ? (
-            <DataTableEmptyRow colSpan={7}>Nenhum usuário encontrado.</DataTableEmptyRow>
-          ) : (
-            rows.map((u) => {
-              const { legalName, companyName, title } = resolveUserAssociations(
-                u,
-                legalOrganizations,
-                organizations,
-              );
+      {layout === 'table' && (
+        <DataTable innerClassName="overflow-x-auto">
+          <DataTableHead>
+            <tr>
+              <DataTableTh>Nome</DataTableTh>
+              <DataTableTh className="hidden md:table-cell">E-mail</DataTableTh>
+              <DataTableTh className="hidden lg:table-cell">Telefone</DataTableTh>
+              <DataTableTh className="min-w-[12rem]">Organização / Empresa</DataTableTh>
+              <DataTableTh>Papel</DataTableTh>
+              <DataTableTh>Status</DataTableTh>
+              <DataTableTh className="min-w-[10rem] whitespace-nowrap text-right">Ações</DataTableTh>
+            </tr>
+          </DataTableHead>
+          <DataTableBody>
+            {loading ? (
+              <DataTableEmptyRow colSpan={7}>Carregando…</DataTableEmptyRow>
+            ) : rows.length === 0 ? (
+              <DataTableEmptyRow colSpan={7}>Nenhum usuário encontrado.</DataTableEmptyRow>
+            ) : (
+              rows.map((u) => {
+                const { legalName, companyName, title } = resolveUserAssociations(
+                  u,
+                  legalOrganizations,
+                  organizations,
+                );
+                const resendBusy = mailBusy?.userId === u.id && mailBusy.kind === 'first';
+                const resetBusy = mailBusy?.userId === u.id && mailBusy.kind === 'reset';
+                return (
+                  <DataTableRow key={u.id}>
+                    <DataTableTd className="font-medium text-slate-800">{u.fullName}</DataTableTd>
+                    <DataTableTd className="hidden md:table-cell text-slate-600">{u.email}</DataTableTd>
+                    <DataTableTd className="hidden lg:table-cell text-slate-600">{u.phone || '—'}</DataTableTd>
+                    <DataTableTd className="text-xs text-slate-600 align-top" title={title}>
+                      <div className="max-w-[18rem] space-y-1">
+                        <div className="leading-snug">
+                          <span className="font-medium text-slate-400">Org. jurídica:</span>{' '}
+                          <span className="break-words">{legalName}</span>
+                        </div>
+                        <div className="leading-snug">
+                          <span className="font-medium text-slate-400">Empresa:</span>{' '}
+                          <span className="break-words">{companyName}</span>
+                        </div>
+                      </div>
+                    </DataTableTd>
+                    <DataTableTd className="text-slate-600">{roleLabel(u.role)}</DataTableTd>
+                    <DataTableTd>
+                      <span
+                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                          u.isActive ? 'bg-emerald-50 text-emerald-800' : 'bg-slate-100 text-slate-600'
+                        }`}
+                      >
+                        {u.isActive ? 'Ativo' : 'Inativo'}
+                      </span>
+                    </DataTableTd>
+                    <DataTableTd className="align-middle whitespace-nowrap text-right">
+                      <div className="inline-flex flex-row flex-nowrap items-center justify-end gap-0.5">
+                        <button
+                          type="button"
+                          onClick={() => openEdit(u)}
+                          className={typeMgmtEditIconBtn}
+                          title="Editar"
+                          aria-label="Editar"
+                        >
+                          <EditIcon className="h-5 w-5" />
+                        </button>
+                        {u.isActive && u.id !== selfId && u.needsProfileCompletion && (
+                          <button
+                            type="button"
+                            onClick={() => void runResendFirstAccess(u)}
+                            disabled={!!mailBusy}
+                            aria-busy={resendBusy}
+                            className={`rounded-md p-1.5 text-amber-700 hover:bg-amber-50 disabled:opacity-50 ${
+                              resendBusy ? 'animate-pulse' : ''
+                            }`}
+                            title={
+                              resendBusy
+                                ? 'Enviando e-mail…'
+                                : 'Reenviar e-mail com link para definir a senha de primeiro acesso (convite pendente).'
+                            }
+                            aria-label={
+                              resendBusy
+                                ? 'Enviando e-mail de primeiro acesso'
+                                : 'Reenviar e-mail com link para definir a senha de primeiro acesso'
+                            }
+                          >
+                            <LockClosedIcon className="h-5 w-5" />
+                          </button>
+                        )}
+                        {u.isActive && u.id !== selfId && !u.needsProfileCompletion && (
+                          <button
+                            type="button"
+                            onClick={() => void runSendPasswordReset(u)}
+                            disabled={!!mailBusy}
+                            aria-busy={resetBusy}
+                            className={`rounded-md p-1.5 text-slate-600 hover:bg-slate-100 disabled:opacity-50 ${
+                              resetBusy ? 'animate-pulse' : ''
+                            }`}
+                            title={
+                              resetBusy
+                                ? 'Enviando e-mail…'
+                                : 'Enviar e-mail com link seguro para o usuário definir uma nova senha.'
+                            }
+                            aria-label={
+                              resetBusy
+                                ? 'Enviando e-mail de redefinição de senha'
+                                : 'Enviar e-mail com link para redefinir senha'
+                            }
+                          >
+                            <LockClosedIcon className="h-5 w-5" />
+                          </button>
+                        )}
+                        {u.isActive && u.id !== selfId && (
+                          <button
+                            type="button"
+                            onClick={() => setDeactivateRow(u)}
+                            className="rounded-md p-1.5 text-red-600 hover:bg-red-50"
+                            title="Inativar conta — bloqueia o acesso ao sistema."
+                            aria-label="Inativar usuário"
+                          >
+                            <NoSymbolIcon className="h-5 w-5" />
+                          </button>
+                        )}
+                      </div>
+                    </DataTableTd>
+                  </DataTableRow>
+                );
+              })
+            )}
+          </DataTableBody>
+        </DataTable>
+      )}
+
+      {layout === 'card' && (
+        loading ? (
+          <div className="text-center p-6 bg-white rounded-xl shadow-md">
+            <p className="text-slate-500">Carregando…</p>
+          </div>
+        ) : rows.length === 0 ? (
+          <div className="text-center p-6 bg-white rounded-xl shadow-md">
+            <p className="text-slate-500">Nenhum usuário encontrado.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {rows.map((u) => {
+              const { legalName, companyName } = resolveUserAssociations(u, legalOrganizations, organizations);
               const resendBusy = mailBusy?.userId === u.id && mailBusy.kind === 'first';
               const resetBusy = mailBusy?.userId === u.id && mailBusy.kind === 'reset';
               return (
-                <DataTableRow key={u.id}>
-                  <DataTableTd className="font-medium text-slate-800">{u.fullName}</DataTableTd>
-                  <DataTableTd className="hidden md:table-cell text-slate-600">{u.email}</DataTableTd>
-                  <DataTableTd className="hidden lg:table-cell text-slate-600">{u.phone || '—'}</DataTableTd>
-                  <DataTableTd className="text-xs text-slate-600 align-top" title={title}>
-                    <div className="max-w-[18rem] space-y-1">
-                      <div className="leading-snug">
-                        <span className="font-medium text-slate-400">Org. jurídica:</span>{' '}
-                        <span className="break-words">{legalName}</span>
-                      </div>
-                      <div className="leading-snug">
-                        <span className="font-medium text-slate-400">Empresa:</span>{' '}
-                        <span className="break-words">{companyName}</span>
-                      </div>
-                    </div>
-                  </DataTableTd>
-                  <DataTableTd className="text-slate-600">{roleLabel(u.role)}</DataTableTd>
-                  <DataTableTd>
+                <div key={u.id} className="bg-white rounded-xl shadow-md p-4 flex flex-col gap-2">
+                  <h3 className="font-semibold text-slate-800 truncate">{u.fullName}</h3>
+                  <p className="text-sm text-slate-500 truncate">{u.email}</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">
+                      {roleLabel(u.role)}
+                    </span>
                     <span
                       className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
                         u.isActive ? 'bg-emerald-50 text-emerald-800' : 'bg-slate-100 text-slate-600'
@@ -383,83 +484,189 @@ const UserManagementView: React.FC<UserManagementViewProps> = ({
                     >
                       {u.isActive ? 'Ativo' : 'Inativo'}
                     </span>
-                  </DataTableTd>
-                  <DataTableTd className="align-middle whitespace-nowrap text-right">
-                    <div className="inline-flex flex-row flex-nowrap items-center justify-end gap-0.5">
+                  </div>
+                  <p className="text-xs text-slate-400 truncate">{legalName} / {companyName}</p>
+                  <div className="flex items-center gap-0.5 pt-2 border-t border-slate-100 mt-auto">
+                    <button
+                      type="button"
+                      onClick={() => openEdit(u)}
+                      className={typeMgmtEditIconBtn}
+                      title="Editar"
+                      aria-label="Editar"
+                    >
+                      <EditIcon className="h-5 w-5" />
+                    </button>
+                    {u.isActive && u.id !== selfId && u.needsProfileCompletion && (
                       <button
                         type="button"
-                        onClick={() => openEdit(u)}
-                        className={typeMgmtEditIconBtn}
-                        title="Editar"
-                        aria-label="Editar"
+                        onClick={() => void runResendFirstAccess(u)}
+                        disabled={!!mailBusy}
+                        aria-busy={resendBusy}
+                        className={`rounded-md p-1.5 text-amber-700 hover:bg-amber-50 disabled:opacity-50 ${
+                          resendBusy ? 'animate-pulse' : ''
+                        }`}
+                        title={
+                          resendBusy
+                            ? 'Enviando e-mail…'
+                            : 'Reenviar e-mail com link para definir a senha de primeiro acesso (convite pendente).'
+                        }
+                        aria-label={
+                          resendBusy
+                            ? 'Enviando e-mail de primeiro acesso'
+                            : 'Reenviar e-mail com link para definir a senha de primeiro acesso'
+                        }
                       >
-                        <EditIcon className="h-5 w-5" />
+                        <LockClosedIcon className="h-5 w-5" />
                       </button>
-                      {u.isActive && u.id !== selfId && u.needsProfileCompletion && (
-                        <button
-                          type="button"
-                          onClick={() => void runResendFirstAccess(u)}
-                          disabled={!!mailBusy}
-                          aria-busy={resendBusy}
-                          className={`rounded-md p-1.5 text-amber-700 hover:bg-amber-50 disabled:opacity-50 ${
-                            resendBusy ? 'animate-pulse' : ''
-                          }`}
-                          title={
-                            resendBusy
-                              ? 'Enviando e-mail…'
-                              : 'Reenviar e-mail com link para definir a senha de primeiro acesso (convite pendente).'
-                          }
-                          aria-label={
-                            resendBusy
-                              ? 'Enviando e-mail de primeiro acesso'
-                              : 'Reenviar e-mail com link para definir a senha de primeiro acesso'
-                          }
-                        >
-                          <LockClosedIcon className="h-5 w-5" />
-                        </button>
-                      )}
-                      {u.isActive && u.id !== selfId && !u.needsProfileCompletion && (
-                        <button
-                          type="button"
-                          onClick={() => void runSendPasswordReset(u)}
-                          disabled={!!mailBusy}
-                          aria-busy={resetBusy}
-                          className={`rounded-md p-1.5 text-slate-600 hover:bg-slate-100 disabled:opacity-50 ${
-                            resetBusy ? 'animate-pulse' : ''
-                          }`}
-                          title={
-                            resetBusy
-                              ? 'Enviando e-mail…'
-                              : 'Enviar e-mail com link seguro para o usuário definir uma nova senha.'
-                          }
-                          aria-label={
-                            resetBusy
-                              ? 'Enviando e-mail de redefinição de senha'
-                              : 'Enviar e-mail com link para redefinir senha'
-                          }
-                        >
-                          <LockClosedIcon className="h-5 w-5" />
-                        </button>
-                      )}
-                      {u.isActive && u.id !== selfId && (
-                        <button
-                          type="button"
-                          onClick={() => setDeactivateRow(u)}
-                          className="rounded-md p-1.5 text-red-600 hover:bg-red-50"
-                          title="Inativar conta — bloqueia o acesso ao sistema."
-                          aria-label="Inativar usuário"
-                        >
-                          <NoSymbolIcon className="h-5 w-5" />
-                        </button>
-                      )}
-                    </div>
-                  </DataTableTd>
-                </DataTableRow>
+                    )}
+                    {u.isActive && u.id !== selfId && !u.needsProfileCompletion && (
+                      <button
+                        type="button"
+                        onClick={() => void runSendPasswordReset(u)}
+                        disabled={!!mailBusy}
+                        aria-busy={resetBusy}
+                        className={`rounded-md p-1.5 text-slate-600 hover:bg-slate-100 disabled:opacity-50 ${
+                          resetBusy ? 'animate-pulse' : ''
+                        }`}
+                        title={
+                          resetBusy
+                            ? 'Enviando e-mail…'
+                            : 'Enviar e-mail com link seguro para o usuário definir uma nova senha.'
+                        }
+                        aria-label={
+                          resetBusy
+                            ? 'Enviando e-mail de redefinição de senha'
+                            : 'Enviar e-mail com link para redefinir senha'
+                        }
+                      >
+                        <LockClosedIcon className="h-5 w-5" />
+                      </button>
+                    )}
+                    {u.isActive && u.id !== selfId && (
+                      <button
+                        type="button"
+                        onClick={() => setDeactivateRow(u)}
+                        className="rounded-md p-1.5 text-red-600 hover:bg-red-50"
+                        title="Inativar conta — bloqueia o acesso ao sistema."
+                        aria-label="Inativar usuário"
+                      >
+                        <NoSymbolIcon className="h-5 w-5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
               );
-            })
-          )}
-        </DataTableBody>
-      </DataTable>
+            })}
+          </div>
+        )
+      )}
+
+      {layout === 'list' && (
+        loading ? (
+          <div className="text-center p-6 bg-white rounded-xl shadow-md">
+            <p className="text-slate-500">Carregando…</p>
+          </div>
+        ) : rows.length === 0 ? (
+          <div className="text-center p-6 bg-white rounded-xl shadow-md">
+            <p className="text-slate-500">Nenhum usuário encontrado.</p>
+          </div>
+        ) : (
+          <div className="bg-white rounded-xl shadow-md divide-y divide-slate-200">
+            {rows.map((u) => {
+              const resendBusy = mailBusy?.userId === u.id && mailBusy.kind === 'first';
+              const resetBusy = mailBusy?.userId === u.id && mailBusy.kind === 'reset';
+              return (
+                <div key={u.id} className="flex items-center gap-4 p-4">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-slate-800 truncate">{u.fullName}</h3>
+                    <p className="text-sm text-slate-500 truncate">{u.email}</p>
+                  </div>
+                  <div className="hidden sm:flex items-center gap-2 shrink-0">
+                    <span className="inline-flex rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">
+                      {roleLabel(u.role)}
+                    </span>
+                    <span
+                      className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                        u.isActive ? 'bg-emerald-50 text-emerald-800' : 'bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      {u.isActive ? 'Ativo' : 'Inativo'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-0.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => openEdit(u)}
+                      className={typeMgmtEditIconBtn}
+                      title="Editar"
+                      aria-label="Editar"
+                    >
+                      <EditIcon className="h-5 w-5" />
+                    </button>
+                    {u.isActive && u.id !== selfId && u.needsProfileCompletion && (
+                      <button
+                        type="button"
+                        onClick={() => void runResendFirstAccess(u)}
+                        disabled={!!mailBusy}
+                        aria-busy={resendBusy}
+                        className={`rounded-md p-1.5 text-amber-700 hover:bg-amber-50 disabled:opacity-50 ${
+                          resendBusy ? 'animate-pulse' : ''
+                        }`}
+                        title={
+                          resendBusy
+                            ? 'Enviando e-mail…'
+                            : 'Reenviar e-mail com link para definir a senha de primeiro acesso (convite pendente).'
+                        }
+                        aria-label={
+                          resendBusy
+                            ? 'Enviando e-mail de primeiro acesso'
+                            : 'Reenviar e-mail com link para definir a senha de primeiro acesso'
+                        }
+                      >
+                        <LockClosedIcon className="h-5 w-5" />
+                      </button>
+                    )}
+                    {u.isActive && u.id !== selfId && !u.needsProfileCompletion && (
+                      <button
+                        type="button"
+                        onClick={() => void runSendPasswordReset(u)}
+                        disabled={!!mailBusy}
+                        aria-busy={resetBusy}
+                        className={`rounded-md p-1.5 text-slate-600 hover:bg-slate-100 disabled:opacity-50 ${
+                          resetBusy ? 'animate-pulse' : ''
+                        }`}
+                        title={
+                          resetBusy
+                            ? 'Enviando e-mail…'
+                            : 'Enviar e-mail com link seguro para o usuário definir uma nova senha.'
+                        }
+                        aria-label={
+                          resetBusy
+                            ? 'Enviando e-mail de redefinição de senha'
+                            : 'Enviar e-mail com link para redefinir senha'
+                        }
+                      >
+                        <LockClosedIcon className="h-5 w-5" />
+                      </button>
+                    )}
+                    {u.isActive && u.id !== selfId && (
+                      <button
+                        type="button"
+                        onClick={() => setDeactivateRow(u)}
+                        className="rounded-md p-1.5 text-red-600 hover:bg-red-50"
+                        title="Inativar conta — bloqueia o acesso ao sistema."
+                        aria-label="Inativar usuário"
+                      >
+                        <NoSymbolIcon className="h-5 w-5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )
+      )}
 
       {!loading && total > 0 && (
         <Pagination currentPage={currentPage} totalItems={total} itemsPerPage={pageSize} onPageChange={setCurrentPage} />

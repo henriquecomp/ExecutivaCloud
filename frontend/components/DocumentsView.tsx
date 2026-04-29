@@ -4,7 +4,6 @@ import Modal from './Modal';
 import ConfirmationModal from './ConfirmationModal';
 import ImageModal from './ImageModal';
 import { EditIcon, DeleteIcon, PlusIcon, CogIcon, UploadIcon, PrinterIcon } from './Icons';
-import ViewSwitcher from './ViewSwitcher';
 import { downloadCsv, todayStamp } from '../utils/csvDownload';
 import { FormDangerAlert } from './ui/FormDangerAlert';
 import AppButton from './ui/AppButton';
@@ -36,6 +35,7 @@ interface DocumentsViewProps {
   setDocumentCategories: React.Dispatch<React.SetStateAction<DocumentCategory[]>>;
   executiveId: string;
   onRefresh: () => Promise<void>;
+  layout: LayoutView;
 }
 
 // --- Category Management Components ---
@@ -276,7 +276,7 @@ const DocumentForm: React.FC<{ document: Partial<Document>, onSave: (doc: Docume
 };
 
 // --- Main View Component ---
-const DocumentsView: React.FC<DocumentsViewProps> = ({ documents, setDocuments, documentCategories, setDocumentCategories, executiveId, onRefresh }) => {
+const DocumentsView: React.FC<DocumentsViewProps> = ({ documents, setDocuments, documentCategories, setDocumentCategories, executiveId, onRefresh, layout }) => {
     const [isModalOpen, setModalOpen] = useState(false);
     const [editingDoc, setEditingDoc] = useState<Partial<Document> | null>(null);
     const [docToDelete, setDocToDelete] = useState<Document | null>(null);
@@ -284,7 +284,6 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({ documents, setDocuments, 
     const [filterCategory, setFilterCategory] = useState<string>('all');
     const [viewingImage, setViewingImage] = useState<string | null>(null);
     const [docListError, setDocListError] = useState<string | null>(null);
-    const [layout, setLayout] = useState<LayoutView>('card');
     const [limit, setLimit] = useState(12);
     const [currentPage, setCurrentPage] = useState(1);
 
@@ -347,7 +346,6 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({ documents, setDocuments, 
         <div className="space-y-6 animate-fade-in">
             <FormDangerAlert message={docListError} />
             <div className="flex flex-wrap items-center justify-end gap-2">
-                <ViewSwitcher layout={layout} setLayout={setLayout} />
                 <AppSelect id="limit-docs" value={limit} onChange={(e) => setLimit(Number(e.target.value))} className="w-auto min-w-[5rem]" aria-label="Itens por página">
                     <option value={12}>12</option>
                     <option value={24}>24</option>

@@ -3,7 +3,6 @@ import { Expense, ExpenseStatus, LayoutView, ExpenseCategory, ExpenseType, Expen
 import Modal from './Modal';
 import ConfirmationModal from './ConfirmationModal';
 import Pagination from './Pagination';
-import ViewSwitcher from './ViewSwitcher';
 import { EditIcon, DeleteIcon, PlusIcon, CogIcon, PrinterIcon } from './Icons';
 import { downloadCsv, todayStamp } from '../utils/csvDownload';
 import {
@@ -34,6 +33,7 @@ interface FinancesViewProps {
   expenseCategories: ExpenseCategory[];
   executiveId: string;
   onRefresh: () => Promise<void>;
+  layout: LayoutView;
 }
 
 // --- Category Management Components ---
@@ -298,7 +298,7 @@ const ExpenseForm: React.FC<{ expense: Partial<Expense>, onSave: (expense: Expen
     );
 };
 
-const FinancesView: React.FC<FinancesViewProps> = ({ expenses, expenseCategories, executiveId, onRefresh }) => {
+const FinancesView: React.FC<FinancesViewProps> = ({ expenses, expenseCategories, executiveId, onRefresh, layout }) => {
     const [isModalOpen, setModalOpen] = useState(false);
     const [editingExpense, setEditingExpense] = useState<Partial<Expense> | null>(null);
     const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null);
@@ -315,7 +315,6 @@ const FinancesView: React.FC<FinancesViewProps> = ({ expenses, expenseCategories
     const [filterEntityType, setFilterEntityType] = useState<ExpenseEntityType | 'all'>('all');
     const [filterCategory, setFilterCategory] = useState<string>('all');
     
-    const [layout, setLayout] = useState<LayoutView>('table');
     const [limit, setLimit] = useState(10);
     const [currentPage, setCurrentPage] = useState(1);
 
@@ -527,7 +526,6 @@ const FinancesView: React.FC<FinancesViewProps> = ({ expenses, expenseCategories
         <div className="space-y-6 animate-fade-in">
             <FormDangerAlert message={pageError} />
             <div className="flex flex-wrap items-center justify-end gap-2">
-                <ViewSwitcher layout={layout} setLayout={setLayout} />
                 <AppSelect id="limit" value={limit} onChange={(e) => setLimit(Number(e.target.value))} className="w-auto min-w-[5rem]" aria-label="Itens por página">
                     <option value={10}>10</option>
                     <option value={30}>30</option>
