@@ -10,7 +10,6 @@ import {
   SettingsIcon,
   TasksIcon,
   SecretariesIcon,
-  ReportsIcon,
   DocumentsIcon,
   BriefcaseIcon,
   UserIcon,
@@ -28,6 +27,5 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   { view: 'contacts', label: 'Contatos', icon: <ContactsIcon className="w-6 h-6" /> },
   { view: 'finances', label: 'Finanças', icon: <ExpensesIcon className="w-6 h-6" /> },
   { view: 'tasks', label: 'Tarefas', icon: <TasksIcon className="w-6 h-6" /> },
-  { view: 'reports', label: 'Relatórios', icon: <ReportsIcon className="w-6 h-6" /> },
   { view: 'settings', label: 'Configurações', icon: <SettingsIcon className="w-6 h-6" /> },
 ];

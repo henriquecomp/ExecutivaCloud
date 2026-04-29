@@ -4,7 +4,8 @@ import Modal from './Modal';
 import ConfirmationModal from './ConfirmationModal';
 import Pagination from './Pagination';
 import ViewSwitcher from './ViewSwitcher';
-import { EditIcon, DeleteIcon, PlusIcon, CogIcon } from './Icons';
+import { EditIcon, DeleteIcon, PlusIcon, CogIcon, PrinterIcon } from './Icons';
+import { downloadCsv, todayStamp } from '../utils/csvDownload';
 import {
   DataTable,
   DataTableBody,
@@ -525,7 +526,34 @@ const FinancesView: React.FC<FinancesViewProps> = ({ expenses, expenseCategories
     return (
         <div className="space-y-6 animate-fade-in">
             <FormDangerAlert message={pageError} />
-            <div className="flex flex-wrap justify-end items-center gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+                <ViewSwitcher layout={layout} setLayout={setLayout} />
+                <AppSelect id="limit" value={limit} onChange={(e) => setLimit(Number(e.target.value))} className="w-auto min-w-[5rem]" aria-label="Itens por página">
+                    <option value={10}>10</option>
+                    <option value={30}>30</option>
+                    <option value={50}>50</option>
+                </AppSelect>
+                <AppButton
+                    type="button"
+                    variant="ghost"
+                    className="!p-2"
+                    title="Exportar resultados para CSV"
+                    aria-label="Exportar resultados para CSV"
+                    onClick={() => {
+                        const rows = filteredExpensesForTable.map(e => ({
+                            Descrição: e.description,
+                            Tipo: e.type,
+                            Origem: e.entityType,
+                            Categoria: expenseCategories.find(c => c.id === e.categoryId)?.name ?? '',
+                            Data: e.expenseDate,
+                            Valor: e.amount,
+                            Status: e.status,
+                        }));
+                        downloadCsv(['Descrição', 'Tipo', 'Origem', 'Categoria', 'Data', 'Valor', 'Status'], rows, `financas_${todayStamp()}.csv`);
+                    }}
+                >
+                    <PrinterIcon />
+                </AppButton>
                 <AppButton
                     type="button"
                     variant="primary"
@@ -547,20 +575,6 @@ const FinancesView: React.FC<FinancesViewProps> = ({ expenses, expenseCategories
                     <CogIcon />
                 </AppButton>
             </div>
-
-            <ToolbarPanel className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <ViewSwitcher layout={layout} setLayout={setLayout} />
-                <div className="flex items-center gap-2">
-                    <AppLabel htmlFor="limit" className="mb-0 inline text-slate-600">
-                        Itens por página
-                    </AppLabel>
-                    <AppSelect id="limit" value={limit} onChange={(e) => setLimit(Number(e.target.value))} className="w-auto min-w-[5rem]">
-                        <option value={10}>10</option>
-                        <option value={30}>30</option>
-                        <option value={50}>50</option>
-                    </AppSelect>
-                </div>
-            </ToolbarPanel>
 
             <ToolbarPanel className="space-y-4">
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">

@@ -4,7 +4,8 @@ import Modal from './Modal';
 import ConfirmationModal from './ConfirmationModal';
 import Pagination from './Pagination';
 import ViewSwitcher from './ViewSwitcher';
-import { EditIcon, DeleteIcon, PlusIcon, EmailIcon, PhoneIcon, CogIcon } from './Icons';
+import { EditIcon, DeleteIcon, PlusIcon, EmailIcon, PhoneIcon, CogIcon, PrinterIcon } from './Icons';
+import { downloadCsv, todayStamp } from '../utils/csvDownload';
 import { FormDangerAlert } from './ui/FormDangerAlert';
 import { contactTypeService } from '../services/contactTypeService';
 import { contactService } from '../services/contactService';
@@ -500,7 +501,31 @@ const ContactsView: React.FC<ContactsViewProps> = ({ contacts, contactTypes, exe
     return (
         <div className="space-y-6 animate-fade-in">
             <FormDangerAlert message={contactListError} />
-            <div className="flex flex-wrap justify-end items-center gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+                <ViewSwitcher layout={layout} setLayout={setLayout} />
+                <AppSelect id="limit" value={limit} onChange={(e) => setLimit(Number(e.target.value))} className="w-auto min-w-[5rem]" aria-label="Itens por página">
+                    <option value={10}>10</option>
+                    <option value={30}>30</option>
+                    <option value={50}>50</option>
+                </AppSelect>
+                <AppButton
+                    type="button"
+                    variant="ghost"
+                    className="!p-2"
+                    title="Exportar resultados para CSV"
+                    aria-label="Exportar resultados para CSV"
+                    onClick={() => {
+                        const rows = filteredContacts.map(c => ({
+                            Nome: c.fullName,
+                            Tipo: contactTypes.find(ct => ct.id === c.contactTypeId)?.name ?? '',
+                            Email: c.email ?? '',
+                            Telefone: c.phone ?? '',
+                        }));
+                        downloadCsv(['Nome', 'Tipo', 'Email', 'Telefone'], rows, `contatos_${todayStamp()}.csv`);
+                    }}
+                >
+                    <PrinterIcon />
+                </AppButton>
                 <AppButton
                     type="button"
                     variant="primary"
@@ -522,20 +547,6 @@ const ContactsView: React.FC<ContactsViewProps> = ({ contacts, contactTypes, exe
                     <CogIcon />
                 </AppButton>
             </div>
-
-            <ToolbarPanel className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <ViewSwitcher layout={layout} setLayout={setLayout} />
-                <div className="flex items-center gap-2">
-                    <AppLabel htmlFor="limit" className="mb-0 inline text-slate-600">
-                        Itens por página
-                    </AppLabel>
-                    <AppSelect id="limit" value={limit} onChange={(e) => setLimit(Number(e.target.value))} className="w-auto min-w-[5rem]">
-                        <option value={10}>10</option>
-                        <option value={30}>30</option>
-                        <option value={50}>50</option>
-                    </AppSelect>
-                </div>
-            </ToolbarPanel>
 
             <ToolbarPanel>
                 <div className="flex flex-wrap items-center gap-2">

@@ -1,8 +1,10 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Secretary, Executive, User, Organization, Department } from '../types';
-import { ChevronDownIcon, ExclamationTriangleIcon } from './Icons';
+import { Secretary, Executive, User, Organization, Department, LayoutView } from '../types';
+import { ChevronDownIcon, ExclamationTriangleIcon, PrinterIcon } from './Icons';
+import ViewSwitcher from './ViewSwitcher';
+import { downloadCsv, todayStamp } from '../utils/csvDownload';
+import AppButton from './ui/AppButton';
 import AppSearchInput from './ui/AppSearchInput';
-import AppLabel from './ui/AppLabel';
 import AppSelect from './ui/AppSelect';
 import ToolbarPanel from './ui/ToolbarPanel';
 import Pagination from './Pagination';
@@ -626,6 +628,7 @@ const SecretariesView: React.FC<SecretariesViewProps> = ({
         });
     }, [visibleSecretaries, searchTerm]);
 
+    const [layout, setLayout] = useState<LayoutView>('table');
     const [limit, setLimit] = useState(10);
     const [currentPage, setCurrentPage] = useState(1);
 
@@ -657,18 +660,35 @@ const SecretariesView: React.FC<SecretariesViewProps> = ({
                 />
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
-                    <AppLabel htmlFor="limit-secretaries" className="mb-0 inline text-slate-600">
-                        Itens por página
-                    </AppLabel>
-                    <AppSelect id="limit-secretaries" value={limit} onChange={(e) => setLimit(Number(e.target.value))} className="w-auto min-w-[5rem]">
+                    <ViewSwitcher layout={layout} setLayout={setLayout} />
+                    <AppSelect id="limit-secretaries" value={limit} onChange={(e) => setLimit(Number(e.target.value))} className="w-auto min-w-[5rem]" aria-label="Itens por página">
                         <option value={10}>10</option>
                         <option value={30}>30</option>
                         <option value={50}>50</option>
                     </AppSelect>
+                    <AppButton
+                        type="button"
+                        variant="ghost"
+                        className="!p-2"
+                        title="Exportar resultados para CSV"
+                        aria-label="Exportar resultados para CSV"
+                        onClick={() => {
+                            const rows = filteredSecretaries.map(s => ({
+                                Nome: s.fullName,
+                                Cargo: s.jobTitle ?? '',
+                                'E-mail': s.workEmail ?? '',
+                                'Executivos Atendidos': getExecutiveNames(s.executiveIds),
+                            }));
+                            downloadCsv(['Nome', 'Cargo', 'E-mail', 'Executivos Atendidos'], rows, `secretarias_${todayStamp()}.csv`);
+                        }}
+                    >
+                        <PrinterIcon />
+                    </AppButton>
                 </div>
             </ToolbarPanel>
 
-            <DataTable>
+            {layout === 'table' && (
+              <DataTable>
                 <DataTableHead>
                     <tr>
                         <DataTableTh>Nome</DataTableTh>
@@ -691,7 +711,41 @@ const SecretariesView: React.FC<SecretariesViewProps> = ({
                         ))
                     )}
                 </DataTableBody>
-            </DataTable>
+              </DataTable>
+            )}
+            {layout === 'card' && (
+              filteredSecretaries.length === 0 ? (
+                <div className="text-center p-6 bg-white rounded-xl shadow-md"><p className="text-slate-500">Nenhuma secretária encontrada.</p></div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {paginatedSecretaries.map((sec) => (
+                    <div key={sec.id} className="bg-white rounded-xl shadow-md p-4 space-y-1">
+                      <h3 className="font-semibold text-slate-800 truncate">{sec.fullName}</h3>
+                      <p className="text-sm text-slate-600">{sec.jobTitle || '-'}</p>
+                      {sec.workEmail && <p className="text-sm text-slate-500 truncate">{sec.workEmail}</p>}
+                      <p className="text-xs text-slate-500">{getExecutiveNames(sec.executiveIds) || '-'}</p>
+                    </div>
+                  ))}
+                </div>
+              )
+            )}
+            {layout === 'list' && (
+              filteredSecretaries.length === 0 ? (
+                <div className="text-center p-6 bg-white rounded-xl shadow-md"><p className="text-slate-500">Nenhuma secretária encontrada.</p></div>
+              ) : (
+                <div className="bg-white rounded-xl shadow-md divide-y divide-slate-200">
+                  {paginatedSecretaries.map((sec) => (
+                    <div key={sec.id} className="flex items-center gap-4 p-4">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-slate-800 truncate">{sec.fullName}</h3>
+                        <p className="text-sm text-slate-500">{sec.jobTitle || '-'} — {sec.workEmail || '-'}</p>
+                      </div>
+                      <p className="text-sm text-slate-600 text-right shrink-0 hidden sm:block">{getExecutiveNames(sec.executiveIds) || '-'}</p>
+                    </div>
+                  ))}
+                </div>
+              )
+            )}
 
             {filteredSecretaries.length > 0 && (
                 <Pagination

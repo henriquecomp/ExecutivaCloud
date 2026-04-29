@@ -1,12 +1,21 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Organization, Department, Executive, User, Secretary, Event, Contact, Expense, Task, Document, LegalOrganization, OrganizationCreate, OrganizationUpdate, DepartmentCreate, DepartmentUpdate } from '../types';
+import { Organization, Department, Executive, User, Secretary, Event, Contact, Expense, Task, Document, LegalOrganization, OrganizationCreate, OrganizationUpdate, DepartmentCreate, DepartmentUpdate, LayoutView } from '../types';
 import Modal from './Modal';
 import ConfirmationModal from './ConfirmationModal';
-import { EditIcon, DeleteIcon, PlusIcon } from './Icons';
+import { EditIcon, DeleteIcon, PlusIcon, PrinterIcon } from './Icons';
+import ViewSwitcher from './ViewSwitcher';
+import { downloadCsv, todayStamp } from '../utils/csvDownload';
+import {
+  DataTable,
+  DataTableBody,
+  DataTableHead,
+  DataTableRow,
+  DataTableTd,
+  DataTableTh,
+} from './ui/DataTable';
 import { organizationService } from '@/services/organizationService';
 import { departmentService } from '@/services/departmentService';
 import AppButton from './ui/AppButton';
-import AppLabel from './ui/AppLabel';
 import AppSelect from './ui/AppSelect';
 import ToolbarPanel from './ui/ToolbarPanel';
 import Pagination from './Pagination';
@@ -412,6 +421,7 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
         return organizations;
     }, [organizations, currentUser, isOrgAdmin]);
 
+    const [layout, setLayout] = useState<LayoutView>('card');
     const [orgPageLimit, setOrgPageLimit] = useState(6);
     const [orgCurrentPage, setOrgCurrentPage] = useState(1);
 
@@ -559,7 +569,38 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
                 </div>
             )}
 
-            <div className="flex justify-end">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+                <ViewSwitcher layout={layout} setLayout={setLayout} />
+                <AppSelect
+                    id="limit-orgs"
+                    value={orgPageLimit}
+                    onChange={(e) => setOrgPageLimit(Number(e.target.value))}
+                    className="w-auto min-w-[5rem]"
+                    aria-label="Itens por página"
+                >
+                    <option value={4}>4</option>
+                    <option value={6}>6</option>
+                    <option value={12}>12</option>
+                </AppSelect>
+                <AppButton
+                    type="button"
+                    variant="ghost"
+                    className="!p-2"
+                    title="Exportar resultados para CSV"
+                    aria-label="Exportar resultados para CSV"
+                    onClick={() => {
+                        const rows = visibleOrganizations.map(o => ({
+                            Nome: o.name,
+                            CNPJ: o.cnpj ?? '',
+                            'Organização Legal': legalOrganizations.find(lo => String(lo.id) === String(o.legalOrganizationId))?.name ?? '',
+                            Cidade: o.city ?? '',
+                            Estado: o.state ?? '',
+                        }));
+                        downloadCsv(['Nome', 'CNPJ', 'Organização Legal', 'Cidade', 'Estado'], rows, `empresas_${todayStamp()}.csv`);
+                    }}
+                >
+                    <PrinterIcon />
+                </AppButton>
                 <AppButton
                     onClick={handleAddOrganization}
                     disabled={isOrgAdmin}
@@ -571,27 +612,8 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
                 </AppButton>
             </div>
 
-            {visibleOrganizations.length > 0 && (
-                <ToolbarPanel className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-                    <div className="flex items-center gap-2">
-                        <AppLabel htmlFor="limit-orgs" className="mb-0 inline text-slate-600">
-                            Itens por página
-                        </AppLabel>
-                        <AppSelect
-                            id="limit-orgs"
-                            value={orgPageLimit}
-                            onChange={(e) => setOrgPageLimit(Number(e.target.value))}
-                            className="w-auto min-w-[5rem]"
-                        >
-                            <option value={4}>4</option>
-                            <option value={6}>6</option>
-                            <option value={12}>12</option>
-                        </AppSelect>
-                    </div>
-                </ToolbarPanel>
-            )}
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {(layout === 'card' || layout === 'list') && (
+              <div className={layout === 'card' ? "grid grid-cols-1 lg:grid-cols-2 gap-6" : "space-y-4"}>
                 {paginatedOrganizations.map(org => {
                     const orgDepartments = departments.filter(d => String(d.organizationId) === String(org.id));
                     const legalOrg = legalOrganizations.find(lo => String(lo.id) === String(org.legalOrganizationId));
@@ -604,22 +626,12 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
                                     {org.cnpj && <p className="text-sm text-slate-500 mt-1">CNPJ: {org.cnpj}</p>}
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    {/* type="button" adicionado */}
-                                    <button type="button" onClick={(e) => handleEditOrganization(e, org)} className="p-2 text-slate-500 hover:text-indigo-600 rounded-full hover:bg-slate-100 transition" aria-label="Editar empresa">
-                                        <EditIcon />
-                                    </button>
-                                    {/* type="button" adicionado */}
-                                    <button 
-                                        type="button"
-                                        onClick={(e) => handleDeleteOrganization(e, org)}
-                                        disabled={isOrgAdmin}
-                                        className="p-2 text-slate-500 hover:text-red-600 rounded-full hover:bg-slate-100 transition disabled:text-slate-300 disabled:hover:text-slate-300 disabled:cursor-not-allowed" aria-label="Excluir empresa"
-                                    >
-                                        <DeleteIcon />
-                                    </button>
+                                    <button type="button" onClick={(e) => handleEditOrganization(e, org)} className="p-2 text-slate-500 hover:text-indigo-600 rounded-full hover:bg-slate-100 transition" aria-label="Editar empresa"><EditIcon /></button>
+                                    <button type="button" onClick={(e) => handleDeleteOrganization(e, org)} disabled={isOrgAdmin} className="p-2 text-slate-500 hover:text-red-600 rounded-full hover:bg-slate-100 transition disabled:text-slate-300 disabled:hover:text-slate-300 disabled:cursor-not-allowed" aria-label="Excluir empresa"><DeleteIcon /></button>
                                 </div>
                             </header>
-                            <div className="p-4 flex-1">
+                            {layout === 'card' && (
+                              <div className="p-4 flex-1">
                                 {(org.street || org.city) && (
                                     <div className="mb-4 text-sm text-slate-600 border-b border-slate-200 pb-4">
                                         <address className="not-italic">
@@ -636,7 +648,6 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
                                             <li key={dept.id} className="flex items-center justify-between p-2 bg-slate-50 rounded-md">
                                                 <p className="text-slate-700">{dept.name}</p>
                                                 <div className="flex items-center gap-1">
-                                                    {/* type="button" adicionado */}
                                                     <button type="button" onClick={(e) => handleEditDepartment(e, dept)} className="p-1 text-slate-400 hover:text-indigo-600" aria-label="Editar departamento"><EditIcon /></button>
                                                     <button type="button" onClick={(e) => handleDeleteDepartment(e, dept)} className="p-1 text-slate-400 hover:text-red-600" aria-label="Excluir departamento"><DeleteIcon /></button>
                                                 </div>
@@ -646,36 +657,58 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
                                 ) : (
                                     <p className="text-sm text-slate-500 text-center py-4">Nenhum departamento cadastrado.</p>
                                 )}
-                            </div>
-                            <footer className="p-4 border-t border-slate-200">
-                                <button
-                                    type="button"
-                                    onClick={(e) => handleAddDepartment(e, org.id)}
-                                    className="flex w-full items-center justify-center rounded-md bg-slate-100 px-3 py-2 text-slate-700 transition hover:bg-slate-200"
-                                    title="Adicionar departamento"
-                                    aria-label="Adicionar departamento"
-                                >
-                                    <PlusIcon />
-                                </button>
-                            </footer>
+                              </div>
+                            )}
+                            {layout === 'card' && (
+                              <footer className="p-4 border-t border-slate-200">
+                                <button type="button" onClick={(e) => handleAddDepartment(e, org.id)} className="flex w-full items-center justify-center rounded-md bg-slate-100 px-3 py-2 text-slate-700 transition hover:bg-slate-200" title="Adicionar departamento" aria-label="Adicionar departamento"><PlusIcon /></button>
+                              </footer>
+                            )}
                         </div>
                     );
                 })}
-
                 {visibleOrganizations.length === 0 && (
-                    <div className="lg:col-span-2 text-center p-6 bg-white rounded-xl shadow-md">
-                        <p className="text-slate-500">Nenhuma empresa cadastrada.</p>
-                    </div>
+                    <div className="lg:col-span-2 text-center p-6 bg-white rounded-xl shadow-md"><p className="text-slate-500">Nenhuma empresa cadastrada.</p></div>
                 )}
-            </div>
+              </div>
+            )}
+            {layout === 'table' && (
+              <DataTable>
+                <DataTableHead>
+                  <tr>
+                    <DataTableTh>Nome</DataTableTh>
+                    <DataTableTh className="hidden md:table-cell">CNPJ</DataTableTh>
+                    <DataTableTh className="hidden lg:table-cell">Organização Legal</DataTableTh>
+                    <DataTableTh className="hidden lg:table-cell">Cidade / Estado</DataTableTh>
+                    <DataTableTh className="min-w-[6rem] whitespace-nowrap text-right">Ações</DataTableTh>
+                  </tr>
+                </DataTableHead>
+                <DataTableBody>
+                  {visibleOrganizations.length === 0 ? (
+                    <tr><td colSpan={5} className="text-center p-6 text-slate-500">Nenhuma empresa cadastrada.</td></tr>
+                  ) : paginatedOrganizations.map(org => {
+                    const legalOrg = legalOrganizations.find(lo => String(lo.id) === String(org.legalOrganizationId));
+                    return (
+                      <DataTableRow key={org.id}>
+                        <DataTableTd className="font-medium text-slate-800">{org.name}</DataTableTd>
+                        <DataTableTd className="hidden md:table-cell text-slate-600">{org.cnpj || '-'}</DataTableTd>
+                        <DataTableTd className="hidden lg:table-cell text-slate-600">{legalOrg?.name || '-'}</DataTableTd>
+                        <DataTableTd className="hidden lg:table-cell text-slate-600">{[org.city, org.state].filter(Boolean).join(' / ') || '-'}</DataTableTd>
+                        <DataTableTd className="text-right">
+                          <div className="inline-flex items-center gap-1">
+                            <button type="button" onClick={(e) => handleEditOrganization(e, org)} className="p-2 text-slate-500 hover:text-indigo-600 rounded-full hover:bg-slate-100 transition" aria-label="Editar empresa"><EditIcon /></button>
+                            <button type="button" onClick={(e) => handleDeleteOrganization(e, org)} disabled={isOrgAdmin} className="p-2 text-slate-500 hover:text-red-600 rounded-full hover:bg-slate-100 transition disabled:text-slate-300 disabled:hover:text-slate-300 disabled:cursor-not-allowed" aria-label="Excluir empresa"><DeleteIcon /></button>
+                          </div>
+                        </DataTableTd>
+                      </DataTableRow>
+                    );
+                  })}
+                </DataTableBody>
+              </DataTable>
+            )}
 
             {visibleOrganizations.length > 0 && (
-                <Pagination
-                    currentPage={orgCurrentPage}
-                    totalItems={visibleOrganizations.length}
-                    itemsPerPage={orgPageLimit}
-                    onPageChange={setOrgCurrentPage}
-                />
+                <Pagination currentPage={orgCurrentPage} totalItems={visibleOrganizations.length} itemsPerPage={orgPageLimit} onPageChange={setOrgCurrentPage} />
             )}
 
             {/* AQUI ESTÁ A CORREÇÃO PRINCIPAL: Passando isOpen explicitamente e removendo o && */}

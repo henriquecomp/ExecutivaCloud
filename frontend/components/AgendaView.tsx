@@ -1,9 +1,19 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Event, EventType, RecurrenceRule } from '../types';
+import { Event, EventType, RecurrenceRule, LayoutView } from '../types';
 import Modal from './Modal';
 import ConfirmationModal from './ConfirmationModal';
 import Pagination from './Pagination';
-import { EditIcon, DeleteIcon, PlusIcon, BellIcon, RecurrenceIcon, CogIcon } from './Icons';
+import { EditIcon, DeleteIcon, PlusIcon, BellIcon, RecurrenceIcon, CogIcon, PrinterIcon } from './Icons';
+import ViewSwitcher from './ViewSwitcher';
+import { downloadCsv, todayStamp } from '../utils/csvDownload';
+import {
+  DataTable,
+  DataTableBody,
+  DataTableHead,
+  DataTableRow,
+  DataTableTd,
+  DataTableTh,
+} from './ui/DataTable';
 import { FormDangerAlert } from './ui/FormDangerAlert';
 import AppButton from './ui/AppButton';
 import AppInput from './ui/AppInput';
@@ -558,6 +568,7 @@ const AgendaView: React.FC<AgendaViewProps> = ({ events, setEvents, eventTypes, 
     const [isSettingsModalOpen, setSettingsModalOpen] = useState(false);
     const [listActionError, setListActionError] = useState<string | null>(null);
 
+    const [layout, setLayout] = useState<LayoutView>('list');
     const [limit, setLimit] = useState(10);
     const [currentPage, setCurrentPage] = useState(1);
     
@@ -694,7 +705,38 @@ const AgendaView: React.FC<AgendaViewProps> = ({ events, setEvents, eventTypes, 
     return (
         <div className="space-y-6 animate-fade-in">
             <FormDangerAlert message={listActionError} />
-            <div className="flex flex-wrap justify-end items-center gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+                <ViewSwitcher layout={layout} setLayout={setLayout} />
+                <AppSelect
+                    id="limit-agenda"
+                    value={limit}
+                    onChange={(e) => setLimit(Number(e.target.value))}
+                    className="w-auto min-w-[5rem]"
+                    aria-label="Itens por página"
+                >
+                    <option value={10}>10</option>
+                    <option value={30}>30</option>
+                    <option value={50}>50</option>
+                </AppSelect>
+                <AppButton
+                    type="button"
+                    variant="ghost"
+                    className="!p-2"
+                    title="Exportar resultados para CSV"
+                    aria-label="Exportar resultados para CSV"
+                    onClick={() => {
+                        const rows = sortedEvents.map(ev => ({
+                            Título: ev.title,
+                            Início: new Date(ev.startTime).toLocaleString('pt-BR'),
+                            Tipo: eventTypes.find(et => et.id === ev.eventTypeId)?.name ?? '',
+                            Local: ev.location ?? '',
+                            Recorrente: ev.recurrenceId ? 'Sim' : 'Não',
+                        }));
+                        downloadCsv(['Título', 'Início', 'Tipo', 'Local', 'Recorrente'], rows, `agenda_${todayStamp()}.csv`);
+                    }}
+                >
+                    <PrinterIcon />
+                </AppButton>
                 <AppButton
                     type="button"
                     variant="primary"
@@ -716,72 +758,127 @@ const AgendaView: React.FC<AgendaViewProps> = ({ events, setEvents, eventTypes, 
                     <CogIcon />
                 </AppButton>
             </div>
-            
-            <ToolbarPanel className="flex flex-wrap items-center justify-end gap-2">
-                <AppLabel htmlFor="limit-agenda" className="mb-0 inline text-slate-600">
-                    Itens por página
-                </AppLabel>
-                <AppSelect
-                    id="limit-agenda"
-                    value={limit}
-                    onChange={(e) => setLimit(Number(e.target.value))}
-                    className="w-auto min-w-[5rem]"
-                >
-                    <option value={10}>10</option>
-                    <option value={30}>30</option>
-                    <option value={50}>50</option>
-                </AppSelect>
-            </ToolbarPanel>
 
-            <div className="bg-white p-4 sm:p-6 rounded-xl shadow-md space-y-4">
-              {paginatedEvents.length > 0 ? paginatedEvents.map(event => {
-                  const eventType = eventTypes.find(et => et.id === event.eventTypeId);
-                  return (
-                      <div key={event.id} className="flex items-start space-x-4 p-4 rounded-lg bg-slate-50" style={{borderLeft: `4px solid ${eventType?.color || '#a855f7'}`}}>
-                          <div className="flex-shrink-0 text-center bg-slate-700 text-white rounded-lg p-3 w-24">
-                              <p className="text-3xl font-bold">{formatTime(event.startTime)}</p>
-                              <p className="text-sm">{new Date(event.startTime).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}</p>
-                          </div>
-                          <div className="flex-1">
-                              <div className="flex items-center gap-3">
-                                <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
-                                  {event.recurrenceId && <span className="text-slate-400" title="Evento recorrente"><RecurrenceIcon className="w-4 h-4" /></span>}
-                                  {event.title}
-                                </h3>
-                                {eventType && <span className="text-xs font-semibold px-2 py-1 rounded-full" style={{backgroundColor: eventType.color, color: '#fff'}}>{eventType.name}</span>}
+            {(() => {
+              const renderListView = () => (
+                <div className="bg-white p-4 sm:p-6 rounded-xl shadow-md space-y-4">
+                  {paginatedEvents.length > 0 ? paginatedEvents.map(event => {
+                      const eventType = eventTypes.find(et => et.id === event.eventTypeId);
+                      return (
+                          <div key={event.id} className="flex items-start space-x-4 p-4 rounded-lg bg-slate-50" style={{borderLeft: `4px solid ${eventType?.color || '#a855f7'}`}}>
+                              <div className="flex-shrink-0 text-center bg-slate-700 text-white rounded-lg p-3 w-24">
+                                  <p className="text-3xl font-bold">{formatTime(event.startTime)}</p>
+                                  <p className="text-sm">{new Date(event.startTime).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}</p>
                               </div>
-                              <p className="text-slate-500">{event.location}</p>
-                              {event.reminderMinutes && (
-                                <p className="text-sm text-slate-500 mt-1 flex items-center gap-1">
-                                    <BellIcon className="w-4 h-4" /> Lembrete: {formatReminderText(event.reminderMinutes)}
-                                </p>
-                              )}
-                              <p className="text-sm text-slate-400 mt-1">{formatFullDate(event.startTime)}</p>
+                              <div className="flex-1">
+                                  <div className="flex items-center gap-3">
+                                    <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+                                      {event.recurrenceId && <span className="text-slate-400" title="Evento recorrente"><RecurrenceIcon className="w-4 h-4" /></span>}
+                                      {event.title}
+                                    </h3>
+                                    {eventType && <span className="text-xs font-semibold px-2 py-1 rounded-full" style={{backgroundColor: eventType.color, color: '#fff'}}>{eventType.name}</span>}
+                                  </div>
+                                  <p className="text-slate-500">{event.location}</p>
+                                  {event.reminderMinutes && (
+                                    <p className="text-sm text-slate-500 mt-1 flex items-center gap-1">
+                                        <BellIcon className="w-4 h-4" /> Lembrete: {formatReminderText(event.reminderMinutes)}
+                                    </p>
+                                  )}
+                                  <p className="text-sm text-slate-400 mt-1">{formatFullDate(event.startTime)}</p>
+                              </div>
+                              <div className="flex flex-col sm:flex-row items-center gap-1">
+                                  <button type="button" onClick={() => handleEditEvent(event)} className={typeMgmtEditIconBtn} aria-label="Editar evento"><EditIcon /></button>
+                                  <button type="button" onClick={() => handleDeleteClick(event)} className={typeMgmtDeleteIconBtn} aria-label="Excluir evento"><DeleteIcon /></button>
+                              </div>
                           </div>
-                          <div className="flex flex-col sm:flex-row items-center gap-1">
-                              <button type="button" onClick={() => handleEditEvent(event)} className={typeMgmtEditIconBtn} aria-label="Editar evento">
-                                  <EditIcon />
-                              </button>
-                              <button type="button" onClick={() => handleDeleteClick(event)} className={typeMgmtDeleteIconBtn} aria-label="Excluir evento">
-                                  <DeleteIcon />
-                              </button>
-                          </div>
-                      </div>
-                  )
-              }) : (
-                <div className="text-center p-6">
-                    <p className="text-slate-500">Nenhum evento agendado para este executivo.</p>
+                      );
+                  }) : (
+                    <div className="text-center p-6"><p className="text-slate-500">Nenhum evento agendado para este executivo.</p></div>
+                  )}
                 </div>
-              )}
-               {sortedEvents.length > 0 && (
-                 <Pagination
-                    currentPage={currentPage}
-                    totalItems={sortedEvents.length}
-                    itemsPerPage={limit}
-                    onPageChange={setCurrentPage}
-                 />
-               )}
-            </div>
+              );
+
+              const renderCardView = () => (
+                paginatedEvents.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {paginatedEvents.map(event => {
+                      const eventType = eventTypes.find(et => et.id === event.eventTypeId);
+                      return (
+                        <div key={event.id} className="bg-white rounded-xl shadow-md p-4 space-y-2" style={{borderTop: `4px solid ${eventType?.color || '#a855f7'}`}}>
+                          <div className="flex items-center justify-between">
+                            <h3 className="font-semibold text-slate-800 truncate flex items-center gap-1">
+                              {event.recurrenceId && <RecurrenceIcon className="w-4 h-4 text-slate-400 flex-shrink-0" />}
+                              {event.title}
+                            </h3>
+                            <div className="flex items-center gap-1">
+                              <button type="button" onClick={() => handleEditEvent(event)} className={typeMgmtEditIconBtn} aria-label="Editar evento"><EditIcon /></button>
+                              <button type="button" onClick={() => handleDeleteClick(event)} className={typeMgmtDeleteIconBtn} aria-label="Excluir evento"><DeleteIcon /></button>
+                            </div>
+                          </div>
+                          {eventType && <span className="inline-block text-xs font-semibold px-2 py-1 rounded-full text-white" style={{backgroundColor: eventType.color}}>{eventType.name}</span>}
+                          <p className="text-sm text-slate-600">{formatTime(event.startTime)} — {new Date(event.startTime).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                          {event.location && <p className="text-sm text-slate-500">{event.location}</p>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center p-6 bg-white rounded-xl shadow-md"><p className="text-slate-500">Nenhum evento agendado para este executivo.</p></div>
+                )
+              );
+
+              const renderTableView = () => (
+                <DataTable>
+                  <DataTableHead>
+                    <tr>
+                      <DataTableTh>Título</DataTableTh>
+                      <DataTableTh>Data / Hora</DataTableTh>
+                      <DataTableTh className="hidden md:table-cell">Tipo</DataTableTh>
+                      <DataTableTh className="hidden lg:table-cell">Local</DataTableTh>
+                      <DataTableTh className="min-w-[6rem] whitespace-nowrap text-right">Ações</DataTableTh>
+                    </tr>
+                  </DataTableHead>
+                  <DataTableBody>
+                    {paginatedEvents.length === 0 ? (
+                      <tr><td colSpan={5} className="text-center p-6 text-slate-500">Nenhum evento agendado para este executivo.</td></tr>
+                    ) : paginatedEvents.map(event => {
+                      const eventType = eventTypes.find(et => et.id === event.eventTypeId);
+                      return (
+                        <DataTableRow key={event.id}>
+                          <DataTableTd className="font-medium text-slate-800">
+                            <span className="flex items-center gap-1">
+                              {event.recurrenceId && <RecurrenceIcon className="w-4 h-4 text-slate-400" />}
+                              {event.title}
+                            </span>
+                          </DataTableTd>
+                          <DataTableTd>{formatTime(event.startTime)} — {new Date(event.startTime).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}</DataTableTd>
+                          <DataTableTd className="hidden md:table-cell">
+                            {eventType && <span className="text-xs font-semibold px-2 py-1 rounded-full text-white" style={{backgroundColor: eventType.color}}>{eventType.name}</span>}
+                          </DataTableTd>
+                          <DataTableTd className="hidden lg:table-cell text-slate-600">{event.location}</DataTableTd>
+                          <DataTableTd className="text-right">
+                            <div className="inline-flex items-center gap-1">
+                              <button type="button" onClick={() => handleEditEvent(event)} className={typeMgmtEditIconBtn} aria-label="Editar evento"><EditIcon /></button>
+                              <button type="button" onClick={() => handleDeleteClick(event)} className={typeMgmtDeleteIconBtn} aria-label="Excluir evento"><DeleteIcon /></button>
+                            </div>
+                          </DataTableTd>
+                        </DataTableRow>
+                      );
+                    })}
+                  </DataTableBody>
+                </DataTable>
+              );
+
+              switch (layout) {
+                case 'card': return renderCardView();
+                case 'table': return renderTableView();
+                default: return renderListView();
+              }
+            })()}
+
+            {sortedEvents.length > 0 && (
+              <Pagination currentPage={currentPage} totalItems={sortedEvents.length} itemsPerPage={limit} onPageChange={setCurrentPage} />
+            )}
 
             {isModalOpen && (
                 <Modal title={editingEvent?.id ? 'Editar evento' : 'Novo evento'} onClose={() => { setModalOpen(false); setEditingEvent(null); }}>

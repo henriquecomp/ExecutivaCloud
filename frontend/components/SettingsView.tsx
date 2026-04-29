@@ -283,16 +283,11 @@ const SettingsView: React.FC<SettingsViewProps> = ({ allData, setAllData, onAfte
                 </div>
                 {savedBackups.length > 0 && (
                     <ToolbarPanel className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-                        <div className="flex items-center gap-2">
-                            <AppLabel htmlFor="limit-backups" className="mb-0 inline text-slate-600">
-                                Itens por página
-                            </AppLabel>
-                            <AppSelect id="limit-backups" value={backupLimit} onChange={(e) => setBackupLimit(Number(e.target.value))} className="w-auto min-w-[5rem]">
-                                <option value={4}>4</option>
-                                <option value={8}>8</option>
-                                <option value={16}>16</option>
-                            </AppSelect>
-                        </div>
+                        <AppSelect id="limit-backups" value={backupLimit} onChange={(e) => setBackupLimit(Number(e.target.value))} className="w-auto min-w-[5rem]" aria-label="Itens por página">
+                            <option value={4}>4</option>
+                            <option value={8}>8</option>
+                            <option value={16}>16</option>
+                        </AppSelect>
                     </ToolbarPanel>
                 )}
                 <div className="space-y-2">

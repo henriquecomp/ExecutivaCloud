@@ -4,7 +4,8 @@ import Modal from './Modal';
 import ConfirmationModal from './ConfirmationModal';
 import Pagination from './Pagination';
 import ViewSwitcher from './ViewSwitcher';
-import { EditIcon, DeleteIcon, PlusIcon, RecurrenceIcon } from './Icons';
+import { EditIcon, DeleteIcon, PlusIcon, RecurrenceIcon, PrinterIcon } from './Icons';
+import { downloadCsv, todayStamp } from '../utils/csvDownload';
 import { FormDangerAlert } from './ui/FormDangerAlert';
 import { taskService } from '../services/taskService';
 import { getApiErrorMessage } from '../utils/apiError';
@@ -569,7 +570,32 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, executiveId, onRefresh }) 
     return (
         <div className="space-y-6 animate-fade-in">
             <FormDangerAlert message={listActionError} />
-            <div className="flex justify-end">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+                <ViewSwitcher layout={layout} setLayout={setLayout} />
+                <AppSelect id="limit-tasks" value={limit} onChange={(e) => setLimit(Number(e.target.value))} className="w-auto min-w-[5rem]" aria-label="Itens por página">
+                    <option value={10}>10</option>
+                    <option value={30}>30</option>
+                    <option value={50}>50</option>
+                </AppSelect>
+                <AppButton
+                    type="button"
+                    variant="ghost"
+                    className="!p-2"
+                    title="Exportar resultados para CSV"
+                    aria-label="Exportar resultados para CSV"
+                    onClick={() => {
+                        const rows = filteredTasks.map(t => ({
+                            Título: t.title,
+                            Descrição: t.description ?? '',
+                            Prioridade: t.priority,
+                            Status: t.status,
+                            Vencimento: t.dueDate,
+                        }));
+                        downloadCsv(['Título', 'Descrição', 'Prioridade', 'Status', 'Vencimento'], rows, `tarefas_${todayStamp()}.csv`);
+                    }}
+                >
+                    <PrinterIcon />
+                </AppButton>
                 <AppButton
                     type="button"
                     variant="primary"
@@ -581,20 +607,6 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, executiveId, onRefresh }) 
                     <PlusIcon />
                 </AppButton>
             </div>
-
-            <ToolbarPanel className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                 <ViewSwitcher layout={layout} setLayout={setLayout} />
-                 <div className="flex items-center gap-2">
-                    <AppLabel htmlFor="limit-tasks" className="mb-0 inline text-slate-600">
-                        Itens por página
-                    </AppLabel>
-                    <AppSelect id="limit-tasks" value={limit} onChange={(e) => setLimit(Number(e.target.value))} className="w-auto min-w-[5rem]">
-                        <option value={10}>10</option>
-                        <option value={30}>30</option>
-                        <option value={50}>50</option>
-                    </AppSelect>
-                </div>
-            </ToolbarPanel>
 
             <ToolbarPanel className="space-y-3">
                     <div className="flex flex-wrap items-center gap-2">

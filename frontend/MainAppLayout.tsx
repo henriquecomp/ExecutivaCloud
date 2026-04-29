@@ -28,7 +28,6 @@ import SettingsView from './components/SettingsView';
 import TasksView from './components/TasksView';
 import SecretariesView from './components/SecretariesView';
 import UserManagementView from './components/UserManagementView';
-import ReportsView from './components/ReportsView';
 import UserMenu from './components/UserMenu';
 import ExecutiveProfileModal from './components/ExecutiveProfileModal';
 import SecretaryProfileModal from './components/SecretaryProfileModal';
@@ -159,26 +158,6 @@ const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout, on
     }
   }, []);
 
-  const loadReportsSlice = useCallback(async (isStale?: () => boolean) => {
-    const stale = () => isStale?.() ?? false;
-    try {
-      const [eventsData, contactsData, tasksData, expensesData] = await Promise.all([
-        eventService.getAll(),
-        contactService.getAll(),
-        taskService.getAll(),
-        expenseService.getAll(),
-      ]);
-      if (stale()) return;
-      setEvents(eventsData);
-      setContacts(contactsData);
-      setTasks(tasksData);
-      setExpenses(expensesData);
-    } catch (error) {
-      if (!stale()) {
-        console.error('Erro ao carregar dados para relatórios:', error);
-      }
-    }
-  }, []);
 
   const loadViewDataset = useCallback(
     async (view: View, executiveId: string | null, isStale?: () => boolean) => {
@@ -265,9 +244,6 @@ const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout, on
             }
             break;
           }
-          case 'reports':
-            await loadReportsSlice(isStale);
-            break;
           case 'settings':
             await loadAllSecondaryLists(isStale);
             break;
@@ -280,7 +256,7 @@ const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout, on
         }
       }
     },
-    [loadAllSecondaryLists, loadReportsSlice],
+    [loadAllSecondaryLists],
   );
 
   const refreshAfterMutation = useCallback(async () => {
@@ -415,7 +391,6 @@ const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout, on
     finances: 'Finanças',
     tasks: 'Tarefas',
     documents: 'Documentos',
-    reports: 'Relatórios',
     settings: 'Configurações',
   };
 
@@ -551,8 +526,6 @@ const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout, on
             onRefresh={refreshAfterMutation}
           />
         );
-      case 'reports':
-        return <ReportsView executives={executives} events={events} expenses={expenses} tasks={tasks} contacts={contacts} />;
       case 'settings':
         return (
           <SettingsView

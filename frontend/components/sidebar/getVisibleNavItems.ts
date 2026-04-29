@@ -9,7 +9,6 @@ const staffOnlyViews: View[] = [
   'documents',
   'contacts',
   'finances',
-  'reports',
 ];
 
 export function getVisibleNavItems(

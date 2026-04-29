@@ -3,7 +3,8 @@ import type { LegalOrganization, Organization, User } from '../types';
 import Modal from './Modal';
 import ConfirmationModal from './ConfirmationModal';
 import InviteUserForm from './InviteUserForm';
-import { EditIcon, LockClosedIcon, NoSymbolIcon, RefreshIcon } from './Icons';
+import { EditIcon, LockClosedIcon, NoSymbolIcon, PlusIcon, RefreshIcon, PrinterIcon } from './Icons';
+import { downloadCsv, todayStamp } from '../utils/csvDownload';
 import { typeMgmtEditIconBtn } from './ui/typeManagementStyles';
 import {
   deactivateManagedUser,
@@ -254,6 +255,29 @@ const UserManagementView: React.FC<UserManagementViewProps> = ({
       <div className="flex flex-wrap justify-end gap-2 shrink-0">
         <button
           type="button"
+          onClick={() => {
+            const csvRows = rows.map(u => {
+              const a = resolveUserAssociations(u, legalOrganizations, organizations);
+              return {
+                Nome: u.fullName ?? '',
+                'E-mail': u.email ?? '',
+                Telefone: u.phone ?? '',
+                Organização: a.legalName ?? '',
+                Empresa: a.companyName ?? '',
+                Papel: u.role ?? '',
+                Status: u.isActive ? 'Ativo' : 'Inativo',
+              };
+            });
+            downloadCsv(['Nome', 'E-mail', 'Telefone', 'Organização', 'Empresa', 'Papel', 'Status'], csvRows, `usuarios_${todayStamp()}.csv`);
+          }}
+          className="rounded-lg border border-slate-300 bg-white p-2 text-slate-700 hover:bg-slate-50 active:scale-95 transition-transform duration-150"
+          title="Exportar resultados para CSV"
+          aria-label="Exportar resultados para CSV"
+        >
+          <PrinterIcon className="h-5 w-5" />
+        </button>
+        <button
+          type="button"
           onClick={() => void refresh()}
           className="rounded-lg border border-slate-300 bg-white p-2 text-slate-700 hover:bg-slate-50 active:scale-95 transition-transform duration-150"
           title="Atualizar lista de usuários"
@@ -264,9 +288,11 @@ const UserManagementView: React.FC<UserManagementViewProps> = ({
         <button
           type="button"
           onClick={() => setInviteOpen(true)}
-          className="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 text-sm font-medium"
+          className="rounded-lg bg-indigo-600 p-2 text-white hover:bg-indigo-700 transition"
+          title="Convidar usuário"
+          aria-label="Convidar usuário"
         >
-          Convidar usuário
+          <PlusIcon />
         </button>
       </div>
 
@@ -287,25 +313,21 @@ const UserManagementView: React.FC<UserManagementViewProps> = ({
           <p className="text-sm text-slate-500">
             {loading ? 'Carregando…' : `${total} registro(s)`}
           </p>
-          <div className="flex items-center gap-2">
-            <AppLabel htmlFor="limit-users" className="mb-0 inline text-slate-600">
-              Por página
-            </AppLabel>
-            <AppSelect
-              id="limit-users"
-              value={pageSize}
-              onChange={(e) => {
-                setPageSize(Number(e.target.value));
-                setCurrentPage(1);
-              }}
-              className="w-auto min-w-[5rem]"
-              disabled={loading}
-            >
-              <option value={10}>10</option>
-              <option value={20}>20</option>
-              <option value={50}>50</option>
-            </AppSelect>
-          </div>
+          <AppSelect
+            id="limit-users"
+            value={pageSize}
+            onChange={(e) => {
+              setPageSize(Number(e.target.value));
+              setCurrentPage(1);
+            }}
+            className="w-auto min-w-[5rem]"
+            disabled={loading}
+            aria-label="Itens por página"
+          >
+            <option value={10}>10</option>
+            <option value={20}>20</option>
+            <option value={50}>50</option>
+          </AppSelect>
         </div>
       </ToolbarPanel>
 

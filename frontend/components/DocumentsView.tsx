@@ -1,9 +1,11 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Document, DocumentCategory } from '../types';
+import { Document, DocumentCategory, LayoutView } from '../types';
 import Modal from './Modal';
 import ConfirmationModal from './ConfirmationModal';
 import ImageModal from './ImageModal';
-import { EditIcon, DeleteIcon, PlusIcon, CogIcon, UploadIcon } from './Icons';
+import { EditIcon, DeleteIcon, PlusIcon, CogIcon, UploadIcon, PrinterIcon } from './Icons';
+import ViewSwitcher from './ViewSwitcher';
+import { downloadCsv, todayStamp } from '../utils/csvDownload';
 import { FormDangerAlert } from './ui/FormDangerAlert';
 import AppButton from './ui/AppButton';
 import AppInput from './ui/AppInput';
@@ -14,6 +16,14 @@ import TypeColorFormField from './ui/TypeColorFormField';
 import TypeColorSwatch from './ui/TypeColorSwatch';
 import { typeMgmtDeleteIconBtn, typeMgmtEditIconBtn } from './ui/typeManagementStyles';
 import ToolbarPanel from './ui/ToolbarPanel';
+import {
+  DataTable,
+  DataTableBody,
+  DataTableHead,
+  DataTableRow,
+  DataTableTd,
+  DataTableTh,
+} from './ui/DataTable';
 import Pagination from './Pagination';
 import { documentCategoryService } from '../services/documentCategoryService';
 import { documentService } from '../services/documentService';
@@ -274,6 +284,7 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({ documents, setDocuments, 
     const [filterCategory, setFilterCategory] = useState<string>('all');
     const [viewingImage, setViewingImage] = useState<string | null>(null);
     const [docListError, setDocListError] = useState<string | null>(null);
+    const [layout, setLayout] = useState<LayoutView>('card');
     const [limit, setLimit] = useState(12);
     const [currentPage, setCurrentPage] = useState(1);
 
@@ -335,7 +346,30 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({ documents, setDocuments, 
     return (
         <div className="space-y-6 animate-fade-in">
             <FormDangerAlert message={docListError} />
-            <div className="flex flex-wrap justify-end items-center gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+                <ViewSwitcher layout={layout} setLayout={setLayout} />
+                <AppSelect id="limit-docs" value={limit} onChange={(e) => setLimit(Number(e.target.value))} className="w-auto min-w-[5rem]" aria-label="Itens por página">
+                    <option value={12}>12</option>
+                    <option value={24}>24</option>
+                    <option value={48}>48</option>
+                </AppSelect>
+                <AppButton
+                    type="button"
+                    variant="ghost"
+                    className="!p-2"
+                    title="Exportar resultados para CSV"
+                    aria-label="Exportar resultados para CSV"
+                    onClick={() => {
+                        const rows = filteredDocuments.map(d => ({
+                            Nome: d.name,
+                            Categoria: documentCategories.find(c => c.id === d.categoryId)?.name ?? '',
+                            Data: formatDate(d.uploadDate),
+                        }));
+                        downloadCsv(['Nome', 'Categoria', 'Data'], rows, `documentos_${todayStamp()}.csv`);
+                    }}
+                >
+                    <PrinterIcon />
+                </AppButton>
                 <AppButton
                     type="button"
                     variant="primary"
@@ -359,8 +393,7 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({ documents, setDocuments, 
             </div>
 
             <ToolbarPanel>
-                <div className="flex flex-col gap-4 border-b border-slate-200 pb-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-                    <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                     <span className="text-sm font-medium text-slate-600">Filtrar:</span>
                     <button type="button" onClick={() => setFilterCategory('all')} className={`rounded-full px-3 py-1 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-indigo-500 ${filterCategory === 'all' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
                         Todos
@@ -370,58 +403,116 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({ documents, setDocuments, 
                             {cat.name}
                         </button>
                     ))}
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <AppLabel htmlFor="limit-docs" className="mb-0 inline text-slate-600">
-                            Itens por página
-                        </AppLabel>
-                        <AppSelect id="limit-docs" value={limit} onChange={(e) => setLimit(Number(e.target.value))} className="w-auto min-w-[5rem]">
-                            <option value={12}>12</option>
-                            <option value={24}>24</option>
-                            <option value={48}>48</option>
-                        </AppSelect>
-                    </div>
                 </div>
             </ToolbarPanel>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                {paginatedDocuments.map(doc => {
+            {(() => {
+              const renderCardView = () => (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                  {paginatedDocuments.map(doc => {
                     const category = documentCategories.find(c => c.id === doc.categoryId);
                     return (
-                        <div key={doc.id} className="bg-white rounded-xl shadow-md overflow-hidden group">
-                            <div className="relative">
-                                <button onClick={() => setViewingImage(doc.imageUrl)} className="w-full h-48 block">
-                                    <img src={doc.imageUrl} alt={doc.name} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
-                                </button>
-                                 <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button type="button" aria-label="Editar documento" onClick={() => handleEditDoc(doc)} className={`${typeMgmtEditIconBtn} bg-white/80 backdrop-blur-sm shadow hover:bg-white`}><EditIcon /></button>
-                                    <button type="button" aria-label="Excluir documento" onClick={() => setDocToDelete(doc)} className={`${typeMgmtDeleteIconBtn} bg-white/80 backdrop-blur-sm shadow hover:bg-white`}><DeleteIcon /></button>
-                                </div>
-                            </div>
-                            <div className="p-4">
-                                <h3 className="font-bold text-slate-800 truncate">{doc.name}</h3>
-                                <div className="flex justify-between items-center mt-2 text-sm">
-                                    <p className="text-slate-500">{formatDate(doc.uploadDate)}</p>
-                                    {category && <span className="text-xs bg-slate-200 text-slate-600 font-semibold px-2 py-1 rounded-full">{category.name}</span>}
-                                </div>
-                            </div>
+                      <div key={doc.id} className="bg-white rounded-xl shadow-md overflow-hidden group">
+                        <div className="relative">
+                          <button onClick={() => setViewingImage(doc.imageUrl)} className="w-full h-48 block">
+                            <img src={doc.imageUrl} alt={doc.name} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                          </button>
+                          <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button type="button" aria-label="Editar documento" onClick={() => handleEditDoc(doc)} className={`${typeMgmtEditIconBtn} bg-white/80 backdrop-blur-sm shadow hover:bg-white`}><EditIcon /></button>
+                            <button type="button" aria-label="Excluir documento" onClick={() => setDocToDelete(doc)} className={`${typeMgmtDeleteIconBtn} bg-white/80 backdrop-blur-sm shadow hover:bg-white`}><DeleteIcon /></button>
+                          </div>
                         </div>
+                        <div className="p-4">
+                          <h3 className="font-bold text-slate-800 truncate">{doc.name}</h3>
+                          <div className="flex justify-between items-center mt-2 text-sm">
+                            <p className="text-slate-500">{formatDate(doc.uploadDate)}</p>
+                            {category && <span className="text-xs bg-slate-200 text-slate-600 font-semibold px-2 py-1 rounded-full">{category.name}</span>}
+                          </div>
+                        </div>
+                      </div>
                     );
-                })}
-            </div>
-             {filteredDocuments.length === 0 && (
+                  })}
+                </div>
+              );
+
+              const renderListView = () => (
+                <div className="bg-white rounded-xl shadow-md divide-y divide-slate-200">
+                  {paginatedDocuments.map(doc => {
+                    const category = documentCategories.find(c => c.id === doc.categoryId);
+                    return (
+                      <div key={doc.id} className="flex items-center gap-4 p-4 group">
+                        <button onClick={() => setViewingImage(doc.imageUrl)} className="w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden">
+                          <img src={doc.imageUrl} alt={doc.name} className="h-full w-full object-cover" />
+                        </button>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-slate-800 truncate">{doc.name}</h3>
+                          <div className="flex items-center gap-2 mt-1 text-sm text-slate-500">
+                            <span>{formatDate(doc.uploadDate)}</span>
+                            {category && <span className="text-xs bg-slate-200 text-slate-600 font-semibold px-2 py-0.5 rounded-full">{category.name}</span>}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button type="button" aria-label="Editar documento" onClick={() => handleEditDoc(doc)} className={typeMgmtEditIconBtn}><EditIcon /></button>
+                          <button type="button" aria-label="Excluir documento" onClick={() => setDocToDelete(doc)} className={typeMgmtDeleteIconBtn}><DeleteIcon /></button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+
+              const renderTableView = () => (
+                <DataTable>
+                  <DataTableHead>
+                    <tr>
+                      <DataTableTh>Nome</DataTableTh>
+                      <DataTableTh className="hidden md:table-cell">Categoria</DataTableTh>
+                      <DataTableTh className="hidden lg:table-cell">Data</DataTableTh>
+                      <DataTableTh className="min-w-[6rem] whitespace-nowrap text-right">Ações</DataTableTh>
+                    </tr>
+                  </DataTableHead>
+                  <DataTableBody>
+                    {paginatedDocuments.length === 0 ? (
+                      <tr><td colSpan={4} className="text-center p-6 text-slate-500">Nenhum documento encontrado.</td></tr>
+                    ) : paginatedDocuments.map(doc => {
+                      const category = documentCategories.find(c => c.id === doc.categoryId);
+                      return (
+                        <DataTableRow key={doc.id}>
+                          <DataTableTd className="font-medium text-slate-800">
+                            <button onClick={() => setViewingImage(doc.imageUrl)} className="hover:underline text-left">{doc.name}</button>
+                          </DataTableTd>
+                          <DataTableTd className="hidden md:table-cell">
+                            {category && <span className="text-xs bg-slate-200 text-slate-600 font-semibold px-2 py-1 rounded-full">{category.name}</span>}
+                          </DataTableTd>
+                          <DataTableTd className="hidden lg:table-cell text-slate-600">{formatDate(doc.uploadDate)}</DataTableTd>
+                          <DataTableTd className="text-right">
+                            <div className="inline-flex items-center gap-1">
+                              <button type="button" aria-label="Editar documento" onClick={() => handleEditDoc(doc)} className={typeMgmtEditIconBtn}><EditIcon /></button>
+                              <button type="button" aria-label="Excluir documento" onClick={() => setDocToDelete(doc)} className={typeMgmtDeleteIconBtn}><DeleteIcon /></button>
+                            </div>
+                          </DataTableTd>
+                        </DataTableRow>
+                      );
+                    })}
+                  </DataTableBody>
+                </DataTable>
+              );
+
+              switch (layout) {
+                case 'list': return renderListView();
+                case 'table': return renderTableView();
+                default: return renderCardView();
+              }
+            })()}
+
+            {filteredDocuments.length === 0 && (
                 <div className="col-span-full text-center p-6 bg-white rounded-xl shadow-md">
                     <p className="text-slate-500">Nenhum documento encontrado para este filtro.</p>
                 </div>
             )}
 
             {filteredDocuments.length > 0 && (
-                <Pagination
-                    currentPage={currentPage}
-                    totalItems={filteredDocuments.length}
-                    itemsPerPage={limit}
-                    onPageChange={setCurrentPage}
-                />
+                <Pagination currentPage={currentPage} totalItems={filteredDocuments.length} itemsPerPage={limit} onPageChange={setCurrentPage} />
             )}
             
             {isModalOpen && (

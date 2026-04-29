@@ -1,13 +1,22 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { LegalOrganization, Organization, Department, Executive, Secretary, Event, Contact, Expense, Task, Document, User, LegalOrganizationCreate, LegalOrganizationUpdate, OrganizationUpdate, OrganizationCreate } from '../types';
+import { LegalOrganization, Organization, Department, Executive, Secretary, Event, Contact, Expense, Task, Document, User, LegalOrganizationCreate, LegalOrganizationUpdate, OrganizationUpdate, OrganizationCreate, LayoutView } from '../types';
 import Modal from './Modal';
 import ConfirmationModal from './ConfirmationModal';
-import { EditIcon, DeleteIcon, PlusIcon } from './Icons';
+import { EditIcon, DeleteIcon, PlusIcon, PrinterIcon } from './Icons';
+import ViewSwitcher from './ViewSwitcher';
+import { downloadCsv, todayStamp } from '../utils/csvDownload';
+import AppButton from './ui/AppButton';
+import {
+  DataTable,
+  DataTableBody,
+  DataTableHead,
+  DataTableRow,
+  DataTableTd,
+  DataTableTh,
+} from './ui/DataTable';
 import { legalOrganizationService } from '@/services/legalOrganizationService';
 import { organizationService } from '@/services/organizationService';
-import AppLabel from './ui/AppLabel';
 import AppSelect from './ui/AppSelect';
-import ToolbarPanel from './ui/ToolbarPanel';
 import Pagination from './Pagination';
 
 // --- Helper Functions ---
@@ -371,6 +380,7 @@ const LegalOrganizationsView: React.FC<LegalOrganizationsViewProps> = ({
         return legalOrganizations;
     }, [legalOrganizations, currentUser, isAdminForLegalOrg]);
 
+    const [layout, setLayout] = useState<LayoutView>('card');
     const [loLimit, setLoLimit] = useState(6);
     const [loCurrentPage, setLoCurrentPage] = useState(1);
 
@@ -480,7 +490,31 @@ const LegalOrganizationsView: React.FC<LegalOrganizationsViewProps> = ({
 
     return (
         <div className="space-y-6 animate-fade-in">
-            <div className="flex justify-end">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+                <ViewSwitcher layout={layout} setLayout={setLayout} />
+                <AppSelect id="limit-lo" value={loLimit} onChange={(e) => setLoLimit(Number(e.target.value))} className="w-auto min-w-[5rem]" aria-label="Itens por página">
+                    <option value={4}>4</option>
+                    <option value={6}>6</option>
+                    <option value={12}>12</option>
+                </AppSelect>
+                <AppButton
+                    type="button"
+                    variant="ghost"
+                    className="!p-2"
+                    title="Exportar resultados para CSV"
+                    aria-label="Exportar resultados para CSV"
+                    onClick={() => {
+                        const rows = visibleLegalOrgs.map(lo => ({
+                            Nome: lo.name,
+                            CNPJ: lo.cnpj ?? '',
+                            Cidade: lo.city ?? '',
+                            Estado: lo.state ?? '',
+                        }));
+                        downloadCsv(['Nome', 'CNPJ', 'Cidade', 'Estado'], rows, `organizacoes_${todayStamp()}.csv`);
+                    }}
+                >
+                    <PrinterIcon />
+                </AppButton>
                 <button
                     type="button"
                     onClick={openAddModal}
@@ -493,22 +527,8 @@ const LegalOrganizationsView: React.FC<LegalOrganizationsViewProps> = ({
                 </button>
             </div>
 
-            {visibleLegalOrgs.length > 0 && (
-                <ToolbarPanel className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-                    <div className="flex items-center gap-2">
-                        <AppLabel htmlFor="limit-lo" className="mb-0 inline text-slate-600">
-                            Itens por página
-                        </AppLabel>
-                        <AppSelect id="limit-lo" value={loLimit} onChange={(e) => setLoLimit(Number(e.target.value))} className="w-auto min-w-[5rem]">
-                            <option value={4}>4</option>
-                            <option value={6}>6</option>
-                            <option value={12}>12</option>
-                        </AppSelect>
-                    </div>
-                </ToolbarPanel>
-            )}
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {(layout === 'card' || layout === 'list') && (
+              <div className={layout === 'card' ? "grid grid-cols-1 lg:grid-cols-2 gap-6" : "space-y-4"}>
                 {paginatedLegalOrgs.map(lo => {
                     const childOrgs = organizations.filter(o => String(o.legalOrganizationId) === String(lo.id));
                     const canManage = currentUser.role === 'master' || (currentUser.role === 'admin' && String(currentUser.legalOrganizationId) === String(lo.id));
@@ -517,11 +537,12 @@ const LegalOrganizationsView: React.FC<LegalOrganizationsViewProps> = ({
                             <header className="flex items-center justify-between p-4 border-b">
                                 <div><h3 className="text-lg font-bold text-slate-800">{lo.name}</h3><p className="text-sm text-slate-500">CNPJ: {lo.cnpj}</p></div>
                                 <div className="flex gap-2">
-                                    <button onClick={() => openEditModal(lo)} className="p-2 hover:bg-slate-100 rounded-full text-indigo-600"><EditIcon /></button>
-                                    <button onClick={() => openDeleteModal(lo)} disabled={isAdminForLegalOrg} className="p-2 hover:bg-slate-100 rounded-full text-red-500 disabled:text-slate-300"><DeleteIcon /></button>
+                                    <button type="button" onClick={() => openEditModal(lo)} className="p-2 hover:bg-slate-100 rounded-full text-indigo-600" aria-label="Editar organização"><EditIcon /></button>
+                                    <button type="button" onClick={() => openDeleteModal(lo)} disabled={isAdminForLegalOrg} className="p-2 hover:bg-slate-100 rounded-full text-red-500 disabled:text-slate-300" aria-label="Excluir organização"><DeleteIcon /></button>
                                 </div>
                             </header>
-                            <div className="p-4 flex-1">
+                            {layout === 'card' && (
+                              <div className="p-4 flex-1">
                                 {(lo.street || lo.city) && (
                                     <div className="mb-4 text-sm text-slate-600 border-b pb-4">
                                         <h4 className="font-semibold mb-2">Endereço</h4>
@@ -536,27 +557,53 @@ const LegalOrganizationsView: React.FC<LegalOrganizationsViewProps> = ({
                                                 <span className="text-slate-700">{org.name}</span>
                                                 {canManage && (
                                                     <div className="flex gap-1">
-                                                        <button onClick={() => openEditCompany(org)} className="p-1 text-slate-400 hover:text-indigo-600"><EditIcon /></button>
-                                                        <button onClick={() => openDeleteCompany(org)} className="p-1 text-slate-400 hover:text-red-600"><DeleteIcon /></button>
+                                                        <button type="button" onClick={() => openEditCompany(org)} className="p-1 text-slate-400 hover:text-indigo-600" aria-label="Editar empresa"><EditIcon /></button>
+                                                        <button type="button" onClick={() => openDeleteCompany(org)} className="p-1 text-slate-400 hover:text-red-600" aria-label="Excluir empresa"><DeleteIcon /></button>
                                                     </div>
                                                 )}
                                             </li>
                                         ))}
                                     </ul>
                                 ) : <p className="text-sm text-slate-500 text-center py-4">Nenhuma empresa vinculada.</p>}
-                            </div>
+                              </div>
+                            )}
                         </div>
                     );
                 })}
-            </div>
+              </div>
+            )}
+            {layout === 'table' && (
+              <DataTable>
+                <DataTableHead>
+                  <tr>
+                    <DataTableTh>Nome</DataTableTh>
+                    <DataTableTh className="hidden md:table-cell">CNPJ</DataTableTh>
+                    <DataTableTh className="hidden lg:table-cell">Cidade / Estado</DataTableTh>
+                    <DataTableTh className="min-w-[6rem] whitespace-nowrap text-right">Ações</DataTableTh>
+                  </tr>
+                </DataTableHead>
+                <DataTableBody>
+                  {visibleLegalOrgs.length === 0 ? (
+                    <tr><td colSpan={4} className="text-center p-6 text-slate-500">Nenhuma organização cadastrada.</td></tr>
+                  ) : paginatedLegalOrgs.map(lo => (
+                    <DataTableRow key={lo.id}>
+                      <DataTableTd className="font-medium text-slate-800">{lo.name}</DataTableTd>
+                      <DataTableTd className="hidden md:table-cell text-slate-600">{lo.cnpj || '-'}</DataTableTd>
+                      <DataTableTd className="hidden lg:table-cell text-slate-600">{[lo.city, lo.state].filter(Boolean).join(' / ') || '-'}</DataTableTd>
+                      <DataTableTd className="text-right">
+                        <div className="inline-flex items-center gap-1">
+                          <button type="button" onClick={() => openEditModal(lo)} className="p-2 hover:bg-slate-100 rounded-full text-indigo-600" aria-label="Editar organização"><EditIcon /></button>
+                          <button type="button" onClick={() => openDeleteModal(lo)} disabled={isAdminForLegalOrg} className="p-2 hover:bg-slate-100 rounded-full text-red-500 disabled:text-slate-300" aria-label="Excluir organização"><DeleteIcon /></button>
+                        </div>
+                      </DataTableTd>
+                    </DataTableRow>
+                  ))}
+                </DataTableBody>
+              </DataTable>
+            )}
 
             {visibleLegalOrgs.length > 0 && (
-                <Pagination
-                    currentPage={loCurrentPage}
-                    totalItems={visibleLegalOrgs.length}
-                    itemsPerPage={loLimit}
-                    onPageChange={setLoCurrentPage}
-                />
+                <Pagination currentPage={loCurrentPage} totalItems={visibleLegalOrgs.length} itemsPerPage={loLimit} onPageChange={setLoCurrentPage} />
             )}
 
             {isModalOpen && (
