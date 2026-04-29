@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { LogoIcon } from './Icons';
-import { loginRequest, mapApiUserToAppUser } from '../services/authService';
-import { User } from '../types';
 import axios from 'axios';
+import { EyeIcon, EyeSlashIcon, LogoIcon } from './Icons';
+import { loginRequest, mapApiUserToAppUser } from '../services/authService';
+import { isWeb3FormsConfigured, submitLoginContactForm } from '../services/web3formsService';
+import { User } from '../types';
 
 interface LoginViewProps {
   onSuccess: (user: User) => void;
@@ -14,6 +15,14 @@ const LoginView: React.FC<LoginViewProps> = ({ onSuccess, onGoRegister }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [revealPassword, setRevealPassword] = useState(false);
+
+  const [contactOpen, setContactOpen] = useState(false);
+  const [contactName, setContactName] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
+  const [contactMessage, setContactMessage] = useState('');
+  const [contactSending, setContactSending] = useState(false);
+  const [contactFeedback, setContactFeedback] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,6 +45,37 @@ const LoginView: React.FC<LoginViewProps> = ({ onSuccess, onGoRegister }) => {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleContactSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setContactFeedback(null);
+    if (!contactEmail.trim() || !contactMessage.trim()) {
+      setContactFeedback({ type: 'err', text: 'Preencha e-mail e mensagem.' });
+      return;
+    }
+    if (!isWeb3FormsConfigured()) {
+      setContactFeedback({
+        type: 'err',
+        text: 'Envio por e-mail não configurado. Defina VITE_WEB3FORMS_ACCESS_KEY no .env e reinicie o Vite.',
+      });
+      return;
+    }
+    setContactSending(true);
+    try {
+      await submitLoginContactForm({
+        fromEmail: contactEmail.trim(),
+        fromName: contactName.trim(),
+        message: contactMessage.trim(),
+      });
+      setContactFeedback({ type: 'ok', text: 'Mensagem enviada. Verifique sua caixa de entrada em breve.' });
+      setContactMessage('');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Não foi possível enviar.';
+      setContactFeedback({ type: 'err', text: msg });
+    } finally {
+      setContactSending(false);
     }
   };
 
@@ -73,15 +113,31 @@ const LoginView: React.FC<LoginViewProps> = ({ onSuccess, onGoRegister }) => {
             <label htmlFor="login-password" className="block text-sm font-medium text-slate-700 mb-1">
               Senha
             </label>
-            <input
-              id="login-password"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-            />
+            <div className="relative">
+              <input
+                id="login-password"
+                type={revealPassword ? 'text' : 'password'}
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className="w-full px-3 py-2 pr-11 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              />
+              <button
+                type="button"
+                className="absolute inset-y-0 right-0 flex items-center justify-center px-2.5 text-slate-500 hover:text-indigo-600 transition-colors rounded-r-md focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                title="Passe o mouse ou foque aqui para exibir a senha"
+                aria-label="Manter o ponteiro ou o foco sobre este botão para exibir a senha"
+                onMouseEnter={() => setRevealPassword(true)}
+                onMouseLeave={() => setRevealPassword(false)}
+                onFocus={() => setRevealPassword(true)}
+                onBlur={() => setRevealPassword(false)}
+                onTouchStart={() => setRevealPassword(true)}
+                onTouchEnd={() => setRevealPassword(false)}
+              >
+                {revealPassword ? <EyeSlashIcon className="text-indigo-600" /> : <EyeIcon />}
+              </button>
+            </div>
           </div>
           <button
             type="submit"
@@ -101,6 +157,93 @@ const LoginView: React.FC<LoginViewProps> = ({ onSuccess, onGoRegister }) => {
             </button>
           </p>
         </form>
+
+        <div className="mt-8 pt-6 border-t border-slate-200">
+          <button
+            type="button"
+            onClick={() => {
+              setContactFeedback(null);
+              const next = !contactOpen;
+              setContactOpen(next);
+              if (next && email.trim()) {
+                setContactEmail(email.trim());
+              }
+            }}
+            className="text-sm text-indigo-600 font-medium hover:text-indigo-800 w-full text-center"
+          >
+            {contactOpen ? 'Fechar contato' : 'Enviar mensagem à equipe'}
+          </button>
+          {contactOpen && (
+            <form onSubmit={handleContactSubmit} className="mt-4 space-y-3">
+              {!isWeb3FormsConfigured() && (
+                <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-2 py-2">
+                  Configure <code className="font-mono text-xs">VITE_WEB3FORMS_ACCESS_KEY</code> no{' '}
+                  <code className="font-mono text-xs">frontend/.env</code> para habilitar o envio por e-mail.
+                </p>
+              )}
+              {contactFeedback && (
+                <p
+                  className={`text-sm px-2 py-2 rounded-md border ${
+                    contactFeedback.type === 'ok'
+                      ? 'bg-green-50 text-green-800 border-green-200'
+                      : 'bg-red-50 text-red-800 border-red-200'
+                  }`}
+                  role="status"
+                >
+                  {contactFeedback.text}
+                </p>
+              )}
+              <div>
+                <label htmlFor="contact-name" className="block text-xs font-medium text-slate-600 mb-1">
+                  Nome (opcional)
+                </label>
+                <input
+                  id="contact-name"
+                  type="text"
+                  value={contactName}
+                  onChange={(e) => setContactName(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm"
+                  autoComplete="name"
+                />
+              </div>
+              <div>
+                <label htmlFor="contact-email" className="block text-xs font-medium text-slate-600 mb-1">
+                  Seu e-mail *
+                </label>
+                <input
+                  id="contact-email"
+                  type="email"
+                  required
+                  value={contactEmail}
+                  onChange={(e) => setContactEmail(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm"
+                  autoComplete="email"
+                />
+              </div>
+              <div>
+                <label htmlFor="contact-message" className="block text-xs font-medium text-slate-600 mb-1">
+                  Mensagem *
+                </label>
+                <textarea
+                  id="contact-message"
+                  required
+                  rows={4}
+                  value={contactMessage}
+                  onChange={(e) => setContactMessage(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm resize-y min-h-[5rem]"
+                  placeholder="Descreva sua dúvida ou solicitação…"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={contactSending}
+                className="w-full py-2 px-4 rounded-md text-sm font-medium text-white bg-slate-700 hover:bg-slate-800 disabled:bg-slate-400 transition-colors"
+              >
+                {contactSending ? 'Enviando…' : 'Enviar mensagem'}
+              </button>
+            </form>
+          )}
+        </div>
       </div>
     </div>
   );

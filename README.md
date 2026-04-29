@@ -71,7 +71,6 @@ Carregadas em `backend/app/main.py`:
 - `/contacts`
 - `/tasks`
 - `/reports`
-- `/settings/backups`
 
 ## Como executar
 

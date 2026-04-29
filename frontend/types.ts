@@ -231,7 +231,7 @@ export interface Expense {
 }
 
 // Views correspond to navigation items in the sidebar
-export type View = 'dashboard' | 'executives' | 'agenda' | 'contacts' | 'finances' | 'legalOrganizations' | 'organizations' | 'settings' | 'tasks' | 'secretaries' | 'documents' | 'userManagement';
+export type View = 'dashboard' | 'executives' | 'agenda' | 'contacts' | 'finances' | 'legalOrganizations' | 'organizations' | 'tasks' | 'secretaries' | 'documents' | 'userManagement';
 
 export enum Priority {
   High = 'Alta',

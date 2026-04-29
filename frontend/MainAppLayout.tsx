@@ -26,7 +26,6 @@ import OrganizationsView from './components/OrganizationsView';
 import AgendaView from './components/AgendaView';
 import ContactsView from './components/ContactsView';
 import FinancesView from './components/ExpensesView';
-import SettingsView from './components/SettingsView';
 import TasksView from './components/TasksView';
 import SecretariesView from './components/SecretariesView';
 import UserManagementView from './components/UserManagementView';
@@ -247,9 +246,6 @@ const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout, on
             }
             break;
           }
-          case 'settings':
-            await loadAllSecondaryLists(isStale);
-            break;
           default:
             break;
         }
@@ -268,12 +264,6 @@ const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout, on
     await loadViewDataset(currentView, selectedExecutiveId, stale);
   }, [currentView, selectedExecutiveId, loadCoreData, loadViewDataset]);
 
-  const refreshAfterRestore = useCallback(async () => {
-    const stale = () => false;
-    await loadCoreData(stale);
-    await loadAllSecondaryLists(stale);
-  }, [loadCoreData, loadAllSecondaryLists]);
-
   useEffect(() => {
     let cancelled = false;
     const stale = () => cancelled;
@@ -291,8 +281,6 @@ const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout, on
       cancelled = true;
     };
   }, [currentView, selectedExecutiveId, loadViewDataset]);
-
-  const noopSetUsers = useCallback<React.Dispatch<React.SetStateAction<User[]>>>(() => {}, []);
 
   const visibleExecutives = useMemo(() => {
     switch (currentUser.role) {
@@ -394,7 +382,6 @@ const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout, on
     finances: 'Finanças',
     tasks: 'Tarefas',
     documents: 'Documentos',
-    settings: 'Configurações',
   };
 
   const renderView = () => {
@@ -537,46 +524,6 @@ const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout, on
             onRefresh={refreshAfterMutation}
           />
         );
-      case 'settings':
-        return (
-          <SettingsView
-            allData={{
-              legalOrganizations,
-              organizations,
-              departments,
-              executives,
-              secretaries,
-              users: [currentUser],
-              eventTypes,
-              events,
-              contactTypes,
-              contacts,
-              expenses,
-              expenseCategories,
-              tasks,
-              documentCategories,
-              documents,
-            }}
-            setAllData={{
-              setLegalOrganizations,
-              setOrganizations,
-              setDepartments,
-              setExecutives,
-              setSecretaries,
-              setUsers: noopSetUsers,
-              setEventTypes,
-              setEvents,
-              setContactTypes,
-              setContacts,
-              setExpenses,
-              setExpenseCategories,
-              setTasks,
-              setDocumentCategories,
-              setDocuments,
-            }}
-            onAfterRestore={refreshAfterRestore}
-          />
-        );
       default:
         return (
           <Dashboard
@@ -611,7 +558,7 @@ const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout, on
           </div>
 
           <div className="flex items-center gap-3">
-            {!['dashboard', 'settings'].includes(currentView) && (
+            {currentView !== 'dashboard' && (
               <ViewSwitcher layout={layout} setLayout={setLayout} />
             )}
             <div className="w-full sm:max-w-xs md:max-w-sm">

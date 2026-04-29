@@ -36,7 +36,7 @@ interface ContactsViewProps {
   layout: LayoutView;
 }
 
-// --- Contact Type Management Components (Moved from SettingsView) ---
+// --- Contact type management (modal) ---
 const ContactTypeForm: React.FC<{ contactType: Partial<ContactType>, onSave: (ct: ContactType) => void, onCancel: () => void }> = ({ contactType, onSave, onCancel }) => {
     const [name, setName] = useState(contactType.name || '');
     const [color, setColor] = useState(contactType.color || '#64748b');

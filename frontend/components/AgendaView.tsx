@@ -41,7 +41,7 @@ interface AgendaViewProps {
   layout: LayoutView;
 }
 
-// --- Event Type Management Components (Moved from SettingsView) ---
+// --- Event type management (modal) ---
 const EventTypeForm: React.FC<{ eventType: Partial<EventType>, onSave: (et: EventType) => void, onCancel: () => void }> = ({ eventType, onSave, onCancel }) => {
     const [name, setName] = useState(eventType.name || '');
     const [color, setColor] = useState(eventType.color || '#3b82f6');

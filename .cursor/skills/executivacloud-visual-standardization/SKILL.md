@@ -26,7 +26,7 @@ description: >-
 1. `ViewSwitcher` is in **`MainAppLayout.tsx` header**, next to the executive selector dropdown — never inside individual views.
 2. `MainAppLayout` owns a single `layout: LayoutView` state (`'card' | 'list' | 'table'`) and passes it as a prop to every data view.
 3. Views accept `layout: LayoutView` in their props interface and render card / list / table accordingly.
-4. ViewSwitcher is hidden on `dashboard` and `settings` views.
+4. ViewSwitcher is hidden on the `dashboard` view.
 
 ## Checklist — Toolbar layout (per-screen)
 
