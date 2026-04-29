@@ -1,11 +1,20 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Document, DocumentCategory } from '../types';
 import Modal from './Modal';
 import ConfirmationModal from './ConfirmationModal';
 import ImageModal from './ImageModal';
-import { EditIcon, DeleteIcon, PlusIcon, SettingsIcon, UploadIcon } from './Icons';
+import { EditIcon, DeleteIcon, PlusIcon, CogIcon, UploadIcon } from './Icons';
+import { FormDangerAlert } from './ui/FormDangerAlert';
+import AppButton from './ui/AppButton';
+import AppInput from './ui/AppInput';
+import AppLabel from './ui/AppLabel';
+import AppSelect from './ui/AppSelect';
+import FormActions from './ui/FormActions';
+import ToolbarPanel from './ui/ToolbarPanel';
+import Pagination from './Pagination';
 import { documentCategoryService } from '../services/documentCategoryService';
 import { documentService } from '../services/documentService';
+import { getApiErrorMessage } from '../utils/apiError';
 
 interface DocumentsViewProps {
   documents: Document[];
@@ -29,13 +38,17 @@ const CategoryForm: React.FC<{ category: Partial<DocumentCategory>, onSave: (cat
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-                <label htmlFor="cat-name" className="block text-sm font-medium text-slate-700">Nome da Categoria</label>
-                <input type="text" id="cat-name" value={name} onChange={e => setName(e.target.value)} required className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                <AppLabel htmlFor="cat-name">Nome da Categoria</AppLabel>
+                <AppInput id="cat-name" type="text" value={name} onChange={e => setName(e.target.value)} required className="mt-1" />
             </div>
-            <div className="flex justify-end space-x-3 pt-4">
-                <button type="button" onClick={onCancel} className="px-4 py-2 bg-slate-200 text-slate-800 rounded-md hover:bg-slate-300 transition">Cancelar</button>
-                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition">Salvar</button>
-            </div>
+            <FormActions>
+                <AppButton type="button" variant="secondary" onClick={onCancel}>
+                    Cancelar
+                </AppButton>
+                <AppButton type="submit" variant="primary">
+                    Salvar
+                </AppButton>
+            </FormActions>
         </form>
     );
 };
@@ -50,8 +63,10 @@ const CategorySettingsModal: React.FC<{
     const [isFormOpen, setFormOpen] = useState(false);
     const [editingCategory, setEditingCategory] = useState<Partial<DocumentCategory> | null>(null);
     const [categoryToDelete, setCategoryToDelete] = useState<DocumentCategory | null>(null);
+    const [categoryActionError, setCategoryActionError] = useState<string | null>(null);
 
     const handleSave = async (category: DocumentCategory) => {
+        setCategoryActionError(null);
         try {
             if (editingCategory?.id) {
                 await documentCategoryService.update(category.id, { name: category.name });
@@ -63,31 +78,40 @@ const CategorySettingsModal: React.FC<{
             setEditingCategory(null);
         } catch (error) {
             console.error('Erro ao salvar categoria de documento:', error);
-            alert('Erro ao salvar categoria de documento.');
+            setCategoryActionError(getApiErrorMessage(error, 'Erro ao salvar categoria de documento.'));
         }
     };
 
     const confirmDelete = async () => {
         if (!categoryToDelete) return;
+        setCategoryActionError(null);
         try {
             await documentCategoryService.delete(categoryToDelete.id);
             await onRefresh();
             setCategoryToDelete(null);
         } catch (error) {
             console.error('Erro ao excluir categoria de documento:', error);
-            alert('Erro ao excluir categoria de documento.');
+            setCategoryActionError(getApiErrorMessage(error, 'Erro ao excluir categoria de documento.'));
         }
     };
     
     if (!isOpen) return null;
 
     return (
-        <Modal title="Gerenciar Categorias de Documento" onClose={onClose}>
+        <Modal title="Categorias" onClose={onClose}>
              <div className="space-y-4">
+                <FormDangerAlert message={categoryActionError} />
                 <div className="flex justify-end">
-                    <button onClick={() => { setEditingCategory({}); setFormOpen(true); }} className="flex items-center gap-2 px-3 py-1 bg-indigo-100 text-indigo-700 rounded-md hover:bg-indigo-200 transition text-sm">
-                        <PlusIcon /> Adicionar Categoria
-                    </button>
+                    <AppButton
+                        type="button"
+                        variant="ghost"
+                        className="!p-2"
+                        title="Adicionar categoria de documento"
+                        aria-label="Adicionar categoria de documento"
+                        onClick={() => { setEditingCategory({}); setFormOpen(true); }}
+                    >
+                        <PlusIcon />
+                    </AppButton>
                 </div>
                 <ul className="space-y-2 max-h-80 overflow-y-auto pr-2">
                     {categories.map(cat => (
@@ -104,7 +128,7 @@ const CategorySettingsModal: React.FC<{
             </div>
             
             {isFormOpen && (
-                <Modal title={editingCategory?.id ? 'Editar Categoria' : 'Nova Categoria'} onClose={() => setFormOpen(false)}>
+                <Modal title={editingCategory?.id ? 'Editar categoria' : 'Nova categoria'} onClose={() => setFormOpen(false)}>
                     <CategoryForm category={editingCategory || {}} onSave={handleSave} onCancel={() => { setFormOpen(false); setEditingCategory(null); }} />
                 </Modal>
             )}
@@ -124,7 +148,7 @@ const CategorySettingsModal: React.FC<{
 
 
 // --- Document Form Component ---
-const DocumentForm: React.FC<{ document: Partial<Document>, onSave: (doc: Document) => void, onCancel: () => void, categories: DocumentCategory[] }> = ({ document, onSave, onCancel, categories }) => {
+const DocumentForm: React.FC<{ document: Partial<Document>, onSave: (doc: Document) => void | Promise<void>, onCancel: () => void, categories: DocumentCategory[] }> = ({ document, onSave, onCancel, categories }) => {
     const [name, setName] = useState(document.name || '');
     const [categoryId, setCategoryId] = useState(document.categoryId || '');
     const [imageUrl, setImageUrl] = useState(document.imageUrl || '');
@@ -154,67 +178,76 @@ const DocumentForm: React.FC<{ document: Partial<Document>, onSave: (doc: Docume
         reader.readAsDataURL(file);
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!name || !imageUrl || !document.executiveId) {
             setError('Nome do documento e imagem são obrigatórios.');
             return;
         }
-        onSave({
-            id: document.id || `doc_${new Date().getTime()}`,
-            executiveId: document.executiveId,
-            name,
-            imageUrl,
-            categoryId,
-            uploadDate: document.uploadDate || new Date().toISOString(),
-        });
+        setError('');
+        try {
+            await Promise.resolve(
+                onSave({
+                    id: document.id || `doc_${new Date().getTime()}`,
+                    executiveId: document.executiveId,
+                    name,
+                    imageUrl,
+                    categoryId,
+                    uploadDate: document.uploadDate || new Date().toISOString(),
+                }),
+            );
+        } catch (err: unknown) {
+            setError(getApiErrorMessage(err, 'Erro ao salvar documento.'));
+        }
     };
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
             <fieldset disabled={isLoading} className="space-y-4">
                 <div>
-                    <label htmlFor="doc-name" className="block text-sm font-medium text-slate-700">Nome/Descrição do Documento</label>
-                    <input type="text" id="doc-name" value={name} onChange={e => setName(e.target.value)} required className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                    <AppLabel htmlFor="doc-name">Nome/Descrição do Documento</AppLabel>
+                    <AppInput id="doc-name" type="text" value={name} onChange={e => setName(e.target.value)} required className="mt-1" />
                 </div>
                  <div>
-                    <label htmlFor="doc-category" className="block text-sm font-medium text-slate-700">Categoria</label>
-                    <select id="doc-category" value={categoryId} onChange={e => setCategoryId(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    <AppLabel htmlFor="doc-category">Categoria</AppLabel>
+                    <AppSelect id="doc-category" value={categoryId} onChange={e => setCategoryId(e.target.value)} className="mt-1">
                         <option value="">Sem Categoria</option>
                         {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
-                    </select>
+                    </AppSelect>
                 </div>
                 <div>
-                    <label className="block text-sm font-medium text-slate-700">Arquivo de Imagem</label>
+                    <AppLabel>Arquivo de Imagem</AppLabel>
                     <div className="mt-2 flex items-center gap-4">
                          {imageUrl && !isLoading && <img src={imageUrl} alt="Preview" className="w-24 h-24 rounded-md object-cover border-2 border-slate-200" />}
                          <div className="flex-1">
                             {isLoading ? (
-                                 <div className="flex items-center justify-center gap-2 p-4 text-slate-500 bg-slate-50 rounded-md">
-                                    <div className="w-5 h-5 border-2 border-slate-300 border-t-indigo-600 rounded-full animate-spin"></div>
+                                 <div className="flex items-center justify-center gap-2 rounded-md bg-slate-50 p-4 text-sm text-slate-500">
+                                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-indigo-600"></div>
                                     <span>Processando imagem...</span>
                                 </div>
                             ) : (
                                 <>
-                                    <label htmlFor="file-upload" className="cursor-pointer flex items-center justify-center gap-2 px-4 py-2 bg-white text-indigo-600 rounded-md shadow-sm border border-indigo-300 hover:bg-indigo-50 transition">
+                                    <label htmlFor="file-upload" className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-md border border-indigo-300 bg-white px-4 py-2 text-sm font-medium text-indigo-600 shadow-sm transition hover:bg-indigo-50">
                                         <UploadIcon />
                                         <span>{imageUrl ? 'Trocar Imagem' : 'Selecionar Imagem'}</span>
                                     </label>
                                     <input id="file-upload" name="file-upload" type="file" className="sr-only" accept="image/*" onChange={handleFileChange} />
-                                    <p className="text-xs text-slate-500 mt-2">Formatos suportados: PNG, JPG, GIF, etc.</p>
+                                    <p className="mt-2 text-xs text-slate-500">Formatos suportados: PNG, JPG, GIF, etc.</p>
                                 </>
                             )}
                          </div>
                     </div>
                 </div>
             </fieldset>
-            {error && <p className="text-sm text-red-600">{error}</p>}
-            <div className="flex justify-end space-x-3 pt-4">
-                <button type="button" onClick={onCancel} className="px-4 py-2 bg-slate-200 text-slate-800 rounded-md hover:bg-slate-300 transition">Cancelar</button>
-                <button type="submit" disabled={isLoading} className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition disabled:bg-slate-400 disabled:cursor-not-allowed">
+            <FormDangerAlert message={error || null} />
+            <FormActions>
+                <AppButton type="button" variant="secondary" onClick={onCancel}>
+                    Cancelar
+                </AppButton>
+                <AppButton type="submit" variant="primary" disabled={isLoading}>
                     {isLoading ? 'Aguarde...' : 'Salvar Documento'}
-                </button>
-            </div>
+                </AppButton>
+            </FormActions>
         </form>
     );
 };
@@ -227,7 +260,9 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({ documents, setDocuments, 
     const [isCategoryModalOpen, setCategoryModalOpen] = useState(false);
     const [filterCategory, setFilterCategory] = useState<string>('all');
     const [viewingImage, setViewingImage] = useState<string | null>(null);
-
+    const [docListError, setDocListError] = useState<string | null>(null);
+    const [limit, setLimit] = useState(12);
+    const [currentPage, setCurrentPage] = useState(1);
 
     const filteredDocuments = useMemo(() => {
         const sorted = [...documents].sort((a, b) => new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime());
@@ -235,42 +270,49 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({ documents, setDocuments, 
         return sorted.filter(doc => doc.categoryId === filterCategory);
     }, [documents, filterCategory]);
 
+    const paginatedDocuments = useMemo(() => {
+        const start = (currentPage - 1) * limit;
+        return filteredDocuments.slice(start, start + limit);
+    }, [filteredDocuments, currentPage, limit]);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [filterCategory, documents, limit]);
+
     const handleAddDoc = () => {
+        setDocListError(null);
         setEditingDoc({ executiveId });
         setModalOpen(true);
     };
 
     const handleEditDoc = (doc: Document) => {
+        setDocListError(null);
         setEditingDoc(doc);
         setModalOpen(true);
     };
 
     const confirmDelete = async () => {
         if (!docToDelete) return;
+        setDocListError(null);
         try {
             await documentService.delete(docToDelete.id);
             await onRefresh();
             setDocToDelete(null);
         } catch (error) {
             console.error('Erro ao excluir documento:', error);
-            alert('Erro ao excluir documento.');
+            setDocListError(getApiErrorMessage(error, 'Erro ao excluir documento.'));
         }
     };
 
     const handleSaveDoc = async (doc: Document) => {
-        try {
-            if (editingDoc?.id) {
-                await documentService.update(doc.id, doc);
-            } else {
-                await documentService.create(doc);
-            }
-            await onRefresh();
-            setModalOpen(false);
-            setEditingDoc(null);
-        } catch (error) {
-            console.error('Erro ao salvar documento:', error);
-            alert('Erro ao salvar documento.');
+        if (editingDoc?.id) {
+            await documentService.update(doc.id, doc);
+        } else {
+            await documentService.create(doc);
         }
+        await onRefresh();
+        setModalOpen(false);
+        setEditingDoc(null);
     };
 
     const formatDate = (isoString: string) => {
@@ -279,38 +321,58 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({ documents, setDocuments, 
 
     return (
         <div className="space-y-6 animate-fade-in">
-            <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div>
-                    <h2 className="text-3xl font-bold text-slate-800">Documentos</h2>
-                    <p className="text-slate-500 mt-1">Repositório de imagens e documentos importantes.</p>
-                </div>
-                 <div className="flex items-center gap-2">
-                    <button onClick={handleAddDoc} className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-md shadow-sm hover:bg-indigo-700 transition">
-                        <PlusIcon />
-                        Novo Documento
-                    </button>
-                     <button onClick={() => setCategoryModalOpen(true)} className="p-2 bg-indigo-100 text-indigo-700 rounded-md shadow-sm hover:bg-indigo-200 transition" aria-label="Gerenciar Categorias">
-                        <SettingsIcon />
-                    </button>
-                </div>
-            </header>
+            <FormDangerAlert message={docListError} />
+            <div className="flex flex-wrap justify-end items-center gap-2">
+                <AppButton
+                    type="button"
+                    variant="primary"
+                    onClick={handleAddDoc}
+                    className="!p-2"
+                    title="Novo documento"
+                    aria-label="Novo documento"
+                >
+                    <PlusIcon />
+                </AppButton>
+                <AppButton
+                    type="button"
+                    variant="ghost"
+                    className="!p-2"
+                    title="Gerenciar categorias de documento"
+                    aria-label="Gerenciar categorias de documento"
+                    onClick={() => setCategoryModalOpen(true)}
+                >
+                    <CogIcon />
+                </AppButton>
+            </div>
 
-            <div className="bg-white p-4 rounded-xl shadow-md">
-                <div className="flex items-center space-x-2 border-b border-slate-200 pb-3 mb-3 flex-wrap gap-y-2">
+            <ToolbarPanel>
+                <div className="flex flex-col gap-4 border-b border-slate-200 pb-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                    <div className="flex flex-wrap items-center gap-2">
                     <span className="text-sm font-medium text-slate-600">Filtrar:</span>
-                    <button onClick={() => setFilterCategory('all')} className={`px-3 py-1 text-sm rounded-full transition ${filterCategory === 'all' ? 'bg-indigo-600 text-white font-semibold' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                    <button type="button" onClick={() => setFilterCategory('all')} className={`rounded-full px-3 py-1 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-indigo-500 ${filterCategory === 'all' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
                         Todos
                     </button>
                     {documentCategories.map(cat => (
-                         <button key={cat.id} onClick={() => setFilterCategory(cat.id)} className={`px-3 py-1 text-sm rounded-full transition ${filterCategory === cat.id ? 'bg-indigo-600 text-white font-semibold' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                         <button key={cat.id} type="button" onClick={() => setFilterCategory(cat.id)} className={`rounded-full px-3 py-1 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-indigo-500 ${filterCategory === cat.id ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
                             {cat.name}
                         </button>
                     ))}
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <AppLabel htmlFor="limit-docs" className="mb-0 inline text-slate-600">
+                            Itens por página
+                        </AppLabel>
+                        <AppSelect id="limit-docs" value={limit} onChange={(e) => setLimit(Number(e.target.value))} className="w-auto min-w-[5rem]">
+                            <option value={12}>12</option>
+                            <option value={24}>24</option>
+                            <option value={48}>48</option>
+                        </AppSelect>
+                    </div>
                 </div>
-            </div>
+            </ToolbarPanel>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                {filteredDocuments.map(doc => {
+                {paginatedDocuments.map(doc => {
                     const category = documentCategories.find(c => c.id === doc.categoryId);
                     return (
                         <div key={doc.id} className="bg-white rounded-xl shadow-md overflow-hidden group">
@@ -339,9 +401,18 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({ documents, setDocuments, 
                     <p className="text-slate-500">Nenhum documento encontrado para este filtro.</p>
                 </div>
             )}
+
+            {filteredDocuments.length > 0 && (
+                <Pagination
+                    currentPage={currentPage}
+                    totalItems={filteredDocuments.length}
+                    itemsPerPage={limit}
+                    onPageChange={setCurrentPage}
+                />
+            )}
             
             {isModalOpen && (
-                <Modal title={editingDoc?.id ? 'Editar Documento' : 'Novo Documento'} onClose={() => setModalOpen(false)}>
+                <Modal title={editingDoc?.id ? 'Editar documento' : 'Novo documento'} onClose={() => setModalOpen(false)}>
                     <DocumentForm document={editingDoc || {}} onSave={handleSaveDoc} onCancel={() => { setModalOpen(false); setEditingDoc(null); }} categories={documentCategories} />
                 </Modal>
             )}

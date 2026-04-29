@@ -1,6 +1,12 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Secretary, Executive, User, Organization, Department } from '../types';
 import { ChevronDownIcon, ExclamationTriangleIcon } from './Icons';
+import AppSearchInput from './ui/AppSearchInput';
+import AppLabel from './ui/AppLabel';
+import AppSelect from './ui/AppSelect';
+import ToolbarPanel from './ui/ToolbarPanel';
+import Pagination from './Pagination';
+import { DataTable, DataTableBody, DataTableEmptyRow, DataTableHead, DataTableRow, DataTableTd, DataTableTh } from './ui/DataTable';
 // --- Helper Functions ---
 /**
  * Validates a Brazilian CPF number.
@@ -105,10 +111,10 @@ export const SecretaryForm: React.FC<{
     departments: Department[],
     executives: Executive[],
     currentUser: User;
-    /** Primeiro acesso: permite escolher executivos vinculados. */
+    /** Primeiro acesso (fluxo de conclusão de perfil). */
     profileCompletion?: boolean;
-    /** Secretária editando o próprio cadastro fora do primeiro acesso: habilita alterar executivos vinculados. */
-    allowSelfExecutiveSelection?: boolean;
+    /** E-mail corporativo bloqueado até concluir o primeiro acesso (mesmo e-mail do convite). */
+    workEmailReadOnly?: boolean;
     /** Texto do botão de envio (ex.: modal “Meu perfil”). */
     submitButtonLabel?: string;
 }> = ({
@@ -120,7 +126,7 @@ export const SecretaryForm: React.FC<{
     executives,
     currentUser,
     profileCompletion = false,
-    allowSelfExecutiveSelection = false,
+    workEmailReadOnly = false,
     submitButtonLabel,
 }) => {
     const [openSections, setOpenSections] = useState<string[]>(['principal', 'org']);
@@ -176,6 +182,7 @@ export const SecretaryForm: React.FC<{
     const [hireDateError, setHireDateError] = useState('');
 
     const isSecretaryUser = currentUser.role === 'secretary';
+    const canAssignExecutives = !isSecretaryUser;
     const isAdminForLegalOrg = currentUser.role === 'admin' && !!currentUser.legalOrganizationId;
     const isOrgAdmin = currentUser.role === 'admin' && !!currentUser.organizationId;
 
@@ -200,23 +207,11 @@ export const SecretaryForm: React.FC<{
         if (!organizationId) return [];
         return executives.filter(e => e.organizationId === organizationId);
     }, [executives, organizationId]);
-    
-    /** Escopo de empresa para secretária em primeiro acesso ou edição do próprio vínculo (executiveIds pode estar vazio no convite). */
-    const secretarySelectableOrgId =
-        currentUser.organizationId ||
-        (secretary.organizationId != null && String(secretary.organizationId).trim() !== ''
-            ? String(secretary.organizationId)
-            : undefined);
 
     const adminScopedExecutives = useMemo(() => {
         if (isSecretaryUser) {
-            if (profileCompletion || allowSelfExecutiveSelection) {
-                if (secretarySelectableOrgId) {
-                    return executives.filter((e) => e.organizationId === secretarySelectableOrgId);
-                }
-                return [];
-            }
-            return executives.filter((exec) => (secretary.executiveIds || []).includes(exec.id));
+            const ids = secretary.executiveIds || [];
+            return executives.filter((exec) => ids.includes(exec.id));
         }
         if (isAdminForLegalOrg) {
             const orgIds = organizations.filter(o => o.legalOrganizationId === currentUser.legalOrganizationId).map(o => o.id);
@@ -231,30 +226,20 @@ export const SecretaryForm: React.FC<{
         organizations,
         currentUser,
         secretary.executiveIds,
-        secretary.organizationId,
-        secretarySelectableOrgId,
         isSecretaryUser,
         isAdminForLegalOrg,
         isOrgAdmin,
-        profileCompletion,
-        allowSelfExecutiveSelection,
     ]);
 
     const assignableExecutives = useMemo(() => {
         if (isSecretaryUser) {
-            if (profileCompletion || allowSelfExecutiveSelection) {
-                if (organizationId) {
-                    return adminScopedExecutives.filter((exec) => exec.organizationId === organizationId);
-                }
-                return [];
-            }
             return adminScopedExecutives;
         }
         if (organizationId) {
             return adminScopedExecutives.filter(exec => exec.organizationId === organizationId);
         }
         return [];
-    }, [adminScopedExecutives, organizationId, isSecretaryUser, profileCompletion, allowSelfExecutiveSelection]);
+    }, [adminScopedExecutives, organizationId, isSecretaryUser]);
 
     useEffect(() => {
         const assignableIds = new Set(assignableExecutives.map(e => e.id));
@@ -274,6 +259,7 @@ export const SecretaryForm: React.FC<{
     }, [organizationId, availableManagers, reportsToExecutiveId]);
 
     const handleExecutiveToggle = (execId: string) => {
+        if (!canAssignExecutives) return;
         setSelectedExecutiveIds(prev => prev.includes(execId) ? prev.filter(id => id !== execId) : [...prev, execId]);
     };
 
@@ -459,8 +445,13 @@ export const SecretaryForm: React.FC<{
                     </div>
                 </div>
                 <div>
-                    <label className="block text-sm font-medium text-slate-700">Executivos Atendidos</label>
-                    <div className={`mt-2 p-3 border rounded-md max-h-60 overflow-y-auto space-y-2 ${isSecretaryUser ? 'bg-slate-50' : 'border-slate-300'}`}>
+                    <label className="block text-sm font-medium text-slate-700">Executivos atendidos</label>
+                    {isSecretaryUser && (
+                        <p className="mt-1 text-xs text-slate-500">
+                            A vinculação a executivos é feita pelo administrador da empresa; você só visualiza os vínculos atuais.
+                        </p>
+                    )}
+                    <div className={`mt-2 max-h-60 space-y-2 overflow-y-auto rounded-md border p-3 ${isSecretaryUser ? 'border-slate-200 bg-slate-50' : 'border-slate-300'}`}>
                         {assignableExecutives.length > 0 ? assignableExecutives.map(exec => (
                             <div key={exec.id} className="flex items-center">
                                 <input
@@ -468,17 +459,17 @@ export const SecretaryForm: React.FC<{
                                     id={`exec-${exec.id}`}
                                     checked={selectedExecutiveIds.includes(exec.id)}
                                     onChange={() => handleExecutiveToggle(exec.id)}
-                                    disabled={isSecretaryUser && !profileCompletion && !allowSelfExecutiveSelection}
+                                    disabled={!canAssignExecutives}
                                     className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:text-slate-400"
                                 />
-                                <label htmlFor={`exec-${exec.id}`} className={`ml-3 block text-sm ${isSecretaryUser && !profileCompletion && !allowSelfExecutiveSelection ? 'text-slate-500' : 'text-slate-600'}`}>
+                                <label htmlFor={`exec-${exec.id}`} className={`ml-3 block text-sm ${!canAssignExecutives ? 'text-slate-500' : 'text-slate-600'}`}>
                                     {getExecutiveDetails(exec)}
                                 </label>
                             </div>
                         )) : (
                             <p className="text-sm text-slate-500">
                                 {isSecretaryUser
-                                    ? 'Nenhum executivo para exibir.'
+                                    ? 'Nenhum executivo vinculado ainda. Peça ao administrador da empresa para associar sua conta aos executivos.'
                                     : organizationId
                                         ? 'Nenhum executivo encontrado para esta empresa.'
                                         : 'Selecione uma empresa para listar os executivos.'
@@ -495,8 +486,18 @@ export const SecretaryForm: React.FC<{
                     <div className="space-y-4 pt-2">
                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <label htmlFor="workEmail" className="block text-sm font-medium text-slate-700">E-mail</label>
-                                <input type="email" id="workEmail" value={workEmail} onChange={e => setWorkEmail(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                                <label htmlFor="workEmail" className="block text-sm font-medium text-slate-700">E-mail corporativo</label>
+                                <input
+                                    type="email"
+                                    id="workEmail"
+                                    readOnly={workEmailReadOnly}
+                                    value={workEmail}
+                                    onChange={e => setWorkEmail(e.target.value)}
+                                    className={`mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm ${workEmailReadOnly ? 'cursor-not-allowed bg-slate-100' : ''}`}
+                                />
+                                {workEmailReadOnly && (
+                                    <p className="mt-1 text-xs text-slate-500">Alterável após concluir o primeiro acesso.</p>
+                                )}
                             </div>
                             <div>
                                 <label htmlFor="workPhone" className="block text-sm font-medium text-slate-700">Telefone</label>
@@ -563,6 +564,7 @@ const SecretariesView: React.FC<SecretariesViewProps> = ({
     currentUser,
     organizations,
 }) => {
+    const [searchTerm, setSearchTerm] = useState('');
     const isSecretaryUser = currentUser.role === 'secretary';
     const isAdminForLegalOrg = currentUser.role === 'admin' && !!currentUser.legalOrganizationId;
     const isOrgAdmin = currentUser.role === 'admin' && !!currentUser.organizationId;
@@ -613,6 +615,29 @@ const SecretariesView: React.FC<SecretariesViewProps> = ({
         adminScopedOrganizationIds,
     ]);
 
+    const filteredSecretaries = useMemo(() => {
+        const term = searchTerm.trim().toLowerCase();
+        if (!term) return visibleSecretaries;
+        return visibleSecretaries.filter((sec) => {
+            const name = sec.fullName?.toLowerCase() || '';
+            const workEmail = sec.workEmail?.toLowerCase() || '';
+            const personalEmail = sec.personalEmail?.toLowerCase() || '';
+            return name.includes(term) || workEmail.includes(term) || personalEmail.includes(term);
+        });
+    }, [visibleSecretaries, searchTerm]);
+
+    const [limit, setLimit] = useState(10);
+    const [currentPage, setCurrentPage] = useState(1);
+
+    const paginatedSecretaries = useMemo(() => {
+        const start = (currentPage - 1) * limit;
+        return filteredSecretaries.slice(start, start + limit);
+    }, [filteredSecretaries, currentPage, limit]);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, limit, secretaries]);
+
     const getExecutiveNames = (executiveIds: string[]): string => {
         return executiveIds
             .map(id => executives.find(exec => exec.id === id)?.fullName)
@@ -622,42 +647,60 @@ const SecretariesView: React.FC<SecretariesViewProps> = ({
 
     return (
         <div className="space-y-6 animate-fade-in">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div>
-                    <h2 className="text-3xl font-bold text-slate-800">Secretárias</h2>
-                    <p className="text-slate-500 mt-1">
-                        {isSecretaryUser
-                            ? 'Visualização dos vínculos com executivos.'
-                            : 'Listagem somente leitura. Novos acessos são criados em Usuários (convite).'}
-                    </p>
+            <ToolbarPanel className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                <div className="min-w-0 flex-1">
+                <AppSearchInput
+                    type="text"
+                    placeholder="Buscar por nome ou email..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                />
                 </div>
-            </div>
+                <div className="flex shrink-0 items-center gap-2">
+                    <AppLabel htmlFor="limit-secretaries" className="mb-0 inline text-slate-600">
+                        Itens por página
+                    </AppLabel>
+                    <AppSelect id="limit-secretaries" value={limit} onChange={(e) => setLimit(Number(e.target.value))} className="w-auto min-w-[5rem]">
+                        <option value={10}>10</option>
+                        <option value={30}>30</option>
+                        <option value={50}>50</option>
+                    </AppSelect>
+                </div>
+            </ToolbarPanel>
 
-            <div className="bg-white p-4 rounded-xl shadow-md">
-                 <div className="overflow-x-auto">
-                    <table className="w-full text-left">
-                        <thead className="border-b-2 border-slate-200 text-sm text-slate-500">
-                            <tr>
-                                <th className="p-3">Nome</th>
-                                <th className="p-3 hidden md:table-cell">Cargo</th>
-                                <th className="p-3 hidden lg:table-cell">E-mail</th>
-                                <th className="p-3">Executivos Atendidos</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {visibleSecretaries.map(sec => (
-                                <tr key={sec.id} className="border-b border-slate-100 hover:bg-slate-50">
-                                    <td className="p-3 font-medium text-slate-800">{sec.fullName}</td>
-                                    <td className="p-3 hidden md:table-cell text-slate-600">{sec.jobTitle || '-'}</td>
-                                    <td className="p-3 hidden lg:table-cell text-slate-600">{sec.workEmail || '-'}</td>
-                                    <td className="p-3 text-slate-600 text-sm">{getExecutiveNames(sec.executiveIds) || '-'}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                    {visibleSecretaries.length === 0 && <p className="text-center p-6 text-slate-500">Nenhuma secretária cadastrada.</p>}
-                </div>
-            </div>
+            <DataTable>
+                <DataTableHead>
+                    <tr>
+                        <DataTableTh>Nome</DataTableTh>
+                        <DataTableTh className="hidden md:table-cell">Cargo</DataTableTh>
+                        <DataTableTh className="hidden lg:table-cell">E-mail</DataTableTh>
+                        <DataTableTh>Executivos Atendidos</DataTableTh>
+                    </tr>
+                </DataTableHead>
+                <DataTableBody>
+                    {filteredSecretaries.length === 0 ? (
+                        <DataTableEmptyRow colSpan={4}>Nenhuma secretária encontrada.</DataTableEmptyRow>
+                    ) : (
+                        paginatedSecretaries.map((sec) => (
+                            <DataTableRow key={sec.id}>
+                                <DataTableTd className="font-medium text-slate-800">{sec.fullName}</DataTableTd>
+                                <DataTableTd className="hidden md:table-cell text-slate-600">{sec.jobTitle || '-'}</DataTableTd>
+                                <DataTableTd className="hidden lg:table-cell text-slate-600">{sec.workEmail || '-'}</DataTableTd>
+                                <DataTableTd className="text-slate-600">{getExecutiveNames(sec.executiveIds) || '-'}</DataTableTd>
+                            </DataTableRow>
+                        ))
+                    )}
+                </DataTableBody>
+            </DataTable>
+
+            {filteredSecretaries.length > 0 && (
+                <Pagination
+                    currentPage={currentPage}
+                    totalItems={filteredSecretaries.length}
+                    itemsPerPage={limit}
+                    onPageChange={setCurrentPage}
+                />
+            )}
 
         </div>
     );

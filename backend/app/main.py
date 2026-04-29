@@ -35,6 +35,8 @@ from app.routers import (
     task,
     report,
     settings_backup,
+    expense_category,
+    expense,
 )
 
 app = FastAPI(title="Executiva Cloud API", description="Executiva Cloud API")
@@ -103,6 +105,8 @@ app.include_router(contact.router)
 app.include_router(task.router)
 app.include_router(report.router)
 app.include_router(settings_backup.router)
+app.include_router(expense_category.router)
+app.include_router(expense.router)
 
 
 @app.exception_handler(OperationalError)

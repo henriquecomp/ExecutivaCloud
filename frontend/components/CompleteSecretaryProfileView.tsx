@@ -70,7 +70,7 @@ const CompleteSecretaryProfileView: React.FC<CompleteSecretaryProfileViewProps> 
       <div className="max-w-4xl mx-auto bg-white rounded-xl shadow border border-slate-200 p-6">
         <h1 className="text-2xl font-bold text-slate-800 mb-1">Complete seu cadastro</h1>
         <p className="text-slate-500 text-sm mb-6">
-          Preencha seus dados e selecione ao menos um executivo vinculado.
+          Preencha seus dados. A vinculação a executivos é definida pelo administrador da empresa.
         </p>
         <SecretaryForm
           secretary={secretary}
@@ -79,6 +79,7 @@ const CompleteSecretaryProfileView: React.FC<CompleteSecretaryProfileViewProps> 
           executives={executives}
           currentUser={currentUser}
           profileCompletion
+          workEmailReadOnly={!!currentUser.needsProfileCompletion}
           onCancel={() => {}}
           onSave={async (payload) => {
             const apiUser = await completeSecretaryProfile(payload as unknown as Record<string, unknown>);

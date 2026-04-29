@@ -46,6 +46,8 @@ import { contactTypeService } from './services/contactTypeService';
 import { contactService } from './services/contactService';
 import { taskService } from './services/taskService';
 import { secretaryService } from './services/secretaryService';
+import { expenseService } from './services/expenseService';
+import { expenseCategoryService } from './services/expenseCategoryService';
 
 export interface MainAppLayoutProps {
   currentUser: User;
@@ -119,16 +121,27 @@ const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout, on
   const loadAllSecondaryLists = useCallback(async (isStale?: () => boolean) => {
     const stale = () => isStale?.() ?? false;
     try {
-      const [eventTypesData, eventsData, contactTypesData, contactsData, tasksData, documentCategoriesData, documentsData] =
-        await Promise.all([
-          eventTypeService.getAll(),
-          eventService.getAll(),
-          contactTypeService.getAll(),
-          contactService.getAll(),
-          taskService.getAll(),
-          documentCategoryService.getAll(),
-          documentService.getAll(),
-        ]);
+      const [
+        eventTypesData,
+        eventsData,
+        contactTypesData,
+        contactsData,
+        tasksData,
+        documentCategoriesData,
+        documentsData,
+        expensesData,
+        expenseCategoriesData,
+      ] = await Promise.all([
+        eventTypeService.getAll(),
+        eventService.getAll(),
+        contactTypeService.getAll(),
+        contactService.getAll(),
+        taskService.getAll(),
+        documentCategoryService.getAll(),
+        documentService.getAll(),
+        expenseService.getAll(),
+        expenseCategoryService.getAll(),
+      ]);
       if (stale()) return;
       setEventTypes(eventTypesData);
       setEvents(eventsData);
@@ -137,6 +150,8 @@ const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout, on
       setTasks(tasksData);
       setDocumentCategories(documentCategoriesData);
       setDocuments(documentsData);
+      setExpenses(expensesData);
+      setExpenseCategories(expenseCategoriesData);
     } catch (error) {
       if (!stale()) {
         console.error('Erro ao carregar listas secundárias:', error);
@@ -147,15 +162,17 @@ const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout, on
   const loadReportsSlice = useCallback(async (isStale?: () => boolean) => {
     const stale = () => isStale?.() ?? false;
     try {
-      const [eventsData, contactsData, tasksData] = await Promise.all([
+      const [eventsData, contactsData, tasksData, expensesData] = await Promise.all([
         eventService.getAll(),
         contactService.getAll(),
         taskService.getAll(),
+        expenseService.getAll(),
       ]);
       if (stale()) return;
       setEvents(eventsData);
       setContacts(contactsData);
       setTasks(tasksData);
+      setExpenses(expensesData);
     } catch (error) {
       if (!stale()) {
         console.error('Erro ao carregar dados para relatórios:', error);
@@ -170,10 +187,20 @@ const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout, on
         switch (view) {
           case 'dashboard': {
             if (executiveId) {
-              const ev = await eventService.getAll({ executiveId });
-              if (!stale()) setEvents(ev);
+              const [ev, exps, ecats] = await Promise.all([
+                eventService.getAll({ executiveId }),
+                expenseService.getAll({ executiveId }),
+                expenseCategoryService.getAll({ executiveId }),
+              ]);
+              if (!stale()) {
+                setEvents(ev);
+                setExpenses(exps);
+                setExpenseCategories(ecats);
+              }
             } else if (!stale()) {
               setEvents([]);
+              setExpenses([]);
+              setExpenseCategories([]);
             }
             break;
           }
@@ -219,6 +246,22 @@ const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout, on
               if (!stale()) setDocuments(list);
             } else if (!stale()) {
               setDocuments([]);
+            }
+            break;
+          }
+          case 'finances': {
+            if (executiveId) {
+              const [list, ecats] = await Promise.all([
+                expenseService.getAll({ executiveId }),
+                expenseCategoryService.getAll({ executiveId }),
+              ]);
+              if (!stale()) {
+                setExpenses(list);
+                setExpenseCategories(ecats);
+              }
+            } else if (!stale()) {
+              setExpenses([]);
+              setExpenseCategories([]);
             }
             break;
           }
@@ -488,10 +531,9 @@ const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout, on
         return (
           <FinancesView
             expenses={filteredFinances}
-            setExpenses={setExpenses}
             expenseCategories={expenseCategories}
-            setExpenseCategories={setExpenseCategories}
             executiveId={selectedExecutiveId!}
+            onRefresh={refreshAfterMutation}
           />
         );
       case 'tasks':

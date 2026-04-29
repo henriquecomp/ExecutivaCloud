@@ -10,6 +10,20 @@ import {
   patchManagedUser,
   type ManagedUserRow,
 } from '../services/userManagementService';
+import {
+  DataTable,
+  DataTableBody,
+  DataTableEmptyRow,
+  DataTableHead,
+  DataTableRow,
+  DataTableTd,
+  DataTableTh,
+} from './ui/DataTable';
+import AppSearchInput from './ui/AppSearchInput';
+import AppLabel from './ui/AppLabel';
+import AppSelect from './ui/AppSelect';
+import ToolbarPanel from './ui/ToolbarPanel';
+import Pagination from './Pagination';
 
 const roleLabel = (role: string): string => {
   const map: Record<string, string> = {
@@ -73,34 +87,29 @@ const UserManagementView: React.FC<UserManagementViewProps> = ({
   const [editPhone, setEditPhone] = useState('');
   const [editActive, setEditActive] = useState(true);
   const [editSaving, setEditSaving] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   useEffect(() => {
     const t = window.setTimeout(() => setQApplied(qInput.trim()), 350);
     return () => window.clearTimeout(t);
   }, [qInput]);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [qApplied]);
+
   const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const limit = 200;
-      let skip = 0;
-      const acc: ManagedUserRow[] = [];
-      let totalCount = 0;
-      for (;;) {
-        const { items, total } = await listManagedUsers({
-          q: qApplied || undefined,
-          skip,
-          limit,
-        });
-        totalCount = total;
-        acc.push(...items);
-        if (acc.length >= total || items.length === 0) {
-          break;
-        }
-        skip += items.length;
-      }
-      setRows(acc);
+      const skip = (currentPage - 1) * pageSize;
+      const { items, total: totalCount } = await listManagedUsers({
+        q: qApplied || undefined,
+        skip,
+        limit: pageSize,
+      });
+      setRows(items);
       setTotal(totalCount);
     } catch (e: unknown) {
       const ax = e as { response?: { data?: { detail?: string } } };
@@ -108,11 +117,16 @@ const UserManagementView: React.FC<UserManagementViewProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [qApplied]);
+  }, [qApplied, currentPage, pageSize]);
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil(total / pageSize) || 1);
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [total, pageSize, currentPage]);
 
   const openEdit = (u: ManagedUserRow) => {
     setEditRow(u);
@@ -164,100 +178,106 @@ const UserManagementView: React.FC<UserManagementViewProps> = ({
 
   return (
     <div className="space-y-6 animate-fade-in w-full min-w-0">
-      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-        <div>
-          <h2 className="text-3xl font-bold text-slate-800">Usuários</h2>
-          {currentUser.role === 'master' ? (
-            <p className="text-slate-500 mt-1 text-sm md:text-base">
-              Como administrador geral do sistema, você vê todos os usuários de todas as organizações jurídicas, empresas, executivos e
-              secretárias. Convite, alteração e inativação podem ser feitos em qualquer conta (exceto inativar a própria sessão aqui).
-              Apenas o papel master tem esta visão global.
-            </p>
-          ) : (
-            <p className="text-slate-500 mt-1 text-sm md:text-base">
-              Consulta, convite, alteração e inativação apenas no seu escopo: sua empresa ou sua organização jurídica. A listagem de todo o
-              sistema é exclusiva do administrador geral (master).
-            </p>
-          )}
-        </div>
-        <div className="flex flex-wrap gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={() => void refresh()}
-            className="px-4 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 text-sm font-medium"
-          >
-            Atualizar
-          </button>
-          <button
-            type="button"
-            onClick={() => setInviteOpen(true)}
-            className="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 text-sm font-medium"
-          >
-            Convidar usuário
-          </button>
-        </div>
+      <div className="flex flex-wrap justify-end gap-2 shrink-0">
+        <button
+          type="button"
+          onClick={() => void refresh()}
+          className="px-4 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 text-sm font-medium"
+        >
+          Atualizar
+        </button>
+        <button
+          type="button"
+          onClick={() => setInviteOpen(true)}
+          className="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 text-sm font-medium"
+        >
+          Convidar usuário
+        </button>
       </div>
 
       {flash && <p className="text-sm text-green-800 bg-green-50 border border-green-200 rounded-lg px-4 py-3">{flash}</p>}
       {error && <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-4 py-3">{error}</p>}
 
-      <div className="bg-white p-4 rounded-xl shadow-md border border-slate-100">
-        <div className="mb-4 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
-          <label className="block text-sm text-slate-600 flex-1 min-w-0">
-            <span className="font-medium text-slate-700">Buscar</span>
-            <input
-              type="search"
-              value={qInput}
-              onChange={(e) => setQInput(e.target.value)}
-              placeholder="Nome ou e-mail…"
-              className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
-            />
-          </label>
-          <p className="text-sm text-slate-500 self-end">
+      <ToolbarPanel className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0 flex-1">
+          <AppSearchInput
+            type="search"
+            value={qInput}
+            onChange={(e) => setQInput(e.target.value)}
+            placeholder="Buscar por nome ou e-mail…"
+            aria-label="Buscar usuários"
+          />
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-4">
+          <p className="text-sm text-slate-500">
             {loading ? 'Carregando…' : `${total} registro(s)`}
           </p>
+          <div className="flex items-center gap-2">
+            <AppLabel htmlFor="limit-users" className="mb-0 inline text-slate-600">
+              Por página
+            </AppLabel>
+            <AppSelect
+              id="limit-users"
+              value={pageSize}
+              onChange={(e) => {
+                setPageSize(Number(e.target.value));
+                setCurrentPage(1);
+              }}
+              className="w-auto min-w-[5rem]"
+              disabled={loading}
+            >
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+            </AppSelect>
+          </div>
         </div>
+      </ToolbarPanel>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b-2 border-slate-200 text-slate-500">
-              <tr>
-                <th className="p-3">Nome</th>
-                <th className="p-3 hidden md:table-cell">E-mail</th>
-                <th className="p-3 hidden lg:table-cell">Telefone</th>
-                <th className="p-3 min-w-[12rem]">Organização / Empresa</th>
-                <th className="p-3">Papel</th>
-                <th className="p-3">Status</th>
-                <th className="p-3 hidden sm:table-cell">Perfil</th>
-                <th className="p-3 w-32">Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((u) => {
-                const { legalName, companyName, title } = resolveUserAssociations(
-                  u,
-                  legalOrganizations,
-                  organizations,
-                );
-                return (
-                <tr key={u.id} className="border-b border-slate-100 hover:bg-slate-50">
-                  <td className="p-3 font-medium text-slate-800">{u.fullName}</td>
-                  <td className="p-3 hidden md:table-cell text-slate-600">{u.email}</td>
-                  <td className="p-3 hidden lg:table-cell text-slate-600">{u.phone || '—'}</td>
-                  <td className="p-3 text-xs text-slate-600 align-top" title={title}>
-                    <div className="space-y-1 max-w-[18rem]">
+      <DataTable innerClassName="overflow-x-auto">
+        <DataTableHead>
+          <tr>
+            <DataTableTh>Nome</DataTableTh>
+            <DataTableTh className="hidden md:table-cell">E-mail</DataTableTh>
+            <DataTableTh className="hidden lg:table-cell">Telefone</DataTableTh>
+            <DataTableTh className="min-w-[12rem]">Organização / Empresa</DataTableTh>
+            <DataTableTh>Papel</DataTableTh>
+            <DataTableTh>Status</DataTableTh>
+            <DataTableTh className="hidden sm:table-cell">Perfil</DataTableTh>
+            <DataTableTh className="w-32">Ações</DataTableTh>
+          </tr>
+        </DataTableHead>
+        <DataTableBody>
+          {loading ? (
+            <DataTableEmptyRow colSpan={8}>Carregando…</DataTableEmptyRow>
+          ) : rows.length === 0 ? (
+            <DataTableEmptyRow colSpan={8}>Nenhum usuário encontrado.</DataTableEmptyRow>
+          ) : (
+            rows.map((u) => {
+              const { legalName, companyName, title } = resolveUserAssociations(
+                u,
+                legalOrganizations,
+                organizations,
+              );
+              return (
+                <DataTableRow key={u.id}>
+                  <DataTableTd className="font-medium text-slate-800">{u.fullName}</DataTableTd>
+                  <DataTableTd className="hidden md:table-cell text-slate-600">{u.email}</DataTableTd>
+                  <DataTableTd className="hidden lg:table-cell text-slate-600">{u.phone || '—'}</DataTableTd>
+                  <DataTableTd className="text-xs text-slate-600 align-top" title={title}>
+                    <div className="max-w-[18rem] space-y-1">
                       <div className="leading-snug">
-                        <span className="text-slate-400 font-medium">Org. jurídica:</span>{' '}
+                        <span className="font-medium text-slate-400">Org. jurídica:</span>{' '}
                         <span className="break-words">{legalName}</span>
                       </div>
                       <div className="leading-snug">
-                        <span className="text-slate-400 font-medium">Empresa:</span>{' '}
+                        <span className="font-medium text-slate-400">Empresa:</span>{' '}
                         <span className="break-words">{companyName}</span>
                       </div>
                     </div>
-                  </td>
-                  <td className="p-3 text-slate-600">{roleLabel(u.role)}</td>
-                  <td className="p-3">
+                  </DataTableTd>
+                  <DataTableTd className="text-slate-600">{roleLabel(u.role)}</DataTableTd>
+                  <DataTableTd>
                     <span
                       className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
                         u.isActive ? 'bg-emerald-50 text-emerald-800' : 'bg-slate-100 text-slate-600'
@@ -265,42 +285,42 @@ const UserManagementView: React.FC<UserManagementViewProps> = ({
                     >
                       {u.isActive ? 'Ativo' : 'Inativo'}
                     </span>
-                  </td>
-                  <td className="p-3 hidden sm:table-cell text-slate-600">
+                  </DataTableTd>
+                  <DataTableTd className="hidden sm:table-cell text-slate-600">
                     {u.needsProfileCompletion ? <span className="text-amber-700">Pendente</span> : '—'}
-                  </td>
-                  <td className="p-3">
+                  </DataTableTd>
+                  <DataTableTd>
                     <div className="flex flex-wrap gap-1">
                       <button
                         type="button"
                         onClick={() => openEdit(u)}
-                        className="p-1.5 rounded-md text-indigo-600 hover:bg-indigo-50"
+                        className="rounded-md p-1.5 text-indigo-600 hover:bg-indigo-50"
                         title="Editar"
                         aria-label="Editar"
                       >
-                        <EditIcon className="w-5 h-5" />
+                        <EditIcon className="h-5 w-5" />
                       </button>
                       {u.isActive && u.id !== selfId && (
                         <button
                           type="button"
                           onClick={() => setDeactivateRow(u)}
-                          className="text-xs px-2 py-1 rounded-md border border-red-200 text-red-700 hover:bg-red-50"
+                          className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50"
                         >
                           Inativar
                         </button>
                       )}
                     </div>
-                  </td>
-                </tr>
+                  </DataTableTd>
+                </DataTableRow>
               );
-              })}
-            </tbody>
-          </table>
-          {!loading && rows.length === 0 && (
-            <p className="text-center p-8 text-slate-500">Nenhum usuário encontrado.</p>
+            })
           )}
-        </div>
-      </div>
+        </DataTableBody>
+      </DataTable>
+
+      {!loading && total > 0 && (
+        <Pagination currentPage={currentPage} totalItems={total} itemsPerPage={pageSize} onPageChange={setCurrentPage} />
+      )}
 
       {inviteOpen && (
         <Modal title="Convidar usuário" onClose={() => setInviteOpen(false)}>

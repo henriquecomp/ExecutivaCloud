@@ -4,54 +4,82 @@ import Modal from './Modal';
 import ConfirmationModal from './ConfirmationModal';
 import Pagination from './Pagination';
 import ViewSwitcher from './ViewSwitcher';
-import { EditIcon, DeleteIcon, PlusIcon, SettingsIcon } from './Icons';
+import { EditIcon, DeleteIcon, PlusIcon, CogIcon } from './Icons';
+import {
+  DataTable,
+  DataTableBody,
+  DataTableHead,
+  DataTableRow,
+  DataTableTd,
+  DataTableTh,
+} from './ui/DataTable';
+import { FormDangerAlert } from './ui/FormDangerAlert';
+import AppButton from './ui/AppButton';
+import AppInput from './ui/AppInput';
+import AppLabel from './ui/AppLabel';
+import AppSelect from './ui/AppSelect';
+import FormActions from './ui/FormActions';
+import ToolbarPanel from './ui/ToolbarPanel';
+import { radioClass } from './ui/controlTokens';
+import { expenseService } from '../services/expenseService';
+import { expenseCategoryService } from '../services/expenseCategoryService';
+import { getApiErrorMessage } from '../utils/apiError';
 
 interface FinancesViewProps {
   expenses: Expense[];
-  setExpenses: React.Dispatch<React.SetStateAction<Expense[]>>;
   expenseCategories: ExpenseCategory[];
-  setExpenseCategories: React.Dispatch<React.SetStateAction<ExpenseCategory[]>>;
   executiveId: string;
+  onRefresh: () => Promise<void>;
 }
 
 // --- Category Management Components ---
-const CategoryForm: React.FC<{ category: Partial<ExpenseCategory>, onSave: (cat: ExpenseCategory) => void, onCancel: () => void }> = ({ category, onSave, onCancel }) => {
+const CategoryForm: React.FC<{ category: Partial<ExpenseCategory>, onSave: (cat: ExpenseCategory) => void | Promise<void>, onCancel: () => void }> = ({ category, onSave, onCancel }) => {
     const [name, setName] = useState(category.name || '');
     const [color, setColor] = useState(category.color || '#64748b');
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!name) return;
-        onSave({ id: category.id || `ec_${new Date().getTime()}`, name, color });
+        await Promise.resolve(
+            onSave({
+                id: category.id || '',
+                name,
+                color,
+                executiveId: category.executiveId || '',
+            }),
+        );
     };
     return (
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
             <div>
-                <label htmlFor="cat-name" className="block text-sm font-medium text-slate-700">Nome da Categoria</label>
-                <input type="text" id="cat-name" value={name} onChange={e => setName(e.target.value)} required className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                <AppLabel htmlFor="cat-name">Nome da Categoria</AppLabel>
+                <AppInput id="cat-name" type="text" value={name} onChange={e => setName(e.target.value)} required className="mt-1" />
             </div>
             <div>
-                <label htmlFor="cat-color" className="block text-sm font-medium text-slate-700">Cor da Etiqueta</label>
+                <AppLabel htmlFor="cat-color">Cor da Etiqueta</AppLabel>
                 <div className="mt-1 flex items-center gap-3">
                     <input
                         type="color"
                         id="cat-color"
                         value={color}
                         onChange={e => setColor(e.target.value)}
-                        className="h-10 w-14 cursor-pointer rounded border border-slate-300 bg-white p-1"
+                        className="h-10 w-14 shrink-0 cursor-pointer rounded border border-slate-300 bg-white p-1"
                     />
-                    <input
+                    <AppInput
                         type="text"
                         value={color}
                         onChange={e => setColor(e.target.value)}
                         placeholder="#64748b"
-                        className="block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                     />
                 </div>
             </div>
-            <div className="flex justify-end space-x-3 pt-4">
-                <button type="button" onClick={onCancel} className="px-4 py-2 bg-slate-200 text-slate-800 rounded-md hover:bg-slate-300 transition">Cancelar</button>
-                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition">Salvar</button>
-            </div>
+            <FormActions>
+                <AppButton type="button" variant="secondary" onClick={onCancel}>
+                    Cancelar
+                </AppButton>
+                <AppButton type="submit" variant="primary">
+                    Salvar
+                </AppButton>
+            </FormActions>
         </form>
     );
 };
@@ -60,32 +88,67 @@ const CategorySettingsModal: React.FC<{
     isOpen: boolean;
     onClose: () => void;
     categories: ExpenseCategory[];
-    setCategories: React.Dispatch<React.SetStateAction<ExpenseCategory[]>>;
-}> = ({ isOpen, onClose, categories, setCategories }) => {
+    executiveId: string;
+    onRefresh: () => Promise<void>;
+}> = ({ isOpen, onClose, categories, executiveId, onRefresh }) => {
     const [isFormOpen, setFormOpen] = useState(false);
     const [editingCategory, setEditingCategory] = useState<Partial<ExpenseCategory> | null>(null);
     const [categoryToDelete, setCategoryToDelete] = useState<ExpenseCategory | null>(null);
+    const [categoryActionError, setCategoryActionError] = useState<string | null>(null);
 
-    const handleSave = (category: ExpenseCategory) => {
-        setCategories(prev => editingCategory?.id ? prev.map(c => c.id === category.id ? category : c) : [...prev, category]);
-        setFormOpen(false);
-        setEditingCategory(null);
+    const handleSave = async (category: ExpenseCategory) => {
+        setCategoryActionError(null);
+        try {
+            if (editingCategory?.id) {
+                await expenseCategoryService.update(editingCategory.id, {
+                    name: category.name,
+                    color: category.color,
+                });
+            } else {
+                await expenseCategoryService.create({
+                    name: category.name,
+                    color: category.color,
+                    executiveId,
+                });
+            }
+            await onRefresh();
+            setFormOpen(false);
+            setEditingCategory(null);
+        } catch (e) {
+            console.error(e);
+            setCategoryActionError(getApiErrorMessage(e, 'Não foi possível salvar a categoria.'));
+        }
     };
 
-    const confirmDelete = () => {
+    const confirmDelete = async () => {
         if (!categoryToDelete) return;
-        setCategories(prev => prev.filter(c => c.id !== categoryToDelete.id));
-        setCategoryToDelete(null);
+        setCategoryActionError(null);
+        try {
+            await expenseCategoryService.delete(categoryToDelete.id);
+            await onRefresh();
+            setCategoryToDelete(null);
+        } catch (e) {
+            console.error(e);
+            setCategoryActionError(getApiErrorMessage(e, 'Não foi possível excluir a categoria.'));
+        }
     };
 
     if (!isOpen) return null;
     return (
-        <Modal title="Gerenciar Categorias de Finanças" onClose={onClose}>
+        <Modal title="Categorias" onClose={onClose}>
             <div className="space-y-4">
+                <FormDangerAlert message={categoryActionError} />
                 <div className="flex justify-end">
-                    <button onClick={() => { setEditingCategory({}); setFormOpen(true); }} className="flex items-center gap-2 px-3 py-1 bg-indigo-100 text-indigo-700 rounded-md hover:bg-indigo-200 transition text-sm">
-                        <PlusIcon /> Adicionar Categoria
-                    </button>
+                    <AppButton
+                        variant="ghost"
+                        type="button"
+                        className="!p-2"
+                        title="Adicionar categoria de finanças"
+                        aria-label="Adicionar categoria de finanças"
+                        onClick={() => { setEditingCategory({ executiveId }); setFormOpen(true); }}
+                    >
+                        <PlusIcon />
+                    </AppButton>
                 </div>
                 <ul className="space-y-2 max-h-80 overflow-y-auto pr-2">
                     {categories.map(cat => (
@@ -103,7 +166,7 @@ const CategorySettingsModal: React.FC<{
                 </ul>
             </div>
             {isFormOpen && (
-                <Modal title={editingCategory?.id ? 'Editar Categoria' : 'Nova Categoria'} onClose={() => setFormOpen(false)}>
+                <Modal title={editingCategory?.id ? 'Editar categoria' : 'Nova categoria'} onClose={() => setFormOpen(false)}>
                     <CategoryForm category={editingCategory || {}} onSave={handleSave} onCancel={() => { setFormOpen(false); setEditingCategory(null); }} />
                 </Modal>
             )}
@@ -112,7 +175,7 @@ const CategorySettingsModal: React.FC<{
     );
 };
 
-const ExpenseForm: React.FC<{ expense: Partial<Expense>, onSave: (expense: Expense) => void, onCancel: () => void, categories: ExpenseCategory[] }> = ({ expense, onSave, onCancel, categories }) => {
+const ExpenseForm: React.FC<{ expense: Partial<Expense>, onSave: (expense: Expense) => void | Promise<void>, onCancel: () => void, categories: ExpenseCategory[] }> = ({ expense, onSave, onCancel, categories }) => {
     const [description, setDescription] = useState(expense.description || '');
     const [amount, setAmount] = useState(expense.amount || 0);
     const [expenseDate, setExpenseDate] = useState(expense.expenseDate || new Date().toISOString().split('T')[0]);
@@ -136,86 +199,124 @@ const ExpenseForm: React.FC<{ expense: Partial<Expense>, onSave: (expense: Expen
         }
     }, [status, type, statusOptions]);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!description || amount <= 0 || !expense.executiveId) return;
-        onSave({
-            id: expense.id || `exp_${new Date().toISOString()}`,
-            executiveId: expense.executiveId,
-            description, amount, expenseDate, type, entityType, categoryId, status, receiptUrl,
-        });
+        await Promise.resolve(
+            onSave({
+                id: expense.id || '',
+                executiveId: expense.executiveId,
+                description,
+                amount,
+                expenseDate,
+                type,
+                entityType,
+                categoryId: categoryId || undefined,
+                status,
+                receiptUrl,
+            }),
+        );
     };
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
             <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Tipo de Lançamento</label>
-                <div className="flex gap-4">
+                <AppLabel className="mb-2">Tipo de Lançamento</AppLabel>
+                <div className="flex flex-wrap gap-4">
                     {(['A pagar', 'A receber'] as ExpenseType[]).map(t => (
-                        <label key={t} className="flex items-center">
-                            <input type="radio" name="type" value={t} checked={type === t} onChange={() => setType(t)} className="h-4 w-4 text-indigo-600" />
+                        <label key={t} className="flex cursor-pointer items-center">
+                            <input type="radio" name="type" value={t} checked={type === t} onChange={() => setType(t)} className={radioClass} />
                             <span className="ml-2 text-sm text-slate-600">{t}</span>
                         </label>
                     ))}
                 </div>
             </div>
-             <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Origem</label>
-                <div className="flex gap-4">
-                    {(['Pessoa Jurídica', 'Pessoa Física'] as ExpenseEntityType[]).map(e => (
-                        <label key={e} className="flex items-center">
-                            <input type="radio" name="entityType" value={e} checked={entityType === e} onChange={() => setEntityType(e)} className="h-4 w-4 text-indigo-600" />
-                            <span className="ml-2 text-sm text-slate-600">{e}</span>
+            <div>
+                <AppLabel className="mb-2">Origem</AppLabel>
+                <div className="flex flex-wrap gap-4">
+                    {(['Pessoa Jurídica', 'Pessoa Física'] as ExpenseEntityType[]).map(ent => (
+                        <label key={ent} className="flex cursor-pointer items-center">
+                            <input type="radio" name="entityType" value={ent} checked={entityType === ent} onChange={() => setEntityType(ent)} className={radioClass} />
+                            <span className="ml-2 text-sm text-slate-600">{ent}</span>
                         </label>
                     ))}
                 </div>
             </div>
             <div>
-                <label htmlFor="description" className="block text-sm font-medium text-slate-700">Descrição</label>
-                <input type="text" id="description" value={description} onChange={e => setDescription(e.target.value)} required className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                <AppLabel htmlFor="description">Descrição</AppLabel>
+                <AppInput id="description" type="text" value={description} onChange={e => setDescription(e.target.value)} required className="mt-1" />
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
-                    <label htmlFor="amount" className="block text-sm font-medium text-slate-700">Valor (R$)</label>
-                    <input type="number" id="amount" value={amount} onChange={e => setAmount(parseFloat(e.target.value))} required min="0.01" step="0.01" className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                    <AppLabel htmlFor="amount">Valor (R$)</AppLabel>
+                    <AppInput
+                        id="amount"
+                        type="number"
+                        value={amount || ''}
+                        onChange={e => setAmount(parseFloat(e.target.value))}
+                        required
+                        min={0.01}
+                        step={0.01}
+                        className="mt-1"
+                    />
                 </div>
                 <div>
-                    <label htmlFor="expenseDate" className="block text-sm font-medium text-slate-700">Data</label>
-                    <input type="date" id="expenseDate" value={expenseDate} onChange={e => setExpenseDate(e.target.value)} required className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                    <AppLabel htmlFor="expenseDate">Data</AppLabel>
+                    <AppInput id="expenseDate" type="date" value={expenseDate} onChange={e => setExpenseDate(e.target.value)} required className="mt-1" />
                 </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
-                    <label htmlFor="category" className="block text-sm font-medium text-slate-700">Categoria</label>
-                    <select id="category" value={categoryId} onChange={e => setCategoryId(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    <AppLabel htmlFor="category">Categoria</AppLabel>
+                    <AppSelect id="category" value={categoryId} onChange={e => setCategoryId(e.target.value)} className="mt-1">
                         <option value="">Sem categoria</option>
-                        {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </select>
+                        {categories.map(c => (
+                            <option key={c.id} value={c.id}>
+                                {c.name}
+                            </option>
+                        ))}
+                    </AppSelect>
                 </div>
                 <div>
-                    <label htmlFor="status" className="block text-sm font-medium text-slate-700">Status</label>
-                    <select id="status" value={status} onChange={e => setStatus(e.target.value as ExpenseStatus)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-                        {statusOptions.map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
+                    <AppLabel htmlFor="status">Status</AppLabel>
+                    <AppSelect id="status" value={status} onChange={e => setStatus(e.target.value as ExpenseStatus)} className="mt-1">
+                        {statusOptions.map(s => (
+                            <option key={s} value={s}>
+                                {s}
+                            </option>
+                        ))}
+                    </AppSelect>
                 </div>
             </div>
             <div>
-                <label htmlFor="receiptUrl" className="block text-sm font-medium text-slate-700">URL do Recibo</label>
-                <input type="url" id="receiptUrl" value={receiptUrl} onChange={e => setReceiptUrl(e.target.value)} placeholder="https://..." className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                <AppLabel htmlFor="receiptUrl" optional>
+                    URL do Recibo
+                </AppLabel>
+                <AppInput id="receiptUrl" type="url" value={receiptUrl} onChange={e => setReceiptUrl(e.target.value)} placeholder="https://..." className="mt-1" />
             </div>
-            <div className="flex justify-end space-x-3 pt-4">
-                <button type="button" onClick={onCancel} className="px-4 py-2 bg-slate-200 text-slate-800 rounded-md hover:bg-slate-300 transition">Cancelar</button>
-                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition">Salvar Lançamento</button>
-            </div>
+            <FormActions>
+                <AppButton type="button" variant="secondary" onClick={onCancel}>
+                    Cancelar
+                </AppButton>
+                <AppButton type="submit" variant="primary">
+                    Salvar Lançamento
+                </AppButton>
+            </FormActions>
         </form>
     );
 };
 
-const FinancesView: React.FC<FinancesViewProps> = ({ expenses, setExpenses, expenseCategories, setExpenseCategories, executiveId }) => {
+const FinancesView: React.FC<FinancesViewProps> = ({ expenses, expenseCategories, executiveId, onRefresh }) => {
     const [isModalOpen, setModalOpen] = useState(false);
     const [editingExpense, setEditingExpense] = useState<Partial<Expense> | null>(null);
     const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null);
     const [isCategoryModalOpen, setCategoryModalOpen] = useState(false);
+    const [pageError, setPageError] = useState<string | null>(null);
+
+    const categoriesForExecutive = useMemo(
+        () => expenseCategories.filter((c) => c.executiveId === executiveId),
+        [expenseCategories, executiveId],
+    );
 
     // Filters for the table
     const [filterType, setFilterType] = useState<ExpenseType | 'all'>('all');
@@ -245,26 +346,45 @@ const FinancesView: React.FC<FinancesViewProps> = ({ expenses, setExpenses, expe
     }, [limit, expenses, layout, filterType, filterEntityType, filterCategory]);
 
     const handleAddExpense = () => {
+        setPageError(null);
         setEditingExpense({ executiveId });
         setModalOpen(true);
     };
 
     const handleEditExpense = (expense: Expense) => {
+        setPageError(null);
         setEditingExpense(expense);
         setModalOpen(true);
     };
 
-    const confirmDelete = () => {
-        if (expenseToDelete) {
-            setExpenses(prev => prev.filter(e => e.id !== expenseToDelete.id));
+    const confirmDelete = async () => {
+        if (!expenseToDelete) return;
+        setPageError(null);
+        try {
+            await expenseService.delete(expenseToDelete.id);
+            await onRefresh();
             setExpenseToDelete(null);
+        } catch (e) {
+            console.error(e);
+            setPageError(getApiErrorMessage(e, 'Não foi possível excluir o lançamento.'));
         }
     };
     
-    const handleSaveExpense = (expense: Expense) => {
-        setExpenses(prev => editingExpense?.id ? prev.map(e => e.id === expense.id ? expense : e) : [...prev, expense]);
-        setModalOpen(false);
-        setEditingExpense(null);
+    const handleSaveExpense = async (expense: Expense) => {
+        setPageError(null);
+        try {
+            if (editingExpense?.id) {
+                await expenseService.update(editingExpense.id, expense);
+            } else {
+                await expenseService.create(expense);
+            }
+            await onRefresh();
+            setModalOpen(false);
+            setEditingExpense(null);
+        } catch (e) {
+            console.error(e);
+            setPageError(getApiErrorMessage(e, 'Não foi possível salvar o lançamento.'));
+        }
     };
 
     const getStatusBadgeClass = (status: ExpenseStatus) => ({
@@ -366,103 +486,122 @@ const FinancesView: React.FC<FinancesViewProps> = ({ expenses, setExpenses, expe
                 </div>
             );
             case 'table': return (
-                <div className="bg-white p-4 rounded-xl shadow-md overflow-x-auto">
-                    <table className="w-full text-left">
-                        <thead className="border-b-2 border-slate-200 text-sm text-slate-500">
-                            <tr>
-                                <th className="p-3">Descrição</th>
-                                <th className="p-3 hidden md:table-cell">Data</th>
-                                <th className="p-3 hidden lg:table-cell">Categoria</th>
-                                <th className="p-3">Valor</th>
-                                <th className="p-3">Status</th>
-                                <th className="p-3 text-right">Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {paginatedExpenses.map(expense => {
-                                const category = getCategoryById(expense.categoryId);
-                                return (
-                                <tr key={expense.id} className="border-b border-slate-100 hover:bg-slate-50">
-                                    <td className="p-3 font-medium text-slate-800">
+                <DataTable>
+                    <DataTableHead>
+                        <tr>
+                            <DataTableTh>Descrição</DataTableTh>
+                            <DataTableTh className="hidden md:table-cell">Data</DataTableTh>
+                            <DataTableTh className="hidden lg:table-cell">Categoria</DataTableTh>
+                            <DataTableTh>Valor</DataTableTh>
+                            <DataTableTh>Status</DataTableTh>
+                            <DataTableTh className="text-right">Ações</DataTableTh>
+                        </tr>
+                    </DataTableHead>
+                    <DataTableBody>
+                        {paginatedExpenses.map((expense) => {
+                            const category = getCategoryById(expense.categoryId);
+                            return (
+                                <DataTableRow key={expense.id}>
+                                    <DataTableTd className="font-medium text-slate-800">
                                         {expense.description}
                                         <p className="font-normal text-xs text-slate-500">{expense.entityType} - {expense.type}</p>
-                                    </td>
-                                    <td className="p-3 hidden md:table-cell text-slate-600">{formatDate(expense.expenseDate)}</td>
-                                    <td className="p-3 hidden lg:table-cell text-slate-600">
+                                    </DataTableTd>
+                                    <DataTableTd className="hidden md:table-cell text-slate-600">{formatDate(expense.expenseDate)}</DataTableTd>
+                                    <DataTableTd className="hidden lg:table-cell text-slate-600">
                                       {category ? (
-                                        <span className="text-xs font-semibold px-2 py-1 rounded-full whitespace-nowrap" style={getTagStyle(category.color)}>
+                                        <span className="whitespace-nowrap rounded-full px-2 py-1 text-xs font-semibold" style={getTagStyle(category.color)}>
                                           {category.name}
                                         </span>
                                       ) : null}
-                                    </td>
-                                    <td className={`p-3 font-medium ${expense.type === 'A receber' ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(expense.amount)}</td>
-                                    <td className="p-3"><span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadgeClass(expense.status)}`}>{expense.status}</span></td>
-                                    <td className="p-3 text-right">
+                                    </DataTableTd>
+                                    <DataTableTd className={`font-medium ${expense.type === 'A receber' ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(expense.amount)}</DataTableTd>
+                                    <DataTableTd><span className={`rounded-full px-2 py-1 text-xs font-semibold ${getStatusBadgeClass(expense.status)}`}>{expense.status}</span></DataTableTd>
+                                    <DataTableTd className="text-right">
                                         <div className="flex justify-end items-center gap-2">
-                                            <button onClick={() => handleEditExpense(expense)} className="p-2 text-slate-500 hover:text-indigo-600 rounded-full hover:bg-slate-200 transition" aria-label="Editar"><EditIcon /></button>
-                                            <button onClick={() => setExpenseToDelete(expense)} className="p-2 text-slate-500 hover:text-red-600 rounded-full hover:bg-slate-200 transition" aria-label="Excluir"><DeleteIcon /></button>
+                                            <button type="button" onClick={() => handleEditExpense(expense)} className="rounded-full p-2 text-slate-500 transition hover:bg-slate-200 hover:text-indigo-600" aria-label="Editar"><EditIcon /></button>
+                                            <button type="button" onClick={() => setExpenseToDelete(expense)} className="rounded-full p-2 text-slate-500 transition hover:bg-slate-200 hover:text-red-600" aria-label="Excluir"><DeleteIcon /></button>
                                         </div>
-                                    </td>
-                                </tr>
-                            )})}
-                        </tbody>
-                    </table>
-                </div>
+                                    </DataTableTd>
+                                </DataTableRow>
+                            );
+                        })}
+                    </DataTableBody>
+                </DataTable>
             );
         }
     };
 
     return (
         <div className="space-y-6 animate-fade-in">
-            <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div>
-                    <h2 className="text-3xl font-bold text-slate-800">Controle Financeiro</h2>
-                    <p className="text-slate-500 mt-1">Registre e acompanhe suas finanças.</p>
-                </div>
-                 <div className="flex items-center gap-2">
-                    <button onClick={handleAddExpense} className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-md shadow-sm hover:bg-indigo-700 transition duration-150">
-                        <PlusIcon />
-                        Novo Lançamento
-                    </button>
-                    <button onClick={() => setCategoryModalOpen(true)} className="p-2 bg-indigo-100 text-indigo-700 rounded-md shadow-sm hover:bg-indigo-200 transition" aria-label="Gerenciar Categorias">
-                        <SettingsIcon />
-                    </button>
-                </div>
-            </header>
+            <FormDangerAlert message={pageError} />
+            <div className="flex flex-wrap justify-end items-center gap-2">
+                <AppButton
+                    type="button"
+                    variant="primary"
+                    onClick={handleAddExpense}
+                    className="!p-2"
+                    title="Novo lançamento"
+                    aria-label="Novo lançamento"
+                >
+                    <PlusIcon />
+                </AppButton>
+                <AppButton
+                    type="button"
+                    variant="ghost"
+                    className="!p-2"
+                    title="Gerenciar categorias de finanças"
+                    aria-label="Gerenciar categorias de finanças"
+                    onClick={() => setCategoryModalOpen(true)}
+                >
+                    <CogIcon />
+                </AppButton>
+            </div>
 
-            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 p-4 bg-white rounded-xl shadow-md">
+            <ToolbarPanel className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <ViewSwitcher layout={layout} setLayout={setLayout} />
-                <div className="flex items-center gap-2 text-sm">
-                    <label htmlFor="limit" className="text-slate-600">Itens por página:</label>
-                    <select id="limit" value={limit} onChange={(e) => setLimit(Number(e.target.value))} className="px-2 py-1 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
-                        <option value={10}>10</option><option value={30}>30</option><option value={50}>50</option>
-                    </select>
+                <div className="flex items-center gap-2">
+                    <AppLabel htmlFor="limit" className="mb-0 inline text-slate-600">
+                        Itens por página
+                    </AppLabel>
+                    <AppSelect id="limit" value={limit} onChange={(e) => setLimit(Number(e.target.value))} className="w-auto min-w-[5rem]">
+                        <option value={10}>10</option>
+                        <option value={30}>30</option>
+                        <option value={50}>50</option>
+                    </AppSelect>
                 </div>
-            </div>
+            </ToolbarPanel>
 
-            <div className="bg-white p-4 rounded-xl shadow-md space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <ToolbarPanel className="space-y-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                     <div>
-                        <label htmlFor="filter-type" className="block text-sm font-medium text-slate-700">Tipo</label>
-                        <select id="filter-type" value={filterType} onChange={e => setFilterType(e.target.value as any)} className="mt-1 w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm">
-                            <option value="all">Todos</option><option value="A pagar">A pagar</option><option value="A receber">A receber</option>
-                        </select>
+                        <AppLabel htmlFor="filter-type">Tipo</AppLabel>
+                        <AppSelect id="filter-type" value={filterType} onChange={e => setFilterType(e.target.value as ExpenseType | 'all')} className="mt-1">
+                            <option value="all">Todos</option>
+                            <option value="A pagar">A pagar</option>
+                            <option value="A receber">A receber</option>
+                        </AppSelect>
                     </div>
                     <div>
-                        <label htmlFor="filter-entity" className="block text-sm font-medium text-slate-700">Origem</label>
-                        <select id="filter-entity" value={filterEntityType} onChange={e => setFilterEntityType(e.target.value as any)} className="mt-1 w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm">
-                            <option value="all">Todas</option><option value="Pessoa Jurídica">Pessoa Jurídica</option><option value="Pessoa Física">Pessoa Física</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label htmlFor="filter-category" className="block text-sm font-medium text-slate-700">Categoria</label>
-                        <select id="filter-category" value={filterCategory} onChange={e => setFilterCategory(e.target.value)} className="mt-1 w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm">
+                        <AppLabel htmlFor="filter-entity">Origem</AppLabel>
+                        <AppSelect id="filter-entity" value={filterEntityType} onChange={e => setFilterEntityType(e.target.value as ExpenseEntityType | 'all')} className="mt-1">
                             <option value="all">Todas</option>
-                            {expenseCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                        </select>
+                            <option value="Pessoa Jurídica">Pessoa Jurídica</option>
+                            <option value="Pessoa Física">Pessoa Física</option>
+                        </AppSelect>
+                    </div>
+                    <div>
+                        <AppLabel htmlFor="filter-category">Categoria</AppLabel>
+                        <AppSelect id="filter-category" value={filterCategory} onChange={e => setFilterCategory(e.target.value)} className="mt-1">
+                            <option value="all">Todas</option>
+                            {categoriesForExecutive.map(c => (
+                                <option key={c.id} value={c.id}>
+                                    {c.name}
+                                </option>
+                            ))}
+                        </AppSelect>
                     </div>
                 </div>
-            </div>
+            </ToolbarPanel>
 
              <div>
                 {renderItems()}
@@ -474,12 +613,18 @@ const FinancesView: React.FC<FinancesViewProps> = ({ expenses, setExpenses, expe
             </div>
 
             {isModalOpen && (
-                <Modal title={editingExpense?.id ? 'Editar Lançamento' : 'Novo Lançamento'} onClose={() => setModalOpen(false)}>
-                    <ExpenseForm expense={editingExpense || {}} onSave={handleSaveExpense} onCancel={() => { setModalOpen(false); setEditingExpense(null); }} categories={expenseCategories} />
+                <Modal title={editingExpense?.id ? 'Editar lançamento' : 'Novo lançamento'} onClose={() => setModalOpen(false)}>
+                    <ExpenseForm expense={editingExpense || {}} onSave={handleSaveExpense} onCancel={() => { setModalOpen(false); setEditingExpense(null); }} categories={categoriesForExecutive} />
                 </Modal>
             )}
             
-            <CategorySettingsModal isOpen={isCategoryModalOpen} onClose={() => setCategoryModalOpen(false)} categories={expenseCategories} setCategories={setExpenseCategories} />
+            <CategorySettingsModal
+                isOpen={isCategoryModalOpen}
+                onClose={() => setCategoryModalOpen(false)}
+                categories={categoriesForExecutive}
+                executiveId={executiveId}
+                onRefresh={onRefresh}
+            />
 
             {expenseToDelete && <ConfirmationModal isOpen={!!expenseToDelete} onClose={() => setExpenseToDelete(null)} onConfirm={confirmDelete} title="Confirmar Exclusão" message={`Tem certeza que deseja excluir o lançamento "${expenseToDelete.description}"?`} />}
         </div>

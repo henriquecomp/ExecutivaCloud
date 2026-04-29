@@ -3,9 +3,20 @@ import { Event, EventType, RecurrenceRule } from '../types';
 import Modal from './Modal';
 import ConfirmationModal from './ConfirmationModal';
 import Pagination from './Pagination';
-import { EditIcon, DeleteIcon, PlusIcon, BellIcon, RecurrenceIcon, SettingsIcon } from './Icons';
+import { EditIcon, DeleteIcon, PlusIcon, BellIcon, RecurrenceIcon, CogIcon } from './Icons';
+import { FormDangerAlert } from './ui/FormDangerAlert';
+import AppButton from './ui/AppButton';
+import AppInput from './ui/AppInput';
+import AppLabel from './ui/AppLabel';
+import AppSelect from './ui/AppSelect';
+import AppTextarea from './ui/AppTextarea';
+import FormActions from './ui/FormActions';
+import ToolbarPanel from './ui/ToolbarPanel';
+import { checkboxClass, radioClass } from './ui/controlTokens';
 import { eventService } from '../services/eventService';
 import { eventTypeService } from '../services/eventTypeService';
+import { getApiErrorMessage } from '../utils/apiError';
+import { toDatetimeLocalInputValue, todayDateInputValue } from '../utils/datetimeLocal';
 
 interface AgendaViewProps {
   events: Event[];
@@ -30,20 +41,24 @@ const EventTypeForm: React.FC<{ eventType: Partial<EventType>, onSave: (et: Even
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-                <label htmlFor="et-name" className="block text-sm font-medium text-slate-700">Nome do Tipo</label>
-                <input type="text" id="et-name" value={name} onChange={e => setName(e.target.value)} required className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                <AppLabel htmlFor="et-name">Nome do Tipo</AppLabel>
+                <AppInput id="et-name" type="text" value={name} onChange={e => setName(e.target.value)} required className="mt-1" />
             </div>
             <div>
-                <label htmlFor="et-color" className="block text-sm font-medium text-slate-700">Cor</label>
-                <div className="flex items-center gap-2">
-                    <input type="color" id="et-color" value={color} onChange={e => setColor(e.target.value)} className="p-1 h-10 w-10 block bg-white border border-slate-300 rounded-md cursor-pointer" />
-                    <input type="text" value={color} onChange={e => setColor(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                <AppLabel htmlFor="et-color">Cor</AppLabel>
+                <div className="mt-1 flex items-center gap-3">
+                    <input type="color" id="et-color" value={color} onChange={e => setColor(e.target.value)} className="block h-10 w-10 shrink-0 cursor-pointer rounded-md border border-slate-300 bg-white p-1" />
+                    <AppInput type="text" value={color} onChange={e => setColor(e.target.value)} placeholder="#3b82f6" />
                 </div>
             </div>
-            <div className="flex justify-end space-x-3 pt-4">
-                <button type="button" onClick={onCancel} className="px-4 py-2 bg-slate-200 text-slate-800 rounded-md hover:bg-slate-300 transition">Cancelar</button>
-                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition">Salvar</button>
-            </div>
+            <FormActions>
+                <AppButton type="button" variant="secondary" onClick={onCancel}>
+                    Cancelar
+                </AppButton>
+                <AppButton type="submit" variant="primary">
+                    Salvar
+                </AppButton>
+            </FormActions>
         </form>
     );
 };
@@ -58,8 +73,10 @@ const EventTypeSettingsModal: React.FC<{
     const [isFormModalOpen, setFormModalOpen] = useState(false);
     const [editingEventType, setEditingEventType] = useState<Partial<EventType> | null>(null);
     const [eventTypeToDelete, setEventTypeToDelete] = useState<EventType | null>(null);
+    const [typeActionError, setTypeActionError] = useState<string | null>(null);
 
     const handleSave = async (eventType: EventType) => {
+        setTypeActionError(null);
         try {
             if (editingEventType?.id) {
                 await eventTypeService.update(eventType.id, {
@@ -77,31 +94,40 @@ const EventTypeSettingsModal: React.FC<{
             setEditingEventType(null);
         } catch (error) {
             console.error('Erro ao salvar tipo de evento:', error);
-            alert('Erro ao salvar tipo de evento.');
+            setTypeActionError(getApiErrorMessage(error, 'Erro ao salvar tipo de evento.'));
         }
     };
 
     const confirmDelete = async () => {
         if (!eventTypeToDelete) return;
+        setTypeActionError(null);
         try {
             await eventTypeService.delete(eventTypeToDelete.id);
             await onRefresh();
             setEventTypeToDelete(null);
         } catch (error) {
             console.error('Erro ao excluir tipo de evento:', error);
-            alert('Erro ao excluir tipo de evento.');
+            setTypeActionError(getApiErrorMessage(error, 'Erro ao excluir tipo de evento.'));
         }
     };
     
     if (!isOpen) return null;
 
     return (
-        <Modal title="Gerenciar Tipos de Evento" onClose={onClose}>
+        <Modal title="Tipos de evento" onClose={onClose}>
             <div className="space-y-4">
+                <FormDangerAlert message={typeActionError} />
                 <div className="flex justify-end">
-                     <button onClick={() => { setEditingEventType({}); setFormModalOpen(true); }} className="flex items-center gap-2 px-3 py-1 bg-indigo-100 text-indigo-700 rounded-md hover:bg-indigo-200 transition text-sm">
-                        <PlusIcon /> Adicionar Tipo
-                    </button>
+                    <AppButton
+                        type="button"
+                        variant="ghost"
+                        className="!p-2"
+                        title="Adicionar tipo de evento"
+                        aria-label="Adicionar tipo de evento"
+                        onClick={() => { setEditingEventType({}); setFormModalOpen(true); }}
+                    >
+                        <PlusIcon />
+                    </AppButton>
                 </div>
                 <ul className="space-y-2 max-h-80 overflow-y-auto pr-2">
                     {eventTypes.map(et => (
@@ -121,7 +147,7 @@ const EventTypeSettingsModal: React.FC<{
             </div>
 
             {isFormModalOpen && (
-                <Modal title={editingEventType?.id ? 'Editar Tipo de Evento' : 'Novo Tipo de Evento'} onClose={() => setFormModalOpen(false)}>
+                <Modal title={editingEventType?.id ? 'Editar tipo' : 'Novo tipo'} onClose={() => setFormModalOpen(false)}>
                     <EventTypeForm eventType={editingEventType || {}} onSave={handleSave} onCancel={() => { setFormModalOpen(false); setEditingEventType(null); }} />
                 </Modal>
             )}
@@ -141,7 +167,12 @@ const EventTypeSettingsModal: React.FC<{
 
 
 // --- Event Form Component ---
-const EventForm: React.FC<{ event: Partial<Event>, onSave: (event: Partial<Event>, recurrence: RecurrenceRule | null) => void, onCancel: () => void, eventTypes: EventType[] }> = ({ event, onSave, onCancel, eventTypes }) => {
+const EventForm: React.FC<{
+    event: Partial<Event>;
+    onSave: (event: Partial<Event>, recurrence: RecurrenceRule | null) => void | Promise<void>;
+    onCancel: () => void;
+    eventTypes: EventType[];
+}> = ({ event, onSave, onCancel, eventTypes }) => {
     const [title, setTitle] = useState(event.title || '');
     const [location, setLocation] = useState(event.location || '');
     const [description, setDescription] = useState(event.description || '');
@@ -160,6 +191,7 @@ const EventForm: React.FC<{ event: Partial<Event>, onSave: (event: Partial<Event
     });
     const [endType, setEndType] = useState(event.recurrence?.endDate ? 'on' : 'after');
 
+    const [formError, setFormError] = useState<string | null>(null);
 
     // Handle datetime-local input which requires YYYY-MM-DDTHH:mm format
     const formatDateTimeForInput = (isoString?: string) => {
@@ -170,8 +202,21 @@ const EventForm: React.FC<{ event: Partial<Event>, onSave: (event: Partial<Event
         return localISOTime;
     };
 
-    const [startTime, setStartTime] = useState(formatDateTimeForInput(event.startTime));
-    const [endTime, setEndTime] = useState(formatDateTimeForInput(event.endTime));
+    const minDatetimeLocal = useMemo(() => toDatetimeLocalInputValue(new Date()), []);
+    const minEndDateOnly = useMemo(() => todayDateInputValue(), []);
+
+    const [startTime, setStartTime] = useState(() => {
+        if (event.startTime) return formatDateTimeForInput(event.startTime);
+        return toDatetimeLocalInputValue(new Date());
+    });
+    const [endTime, setEndTime] = useState(() => {
+        if (event.endTime) return formatDateTimeForInput(event.endTime);
+        if (event.startTime) {
+            const s = new Date(event.startTime);
+            return formatDateTimeForInput(new Date(s.getTime() + 3600000).toISOString());
+        }
+        return toDatetimeLocalInputValue(new Date(Date.now() + 3600000));
+    });
 
     // Populate reminder fields when editing an event
     useEffect(() => {
@@ -205,8 +250,20 @@ const EventForm: React.FC<{ event: Partial<Event>, onSave: (event: Partial<Event
         handleRecurrenceChange('daysOfWeek', newDays.sort());
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleStartTimeChange = (value: string) => {
+        setStartTime(value);
+        setFormError(null);
+        const startMs = new Date(value).getTime();
+        const endMs = new Date(endTime).getTime();
+        if (!Number.isFinite(startMs)) return;
+        if (!endTime || !Number.isFinite(endMs) || endMs <= startMs) {
+            setEndTime(formatDateTimeForInput(new Date(startMs + 3600000).toISOString()));
+        }
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setFormError(null);
         if (!title || !startTime || !endTime || !event.executiveId) return;
         
         const reminderInput = parseInt(reminderValue, 10);
@@ -217,6 +274,24 @@ const EventForm: React.FC<{ event: Partial<Event>, onSave: (event: Partial<Event
                 case 'hours': totalMinutes = reminderInput * 60; break;
                 default: totalMinutes = reminderInput; break;
             }
+        }
+
+        const startMs = new Date(startTime).getTime();
+        const endMs = new Date(endTime).getTime();
+        const nowMs = Date.now();
+        if (startMs < nowMs) {
+            setFormError('A data e hora de início não podem ser no passado.');
+            return;
+        }
+        if (endMs <= startMs) {
+            setFormError('O horário de fim deve ser posterior ao de início.');
+            return;
+        }
+        if (totalMinutes != null && startMs - totalMinutes * 60 * 1000 < nowMs) {
+            setFormError(
+                'O lembrete não pode cair no passado. Reduza o tempo de antecedência ou escolha um horário de início mais tarde.',
+            );
+            return;
         }
 
         let finalRecurrence: RecurrenceRule | null = null;
@@ -232,80 +307,117 @@ const EventForm: React.FC<{ event: Partial<Event>, onSave: (event: Partial<Event
             if (finalRecurrence.frequency !== 'weekly') {
                 delete finalRecurrence.daysOfWeek;
             }
+            if (finalRecurrence.frequency === 'weekly' && (!finalRecurrence.daysOfWeek || finalRecurrence.daysOfWeek.length === 0)) {
+                setFormError('Para recorrência semanal, selecione pelo menos um dia da semana.');
+                return;
+            }
         }
 
-        onSave({
-            ...event,
-            title,
-            description,
-            location,
-            startTime: new Date(startTime).toISOString(),
-            endTime: new Date(endTime).toISOString(),
-            eventTypeId,
-            reminderMinutes: totalMinutes,
-        }, finalRecurrence);
+        try {
+            await Promise.resolve(
+                onSave(
+                    {
+                        ...event,
+                        title,
+                        description,
+                        location,
+                        startTime: new Date(startTime).toISOString(),
+                        endTime: new Date(endTime).toISOString(),
+                        eventTypeId,
+                        reminderMinutes: totalMinutes,
+                    },
+                    finalRecurrence,
+                ),
+            );
+        } catch (err: unknown) {
+            console.error('Erro ao salvar evento:', err);
+            setFormError(getApiErrorMessage(err, 'Erro ao salvar evento.'));
+        }
     };
 
     const weekDays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
+            <FormDangerAlert message={formError} />
             {/* Standard Fields */}
             <div>
-                <label htmlFor="title" className="block text-sm font-medium text-slate-700">Título</label>
-                <input type="text" id="title" value={title} onChange={e => setTitle(e.target.value)} required className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                <AppLabel htmlFor="title">Título</AppLabel>
+                <AppInput type="text" id="title" value={title} onChange={e => setTitle(e.target.value)} required className="mt-1" />
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
-                  <label htmlFor="event-type" className="block text-sm font-medium text-slate-700">Tipo de Evento</label>
-                  <select id="event-type" value={eventTypeId} onChange={e => setEventTypeId(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                  <AppLabel htmlFor="event-type">Tipo de Evento</AppLabel>
+                  <AppSelect id="event-type" value={eventTypeId} onChange={e => setEventTypeId(e.target.value)} className="mt-1">
                       <option value="">Sem tipo</option>
                       {eventTypes.map(et => <option key={et.id} value={et.id}>{et.name}</option>)}
-                  </select>
+                  </AppSelect>
               </div>
                <div>
-                <label htmlFor="location" className="block text-sm font-medium text-slate-700">Local ou Link</label>
-                <input type="text" id="location" value={location} onChange={e => setLocation(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                <AppLabel htmlFor="location" optional>Local ou Link</AppLabel>
+                <AppInput type="text" id="location" value={location} onChange={e => setLocation(e.target.value)} className="mt-1" />
             </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
-                  <label htmlFor="start-time" className="block text-sm font-medium text-slate-700">Início do 1º Evento</label>
-                  <input type="datetime-local" id="start-time" value={startTime} onChange={e => {setStartTime(e.target.value); setEndTime(e.target.value)}} required className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                  <AppLabel htmlFor="start-time">Início do 1º Evento</AppLabel>
+                  <AppInput
+                    type="datetime-local"
+                    id="start-time"
+                    value={startTime}
+                    min={minDatetimeLocal}
+                    onChange={e => handleStartTimeChange(e.target.value)}
+                    onFocus={() => setFormError(null)}
+                    required
+                    className="mt-1"
+                  />
               </div>
               <div>
-                  <label htmlFor="end-time" className="block text-sm font-medium text-slate-700">Fim do 1º Evento</label>
-                  <input type="datetime-local" id="end-time" value={endTime} onChange={e => setEndTime(e.target.value)} required className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                  <AppLabel htmlFor="end-time">Fim do 1º Evento</AppLabel>
+                  <AppInput
+                    type="datetime-local"
+                    id="end-time"
+                    value={endTime}
+                    min={startTime || minDatetimeLocal}
+                    onChange={e => {
+                      setEndTime(e.target.value);
+                      setFormError(null);
+                    }}
+                    required
+                    className="mt-1"
+                  />
               </div>
             </div>
              <div>
-                <label htmlFor="description" className="block text-sm font-medium text-slate-700">Descrição</label>
-                <textarea id="description" value={description} onChange={e => setDescription(e.target.value)} rows={3} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"></textarea>
+                <AppLabel htmlFor="description" optional>Descrição</AppLabel>
+                <AppTextarea id="description" value={description} onChange={e => setDescription(e.target.value)} rows={3} className="mt-1" />
             </div>
              <div>
-                <label htmlFor="reminder" className="block text-sm font-medium text-slate-700">Lembrete</label>
-                <div className="flex items-center gap-2 mt-1">
-                    <input type="number" id="reminder" value={reminderValue} onChange={e => setReminderValue(e.target.value)} placeholder="Não notificar" min="1" className="block w-24 px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm sm:text-sm" />
-                    <select aria-label="Unidade de tempo para o lembrete" value={reminderUnit} onChange={e => setReminderUnit(e.target.value)} className="block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm sm:text-sm">
+                <AppLabel htmlFor="reminder" optional>Lembrete</AppLabel>
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <AppInput type="number" id="reminder" value={reminderValue} onChange={e => { setReminderValue(e.target.value); setFormError(null); }} placeholder="Não notificar" min={1} className="w-28" />
+                    <AppSelect aria-label="Unidade de tempo para o lembrete" value={reminderUnit} onChange={e => setReminderUnit(e.target.value)} className="min-w-0 flex-1 sm:max-w-xs">
                         <option value="minutes">minutos antes</option>
                         <option value="hours">horas antes</option>
                         <option value="days">dias antes</option>
-                    </select>
+                    </AppSelect>
                 </div>
             </div>
 
              {/* Recurrence Section */}
              <div className="space-y-4 rounded-md border border-slate-200 p-4">
                 <div className="flex items-center">
-                    <input type="checkbox" id="isRecurrent" checked={isRecurrent} onChange={e => setIsRecurrent(e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"/>
-                    <label htmlFor="isRecurrent" className="ml-3 block text-sm font-medium text-slate-700">Evento Recorrente</label>
+                    <input type="checkbox" id="isRecurrent" checked={isRecurrent} onChange={e => setIsRecurrent(e.target.checked)} className={checkboxClass}/>
+                    <AppLabel htmlFor="isRecurrent" className="mb-0 ml-3 inline font-medium">
+                        Evento Recorrente
+                    </AppLabel>
                 </div>
                 {isRecurrent && (
-                    <div className="space-y-4 pl-7 animate-fade-in-fast">
-                        <div className="flex items-center gap-2 flex-wrap">
+                    <div className="animate-fade-in-fast space-y-4 pl-7">
+                        <div className="flex flex-wrap items-center gap-2">
                              <span className="text-sm text-slate-600">Repetir a cada</span>
-                             <input type="number" value={recurrence.interval} onChange={e => handleRecurrenceChange('interval', parseInt(e.target.value) || 1)} min="1" className="w-16 px-2 py-1 bg-white border border-slate-300 rounded-md shadow-sm sm:text-sm"/>
-                             <select
+                             <AppInput type="number" value={recurrence.interval} onChange={e => handleRecurrenceChange('interval', parseInt(e.target.value, 10) || 1)} min={1} className="w-16 px-2 py-1"/>
+                             <AppSelect
                                 value={recurrence.frequency}
                                 onChange={e => {
                                     const newFrequency = e.target.value as RecurrenceRule['frequency'];
@@ -318,19 +430,19 @@ const EventForm: React.FC<{ event: Partial<Event>, onSave: (event: Partial<Event
                                         return updated;
                                     });
                                 }}
-                                className="px-2 py-1 bg-white border border-slate-300 rounded-md shadow-sm sm:text-sm">
+                                className="w-auto min-w-[7rem] px-2 py-1">
                                 <option value="daily">dia(s)</option>
                                 <option value="weekly">semana(s)</option>
                                 <option value="monthly">mês(es)</option>
                                 <option value="annually">ano(s)</option>
-                             </select>
+                             </AppSelect>
                         </div>
                         {recurrence.frequency === 'weekly' && (
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-2">Nos dias:</label>
+                                <AppLabel className="mb-2">Nos dias:</AppLabel>
                                 <div className="flex flex-wrap gap-2">
                                     {weekDays.map((day, index) => (
-                                        <button type="button" key={day} onClick={() => handleDaysOfWeekChange(index)} className={`px-3 py-1 text-sm rounded-full transition ${recurrence.daysOfWeek?.includes(index) ? 'bg-indigo-600 text-white font-semibold' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                                        <button type="button" key={day} onClick={() => handleDaysOfWeekChange(index)} className={`rounded-full px-3 py-1 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-indigo-500 ${recurrence.daysOfWeek?.includes(index) ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
                                             {day}
                                         </button>
                                     ))}
@@ -338,21 +450,21 @@ const EventForm: React.FC<{ event: Partial<Event>, onSave: (event: Partial<Event
                             </div>
                         )}
                         <div>
-                             <label className="block text-sm font-medium text-slate-700 mb-2">Termina:</label>
+                             <AppLabel className="mb-2">Termina:</AppLabel>
                              <div className="space-y-2">
                                 <div className="flex items-center">
-                                    <input type="radio" id="end-after" name="endType" value="after" checked={endType === 'after'} onChange={e => setEndType(e.target.value)} className="h-4 w-4 text-indigo-600"/>
-                                    <label htmlFor="end-after" className="ml-3 flex items-center gap-2 text-sm text-slate-600">
+                                    <input type="radio" id="end-after" name="endType" value="after" checked={endType === 'after'} onChange={e => setEndType(e.target.value)} className={radioClass}/>
+                                    <label htmlFor="end-after" className="ml-3 flex flex-wrap items-center gap-2 text-sm text-slate-600">
                                         <span>Após</span>
-                                        <input type="number" disabled={endType !== 'after'} value={recurrence.count || ''} onChange={e => handleRecurrenceChange('count', parseInt(e.target.value))} min="1" className="w-16 px-2 py-1 bg-white border border-slate-300 rounded-md shadow-sm sm:text-sm"/>
+                                        <AppInput type="number" disabled={endType !== 'after'} value={recurrence.count || ''} onChange={e => handleRecurrenceChange('count', parseInt(e.target.value, 10))} min={1} className="w-16 px-2 py-1"/>
                                         <span>ocorrências</span>
                                     </label>
                                 </div>
                                  <div className="flex items-center">
-                                    <input type="radio" id="end-on" name="endType" value="on" checked={endType === 'on'} onChange={e => setEndType(e.target.value)} className="h-4 w-4 text-indigo-600"/>
-                                    <label htmlFor="end-on" className="ml-3 flex items-center gap-2 text-sm text-slate-600">
+                                    <input type="radio" id="end-on" name="endType" value="on" checked={endType === 'on'} onChange={e => setEndType(e.target.value)} className={radioClass}/>
+                                    <label htmlFor="end-on" className="ml-3 flex flex-wrap items-center gap-2 text-sm text-slate-600">
                                         <span>Em</span>
-                                        <input type="date" disabled={endType !== 'on'} value={recurrence.endDate || ''} onChange={e => handleRecurrenceChange('endDate', e.target.value)} className="px-2 py-1 bg-white border border-slate-300 rounded-md shadow-sm sm:text-sm"/>
+                                        <AppInput type="date" disabled={endType !== 'on'} min={minEndDateOnly} value={recurrence.endDate || ''} onChange={e => handleRecurrenceChange('endDate', e.target.value)} className="px-2 py-1"/>
                                     </label>
                                 </div>
                              </div>
@@ -361,10 +473,14 @@ const EventForm: React.FC<{ event: Partial<Event>, onSave: (event: Partial<Event
                 )}
             </div>
            
-            <div className="flex justify-end space-x-3 pt-4">
-                <button type="button" onClick={onCancel} className="px-4 py-2 bg-slate-200 text-slate-800 rounded-md hover:bg-slate-300 transition">Cancelar</button>
-                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition">Salvar Evento</button>
-            </div>
+            <FormActions>
+                <AppButton type="button" variant="secondary" onClick={onCancel}>
+                    Cancelar
+                </AppButton>
+                <AppButton type="submit" variant="primary">
+                    Salvar Evento
+                </AppButton>
+            </FormActions>
         </form>
     );
 };
@@ -437,6 +553,7 @@ const AgendaView: React.FC<AgendaViewProps> = ({ events, setEvents, eventTypes, 
     const [eventToDelete, setEventToDelete] = useState<Event | null>(null);
     const [showRecurrenceDeleteModal, setShowRecurrenceDeleteModal] = useState(false);
     const [isSettingsModalOpen, setSettingsModalOpen] = useState(false);
+    const [listActionError, setListActionError] = useState<string | null>(null);
 
     const [limit, setLimit] = useState(10);
     const [currentPage, setCurrentPage] = useState(1);
@@ -457,11 +574,13 @@ const AgendaView: React.FC<AgendaViewProps> = ({ events, setEvents, eventTypes, 
 
 
     const handleAddEvent = () => {
+        setListActionError(null);
         setEditingEvent({ executiveId });
         setModalOpen(true);
     };
 
     const handleEditEvent = (event: Event) => {
+        setListActionError(null);
         setEditingEvent(event);
         setModalOpen(true);
     };
@@ -475,18 +594,20 @@ const AgendaView: React.FC<AgendaViewProps> = ({ events, setEvents, eventTypes, 
     
     const confirmDelete = async () => {
         if (!eventToDelete) return;
+        setListActionError(null);
         try {
             await eventService.delete(eventToDelete.id);
             await onRefresh();
             setEventToDelete(null);
         } catch (error) {
             console.error('Erro ao excluir evento:', error);
-            alert('Erro ao excluir evento.');
+            setListActionError(getApiErrorMessage(error, 'Erro ao excluir evento.'));
         }
     };
 
     const executeRecurrenceDelete = async (type: 'one' | 'all' | 'future') => {
         if (!eventToDelete) return;
+        setListActionError(null);
         try {
             if (type === 'one') {
                 await eventService.delete(eventToDelete.id);
@@ -501,13 +622,13 @@ const AgendaView: React.FC<AgendaViewProps> = ({ events, setEvents, eventTypes, 
             setEventToDelete(null);
         } catch (error) {
             console.error('Erro ao excluir recorrência:', error);
-            alert('Erro ao excluir recorrência.');
+            setListActionError(getApiErrorMessage(error, 'Erro ao excluir recorrência.'));
         }
     };
 
     const handleSaveEvent = async (eventData: Partial<Event>, recurrenceRule: RecurrenceRule | null) => {
-         const fullEventData = { ...eventData, executiveId: executiveId };
-         const oldRecurrenceId = fullEventData.id
+        const fullEventData = { ...eventData, executiveId: executiveId };
+        const oldRecurrenceId = fullEventData.id
             ? events.find((e) => e.id === fullEventData.id)?.recurrenceId
             : undefined;
 
@@ -516,36 +637,34 @@ const AgendaView: React.FC<AgendaViewProps> = ({ events, setEvents, eventTypes, 
             id: undefined,
         });
 
-        try {
-            if (recurrenceRule) {
-                const recurrenceId = oldRecurrenceId || `recur_${new Date().getTime()}`;
-                const series = generateRecurringEvents(fullEventData, recurrenceRule, recurrenceId);
-
-                if (oldRecurrenceId) {
-                    await eventService.deleteByRecurrence(oldRecurrenceId);
-                } else if (fullEventData.id) {
-                    await eventService.delete(fullEventData.id);
-                }
-
-                await eventService.createBulk(series.map(toPayload));
-            } else {
-                if (oldRecurrenceId) {
-                    await eventService.deleteByRecurrence(oldRecurrenceId);
-                    await eventService.create(toPayload(fullEventData));
-                } else if (fullEventData.id) {
-                    await eventService.update(fullEventData.id, fullEventData);
-                } else {
-                    await eventService.create(toPayload(fullEventData));
-                }
+        if (recurrenceRule) {
+            const recurrenceId = oldRecurrenceId || `recur_${new Date().getTime()}`;
+            const series = generateRecurringEvents(fullEventData, recurrenceRule, recurrenceId);
+            if (series.length === 0) {
+                throw new Error('Não foi possível gerar ocorrências com a recorrência informada. Verifique os dias ou o período.');
             }
 
-            await onRefresh();
-            setModalOpen(false);
-            setEditingEvent(null);
-        } catch (error) {
-            console.error('Erro ao salvar evento:', error);
-            alert('Erro ao salvar evento.');
+            if (oldRecurrenceId) {
+                await eventService.deleteByRecurrence(oldRecurrenceId);
+            } else if (fullEventData.id) {
+                await eventService.delete(fullEventData.id);
+            }
+
+            await eventService.createBulk(series.map(toPayload));
+        } else {
+            if (oldRecurrenceId) {
+                await eventService.deleteByRecurrence(oldRecurrenceId);
+                await eventService.create(toPayload(fullEventData));
+            } else if (fullEventData.id) {
+                await eventService.update(fullEventData.id, fullEventData);
+            } else {
+                await eventService.create(toPayload(fullEventData));
+            }
         }
+
+        await onRefresh();
+        setModalOpen(false);
+        setEditingEvent(null);
     };
     
     const formatFullDate = (isoString: string) => {
@@ -571,35 +690,45 @@ const AgendaView: React.FC<AgendaViewProps> = ({ events, setEvents, eventTypes, 
 
     return (
         <div className="space-y-6 animate-fade-in">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div>
-                    <h2 className="text-3xl font-bold text-slate-800">Agenda de Eventos</h2>
-                    <p className="text-slate-500 mt-1">Visualize e gerencie os próximos eventos.</p>
-                </div>
-                 <div className="flex items-center gap-2">
-                    <button onClick={handleAddEvent} className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-md shadow-sm hover:bg-indigo-700 transition duration-150">
-                        <PlusIcon />
-                        Novo Evento
-                    </button>
-                    <button onClick={() => setSettingsModalOpen(true)} className="p-2 bg-indigo-100 text-indigo-700 rounded-md shadow-sm hover:bg-indigo-200 transition" aria-label="Configurar Tipos de Evento">
-                        <SettingsIcon />
-                    </button>
-                </div>
+            <FormDangerAlert message={listActionError} />
+            <div className="flex flex-wrap justify-end items-center gap-2">
+                <AppButton
+                    type="button"
+                    variant="primary"
+                    onClick={handleAddEvent}
+                    className="!p-2"
+                    title="Novo evento"
+                    aria-label="Novo evento"
+                >
+                    <PlusIcon />
+                </AppButton>
+                <AppButton
+                    type="button"
+                    variant="ghost"
+                    className="!p-2"
+                    title="Gerenciar tipos de evento"
+                    aria-label="Gerenciar tipos de evento"
+                    onClick={() => setSettingsModalOpen(true)}
+                >
+                    <CogIcon />
+                </AppButton>
             </div>
             
-            <div className="flex items-center justify-end gap-2 text-sm">
-                <label htmlFor="limit" className="text-slate-600">Itens por página:</label>
-                <select 
-                    id="limit"
+            <ToolbarPanel className="flex flex-wrap items-center justify-end gap-2">
+                <AppLabel htmlFor="limit-agenda" className="mb-0 inline text-slate-600">
+                    Itens por página
+                </AppLabel>
+                <AppSelect
+                    id="limit-agenda"
                     value={limit}
                     onChange={(e) => setLimit(Number(e.target.value))}
-                    className="px-2 py-1 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                    className="w-auto min-w-[5rem]"
                 >
                     <option value={10}>10</option>
                     <option value={30}>30</option>
                     <option value={50}>50</option>
-                </select>
-            </div>
+                </AppSelect>
+            </ToolbarPanel>
 
             <div className="bg-white p-4 sm:p-6 rounded-xl shadow-md space-y-4">
               {paginatedEvents.length > 0 ? paginatedEvents.map(event => {
@@ -652,7 +781,7 @@ const AgendaView: React.FC<AgendaViewProps> = ({ events, setEvents, eventTypes, 
             </div>
 
             {isModalOpen && (
-                <Modal title={editingEvent?.id ? 'Editar Evento' : 'Novo Evento'} onClose={() => setModalOpen(false)}>
+                <Modal title={editingEvent?.id ? 'Editar evento' : 'Novo evento'} onClose={() => { setModalOpen(false); setEditingEvent(null); }}>
                     <EventForm event={editingEvent || {}} onSave={handleSaveEvent} onCancel={() => { setModalOpen(false); setEditingEvent(null); }} eventTypes={eventTypes} />
                 </Modal>
             )}
@@ -669,10 +798,10 @@ const AgendaView: React.FC<AgendaViewProps> = ({ events, setEvents, eventTypes, 
                 <Modal title="Excluir Evento Recorrente" onClose={() => { setShowRecurrenceDeleteModal(false); setEventToDelete(null); }}>
                     <div className="space-y-4">
                         <p className="text-sm text-slate-600">Este é um evento recorrente. O que você gostaria de excluir?</p>
-                        <div className="flex flex-col space-y-3">
-                             <button onClick={() => executeRecurrenceDelete('one')} className="w-full text-left px-4 py-2 bg-slate-100 text-slate-800 rounded-md hover:bg-slate-200 transition">Apenas esta ocorrência</button>
-                             <button onClick={() => executeRecurrenceDelete('future')} className="w-full text-left px-4 py-2 bg-slate-100 text-slate-800 rounded-md hover:bg-slate-200 transition">Esta e as futuras ocorrências</button>
-                             <button onClick={() => executeRecurrenceDelete('all')} className="w-full text-left px-4 py-2 bg-slate-100 text-slate-800 rounded-md hover:bg-slate-200 transition">Toda a série</button>
+                        <div className="flex flex-col gap-3">
+                             <AppButton type="button" variant="secondary" className="w-full justify-start text-left" onClick={() => executeRecurrenceDelete('one')}>Apenas esta ocorrência</AppButton>
+                             <AppButton type="button" variant="secondary" className="w-full justify-start text-left" onClick={() => executeRecurrenceDelete('future')}>Esta e as futuras ocorrências</AppButton>
+                             <AppButton type="button" variant="secondary" className="w-full justify-start text-left" onClick={() => executeRecurrenceDelete('all')}>Toda a série</AppButton>
                         </div>
                     </div>
                 </Modal>

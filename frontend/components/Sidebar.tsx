@@ -39,12 +39,12 @@ const Sidebar: React.FC<SidebarProps> = ({ currentUser, currentView, setCurrentV
         aria-hidden="true"
       ></div>
 
-      <aside className={`fixed lg:relative top-0 left-0 h-full bg-slate-800 text-white w-64 flex flex-col z-40 transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}>
+      <aside className={`fixed lg:relative top-0 left-0 h-screen bg-slate-800 text-white w-64 flex flex-col z-40 transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}>
         <div className="flex items-center justify-center p-6 border-b border-slate-700">
           <LogoIcon className="w-8 h-8" />
           <h1 className="text-xl font-bold ml-3">Executiva Cloud</h1>
         </div>
-        <nav className="flex-1 px-4 py-6 space-y-2">
+        <nav className="flex-1 min-h-0 overflow-y-auto px-4 py-6 space-y-2">
           {visibleNavItems.map((item) => (
             <SidebarNavLink
               key={item.view}

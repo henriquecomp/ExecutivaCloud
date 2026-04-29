@@ -1,10 +1,15 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Organization, Department, Executive, User, Secretary, Event, Contact, Expense, Task, Document, LegalOrganization, OrganizationCreate, OrganizationUpdate, DepartmentCreate, DepartmentUpdate } from '../types';
 import Modal from './Modal';
 import ConfirmationModal from './ConfirmationModal';
 import { EditIcon, DeleteIcon, PlusIcon } from './Icons';
 import { organizationService } from '@/services/organizationService';
 import { departmentService } from '@/services/departmentService';
+import AppButton from './ui/AppButton';
+import AppLabel from './ui/AppLabel';
+import AppSelect from './ui/AppSelect';
+import ToolbarPanel from './ui/ToolbarPanel';
+import Pagination from './Pagination';
 
 // --- Helper Functions ---
 function validateCNPJ(cnpj: string): boolean {
@@ -407,6 +412,18 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
         return organizations;
     }, [organizations, currentUser, isOrgAdmin]);
 
+    const [orgPageLimit, setOrgPageLimit] = useState(6);
+    const [orgCurrentPage, setOrgCurrentPage] = useState(1);
+
+    const paginatedOrganizations = useMemo(() => {
+        const start = (orgCurrentPage - 1) * orgPageLimit;
+        return visibleOrganizations.slice(start, start + orgPageLimit);
+    }, [visibleOrganizations, orgCurrentPage, orgPageLimit]);
+
+    useEffect(() => {
+        setOrgCurrentPage(1);
+    }, [organizations, orgPageLimit, currentUser.role, currentUser.legalOrganizationId, currentUser.organizationId]);
+
     // Handlers ajustados para prevenir propagação e submits acidentais
     const handleAddOrganization = (e: React.MouseEvent) => {
         e.preventDefault();
@@ -542,25 +559,40 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
                 </div>
             )}
 
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div>
-                    <h2 className="text-3xl font-bold text-slate-800">Gerenciar Empresas</h2>
-                    <p className="text-slate-500 mt-1">Adicione ou edite as empresas e seus respectivos departamentos.</p>
-                </div>
-                {/* type="button" adicionado */}
-                <button 
-                    type="button"
-                    onClick={handleAddOrganization} 
+            <div className="flex justify-end">
+                <AppButton
+                    onClick={handleAddOrganization}
                     disabled={isOrgAdmin}
-                    className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-md shadow-sm hover:bg-indigo-700 transition duration-150 disabled:bg-slate-300 disabled:cursor-not-allowed"
+                    className="!p-2"
+                    title="Nova empresa"
+                    aria-label="Nova empresa"
                 >
                     <PlusIcon />
-                    Nova Empresa
-                </button>
+                </AppButton>
             </div>
 
+            {visibleOrganizations.length > 0 && (
+                <ToolbarPanel className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+                    <div className="flex items-center gap-2">
+                        <AppLabel htmlFor="limit-orgs" className="mb-0 inline text-slate-600">
+                            Itens por página
+                        </AppLabel>
+                        <AppSelect
+                            id="limit-orgs"
+                            value={orgPageLimit}
+                            onChange={(e) => setOrgPageLimit(Number(e.target.value))}
+                            className="w-auto min-w-[5rem]"
+                        >
+                            <option value={4}>4</option>
+                            <option value={6}>6</option>
+                            <option value={12}>12</option>
+                        </AppSelect>
+                    </div>
+                </ToolbarPanel>
+            )}
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {visibleOrganizations.map(org => {
+                {paginatedOrganizations.map(org => {
                     const orgDepartments = departments.filter(d => String(d.organizationId) === String(org.id));
                     const legalOrg = legalOrganizations.find(lo => String(lo.id) === String(org.legalOrganizationId));
                     return (
@@ -616,9 +648,14 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
                                 )}
                             </div>
                             <footer className="p-4 border-t border-slate-200">
-                                {/* type="button" adicionado */}
-                                <button type="button" onClick={(e) => handleAddDepartment(e, org.id)} className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm bg-slate-100 text-slate-700 rounded-md hover:bg-slate-200 transition">
-                                    <PlusIcon /> Adicionar Departamento
+                                <button
+                                    type="button"
+                                    onClick={(e) => handleAddDepartment(e, org.id)}
+                                    className="flex w-full items-center justify-center rounded-md bg-slate-100 px-3 py-2 text-slate-700 transition hover:bg-slate-200"
+                                    title="Adicionar departamento"
+                                    aria-label="Adicionar departamento"
+                                >
+                                    <PlusIcon />
                                 </button>
                             </footer>
                         </div>
@@ -632,10 +669,19 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
                 )}
             </div>
 
+            {visibleOrganizations.length > 0 && (
+                <Pagination
+                    currentPage={orgCurrentPage}
+                    totalItems={visibleOrganizations.length}
+                    itemsPerPage={orgPageLimit}
+                    onPageChange={setOrgCurrentPage}
+                />
+            )}
+
             {/* AQUI ESTÁ A CORREÇÃO PRINCIPAL: Passando isOpen explicitamente e removendo o && */}
             <Modal 
                 isOpen={isOrgModalOpen}
-                title={editingOrganization?.id ? 'Editar Empresa' : 'Nova Empresa'} 
+                title={editingOrganization?.id ? 'Editar empresa' : 'Nova empresa'} 
                 onClose={() => {setOrgModalOpen(false); setEditingOrganization(null)}}
             >
                 {apiError && (
@@ -656,7 +702,7 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
             {/* AQUI ESTÁ A CORREÇÃO PRINCIPAL: Passando isOpen explicitamente e removendo o && */}
             <Modal 
                 isOpen={isDeptModalOpen}
-                title={editingDepartment?.id ? 'Editar Departamento' : 'Novo Departamento'} 
+                title={editingDepartment?.id ? 'Editar departamento' : 'Novo departamento'} 
                 onClose={() => {setDeptModalOpen(false); setEditingDepartment(null)}}
             >
                 {apiError && (

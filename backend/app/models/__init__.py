@@ -21,3 +21,5 @@ from app.models import contact_model  # noqa: F401
 from app.models import task_model  # noqa: F401
 from app.models import report_model  # noqa: F401
 from app.models import settings_backup_model  # noqa: F401
+from app.models import expense_category_model  # noqa: F401 — antes de expense (FK)
+from app.models import expense_model  # noqa: F401

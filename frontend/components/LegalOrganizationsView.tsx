@@ -1,10 +1,14 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { LegalOrganization, Organization, Department, Executive, Secretary, Event, Contact, Expense, Task, Document, User, LegalOrganizationCreate, LegalOrganizationUpdate, OrganizationUpdate, OrganizationCreate } from '../types';
 import Modal from './Modal';
 import ConfirmationModal from './ConfirmationModal';
 import { EditIcon, DeleteIcon, PlusIcon } from './Icons';
 import { legalOrganizationService } from '@/services/legalOrganizationService';
 import { organizationService } from '@/services/organizationService';
+import AppLabel from './ui/AppLabel';
+import AppSelect from './ui/AppSelect';
+import ToolbarPanel from './ui/ToolbarPanel';
+import Pagination from './Pagination';
 
 // --- Helper Functions ---
 function validateCNPJ(cnpj: string): boolean {
@@ -367,6 +371,18 @@ const LegalOrganizationsView: React.FC<LegalOrganizationsViewProps> = ({
         return legalOrganizations;
     }, [legalOrganizations, currentUser, isAdminForLegalOrg]);
 
+    const [loLimit, setLoLimit] = useState(6);
+    const [loCurrentPage, setLoCurrentPage] = useState(1);
+
+    const paginatedLegalOrgs = useMemo(() => {
+        const start = (loCurrentPage - 1) * loLimit;
+        return visibleLegalOrgs.slice(start, start + loLimit);
+    }, [visibleLegalOrgs, loCurrentPage, loLimit]);
+
+    useEffect(() => {
+        setLoCurrentPage(1);
+    }, [legalOrganizations, loLimit, currentUser.legalOrganizationId]);
+
     // Limpa erro ao abrir modais
     const openAddModal = () => { setApiError(null); setEditingLegalOrg({}); setModalOpen(true); };
     const openEditModal = (lo: LegalOrganization) => { setApiError(null); setEditingLegalOrg(lo); setModalOpen(true); };
@@ -464,18 +480,36 @@ const LegalOrganizationsView: React.FC<LegalOrganizationsViewProps> = ({
 
     return (
         <div className="space-y-6 animate-fade-in">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div>
-                    <h2 className="text-3xl font-bold text-slate-800">Gerenciar Organizações</h2>
-                    <p className="text-slate-500 mt-1">Matrizes e empresas filiais do sistema.</p>
-                </div>
-                <button onClick={openAddModal} disabled={isAdminForLegalOrg} className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-md shadow-sm hover:bg-indigo-700 disabled:bg-slate-300">
-                    <PlusIcon /> Nova Organização
+            <div className="flex justify-end">
+                <button
+                    type="button"
+                    onClick={openAddModal}
+                    disabled={isAdminForLegalOrg}
+                    className="flex items-center justify-center rounded-md bg-indigo-600 p-2 text-white shadow-sm hover:bg-indigo-700 disabled:bg-slate-300"
+                    title="Nova organização jurídica"
+                    aria-label="Nova organização jurídica"
+                >
+                    <PlusIcon />
                 </button>
             </div>
 
+            {visibleLegalOrgs.length > 0 && (
+                <ToolbarPanel className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+                    <div className="flex items-center gap-2">
+                        <AppLabel htmlFor="limit-lo" className="mb-0 inline text-slate-600">
+                            Itens por página
+                        </AppLabel>
+                        <AppSelect id="limit-lo" value={loLimit} onChange={(e) => setLoLimit(Number(e.target.value))} className="w-auto min-w-[5rem]">
+                            <option value={4}>4</option>
+                            <option value={6}>6</option>
+                            <option value={12}>12</option>
+                        </AppSelect>
+                    </div>
+                </ToolbarPanel>
+            )}
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {visibleLegalOrgs.map(lo => {
+                {paginatedLegalOrgs.map(lo => {
                     const childOrgs = organizations.filter(o => String(o.legalOrganizationId) === String(lo.id));
                     const canManage = currentUser.role === 'master' || (currentUser.role === 'admin' && String(currentUser.legalOrganizationId) === String(lo.id));
                     return (
@@ -516,8 +550,17 @@ const LegalOrganizationsView: React.FC<LegalOrganizationsViewProps> = ({
                 })}
             </div>
 
+            {visibleLegalOrgs.length > 0 && (
+                <Pagination
+                    currentPage={loCurrentPage}
+                    totalItems={visibleLegalOrgs.length}
+                    itemsPerPage={loLimit}
+                    onPageChange={setLoCurrentPage}
+                />
+            )}
+
             {isModalOpen && (
-                <Modal title={editingLegalOrg?.id ? 'Editar Organização' : 'Nova Organização'} onClose={() => setModalOpen(false)}>
+                <Modal title={editingLegalOrg?.id ? 'Editar organização' : 'Nova organização'} onClose={() => setModalOpen(false)}>
                     {apiError && (
                         <div className="mb-4 bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded" role="alert">
                             <p className="font-bold">Atenção</p>

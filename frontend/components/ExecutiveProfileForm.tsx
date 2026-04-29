@@ -45,6 +45,8 @@ export interface ExecutiveProfileFormProps {
   openSections: Record<string, boolean>;
   toggleSection: (section: string) => void;
   workEmailReadOnly?: boolean;
+  /** Executivo alterando o próprio cadastro: não pode mudar empresa/depto/gestor. */
+  lockHrFields?: boolean;
 }
 
 
@@ -61,6 +63,7 @@ export const ExecutiveProfileForm: React.FC<ExecutiveProfileFormProps> = ({
   openSections,
   toggleSection,
   workEmailReadOnly = false,
+  lockHrFields = false,
 }) => {
   return (
     <div className="flex-1 overflow-y-auto pr-2 space-y-4 pb-4">
@@ -325,9 +328,10 @@ export const ExecutiveProfileForm: React.FC<ExecutiveProfileFormProps> = ({
                    />
                 </div>
                 <div>
-                   <label className="block text-sm font-medium text-gray-700">Organização</label>
+                   <label className="block text-sm font-medium text-gray-700">Empresa (organização)</label>
                    <select 
-                      className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      disabled={lockHrFields}
+                      className={`mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none ${lockHrFields ? 'cursor-not-allowed bg-gray-100' : ''}`}
                       value={currentExecutive.organizationId || ''}
                       onChange={e => setCurrentExecutive({
                         ...currentExecutive,
@@ -341,11 +345,15 @@ export const ExecutiveProfileForm: React.FC<ExecutiveProfileFormProps> = ({
                        <option key={org.id} value={org.id}>{org.name}</option>
                      ))}
                    </select>
+                   {lockHrFields && (
+                     <p className="mt-1 text-xs text-gray-500">Definido pela empresa; não pode ser alterado aqui.</p>
+                   )}
                 </div>
                 <div>
                    <label className="block text-sm font-medium text-gray-700">Departamento</label>
                    <select 
-                      className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      disabled={lockHrFields}
+                      className={`mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none ${lockHrFields ? 'cursor-not-allowed bg-gray-100' : ''}`}
                       value={currentExecutive.departmentId || ''}
                       onChange={e => setCurrentExecutive({...currentExecutive, departmentId: e.target.value || undefined})}
                    >
@@ -358,9 +366,10 @@ export const ExecutiveProfileForm: React.FC<ExecutiveProfileFormProps> = ({
                    </select>
                 </div>
                 <div>
-                   <label className="block text-sm font-medium text-gray-700">Gestor Direto</label>
+                   <label className="block text-sm font-medium text-gray-700">Gestor direto</label>
                    <select 
-                      className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      disabled={lockHrFields}
+                      className={`mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none ${lockHrFields ? 'cursor-not-allowed bg-gray-100' : ''}`}
                       value={currentExecutive.reportsToExecutiveId || ''}
                       onChange={e => setCurrentExecutive({...currentExecutive, reportsToExecutiveId: e.target.value || undefined})}
                    >

@@ -3,8 +3,12 @@ import { executiveService } from '../services/executiveService';
 import { organizationService } from '../services/organizationService';
 import { departmentService } from '../services/departmentService';
 import { Executive, Organization, Department } from '../types';
-import { Search } from 'lucide-react';
 import Pagination from './Pagination';
+import AppSearchInput from './ui/AppSearchInput';
+import AppLabel from './ui/AppLabel';
+import AppSelect from './ui/AppSelect';
+import ToolbarPanel from './ui/ToolbarPanel';
+import { DataTable, DataTableBody, DataTableEmptyRow, DataTableHead, DataTableRow, DataTableTd, DataTableTh } from './ui/DataTable';
 
 /** Listagem somente leitura. Novos executivos são criados em Usuários (convite). */
 const ExecutivesView: React.FC = () => {
@@ -16,7 +20,7 @@ const ExecutivesView: React.FC = () => {
   const [departments, setDepartments] = useState<Department[]>([]);
 
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   useEffect(() => {
     (async () => {
@@ -55,85 +59,81 @@ const ExecutivesView: React.FC = () => {
     if (currentPage > totalPages) {
       setCurrentPage(totalPages);
     }
-  }, [filteredExecutives.length, currentPage]);
+  }, [filteredExecutives.length, currentPage, itemsPerPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [itemsPerPage, searchTerm]);
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-800">Executivos</h2>
-          <p className="text-gray-500 text-sm mt-1">
-            Listagem somente leitura. Novos acessos são criados em Usuários (convite).
-          </p>
-        </div>
-      </div>
-
-      <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 flex gap-4">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-          <input
+      <ToolbarPanel className="flex flex-col gap-4 sm:flex-row sm:items-center">
+        <div className="min-w-0 flex-1">
+          <AppSearchInput
             type="text"
             placeholder="Buscar por nome ou email..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
-      </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <AppLabel htmlFor="limit-exec" className="mb-0 inline text-slate-600">
+            Itens por página
+          </AppLabel>
+          <AppSelect
+            id="limit-exec"
+            value={itemsPerPage}
+            onChange={(e) => setItemsPerPage(Number(e.target.value))}
+            className="w-auto min-w-[5rem]"
+          >
+            <option value={10}>10</option>
+            <option value={30}>30</option>
+            <option value={50}>50</option>
+          </AppSelect>
+        </div>
+      </ToolbarPanel>
 
-      <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead className="bg-gray-50 text-gray-600 text-sm font-semibold">
-              <tr>
-                <th className="p-4 border-b">Nome</th>
-                <th className="p-4 border-b">Cargo / Depto</th>
-                <th className="p-4 border-b">Email Corporativo</th>
-                <th className="p-4 border-b">Celular</th>
-              </tr>
-            </thead>
-            <tbody className="text-gray-700 text-sm">
-              {loading ? (
-                <tr>
-                  <td colSpan={4} className="p-8 text-center text-gray-500">
-                    Carregando...
-                  </td>
-                </tr>
-              ) : filteredExecutives.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="p-8 text-center text-gray-500">
-                    Nenhum executivo encontrado.
-                  </td>
-                </tr>
-              ) : (
-                paginatedExecutives.map((ex) => (
-                  <tr key={ex.id} className="hover:bg-gray-50 border-b last:border-0">
-                    <td className="p-4 font-medium">{ex.fullName}</td>
-                    <td className="p-4">
-                      <div className="font-medium">{ex.jobTitle || '-'}</div>
-                      <div className="text-xs text-gray-500">
-                        {departments.find((d) => d.id === ex.departmentId)?.name || ''}
-                        {ex.departmentId && ex.organizationId ? ' - ' : ''}
-                        {organizations.find((o) => o.id === ex.organizationId)?.name || ''}
-                      </div>
-                    </td>
-                    <td className="p-4">{ex.workEmail}</td>
-                    <td className="p-4">{ex.workPhone || '-'}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-        {!loading && (
-          <Pagination
-            currentPage={currentPage}
-            totalItems={filteredExecutives.length}
-            itemsPerPage={itemsPerPage}
-            onPageChange={setCurrentPage}
-          />
-        )}
-      </div>
+      <DataTable>
+        <DataTableHead>
+          <tr>
+            <DataTableTh>Nome</DataTableTh>
+            <DataTableTh>Cargo / Depto</DataTableTh>
+            <DataTableTh>Email Corporativo</DataTableTh>
+            <DataTableTh>Celular</DataTableTh>
+          </tr>
+        </DataTableHead>
+        <DataTableBody>
+          {loading ? (
+            <DataTableEmptyRow colSpan={4}>Carregando...</DataTableEmptyRow>
+          ) : filteredExecutives.length === 0 ? (
+            <DataTableEmptyRow colSpan={4}>Nenhum executivo encontrado.</DataTableEmptyRow>
+          ) : (
+            paginatedExecutives.map((ex) => (
+              <DataTableRow key={ex.id}>
+                <DataTableTd className="font-medium text-slate-800">{ex.fullName}</DataTableTd>
+                <DataTableTd>
+                  <div className="font-medium">{ex.jobTitle || '-'}</div>
+                  <div className="text-xs text-slate-500">
+                    {departments.find((d) => d.id === ex.departmentId)?.name || ''}
+                    {ex.departmentId && ex.organizationId ? ' - ' : ''}
+                    {organizations.find((o) => o.id === ex.organizationId)?.name || ''}
+                  </div>
+                </DataTableTd>
+                <DataTableTd>{ex.workEmail}</DataTableTd>
+                <DataTableTd>{ex.workPhone || '-'}</DataTableTd>
+              </DataTableRow>
+            ))
+          )}
+        </DataTableBody>
+      </DataTable>
+      {!loading && (
+        <Pagination
+          currentPage={currentPage}
+          totalItems={filteredExecutives.length}
+          itemsPerPage={itemsPerPage}
+          onPageChange={setCurrentPage}
+        />
+      )}
     </div>
   );
 };

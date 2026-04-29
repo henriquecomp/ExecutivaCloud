@@ -1,9 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { AllDataBackup } from '../types';
 import Modal from './Modal';
 import ConfirmationModal from './ConfirmationModal';
 import { DownloadIcon, UploadIcon, CheckCircleIcon, ExclamationTriangleIcon } from './Icons';
 import { settingsBackupService, SettingsBackup } from '../services/settingsBackupService';
+import AppLabel from './ui/AppLabel';
+import AppSelect from './ui/AppSelect';
+import ToolbarPanel from './ui/ToolbarPanel';
+import Pagination from './Pagination';
 
 // --- Main Settings View ---
 interface SettingsViewProps {
@@ -24,6 +28,17 @@ const SettingsView: React.FC<SettingsViewProps> = ({ allData, setAllData, onAfte
     const [isLoadingBackups, setIsLoadingBackups] = useState(false);
     const [backupToRestore, setBackupToRestore] = useState<SettingsBackup | null>(null);
     const [backupToDelete, setBackupToDelete] = useState<SettingsBackup | null>(null);
+    const [backupPage, setBackupPage] = useState(1);
+    const [backupLimit, setBackupLimit] = useState(8);
+
+    const paginatedBackups = useMemo(() => {
+        const start = (backupPage - 1) * backupLimit;
+        return savedBackups.slice(start, start + backupLimit);
+    }, [savedBackups, backupPage, backupLimit]);
+
+    useEffect(() => {
+        setBackupPage(1);
+    }, [savedBackups, backupLimit]);
     
     useEffect(() => {
         if (importMessage) {
@@ -218,11 +233,6 @@ const SettingsView: React.FC<SettingsViewProps> = ({ allData, setAllData, onAfte
 
     return (
         <div className="space-y-8 animate-fade-in">
-             <header>
-                <h2 className="text-3xl font-bold text-slate-800">Configurações</h2>
-                <p className="text-slate-500 mt-1">Gerencie os dados da sua aplicação.</p>
-            </header>
-
             {/* Data Management Panel */}
             <div className="bg-white p-6 rounded-xl shadow-md">
                 <h3 className="text-xl font-bold text-slate-700 mb-4 border-b border-slate-200 pb-3">Gerenciamento de Dados</h3>
@@ -267,12 +277,26 @@ const SettingsView: React.FC<SettingsViewProps> = ({ allData, setAllData, onAfte
             </div>
 
             <div className="bg-white p-6 rounded-xl shadow-md">
-                <div className="flex items-center justify-between mb-4 border-b border-slate-200 pb-3">
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-4 border-b border-slate-200 pb-3">
                     <h3 className="text-xl font-bold text-slate-700">Backups Salvos no Servidor</h3>
                     {isLoadingBackups && <span className="text-sm text-slate-500">Carregando...</span>}
                 </div>
-                <div className="space-y-2 max-h-72 overflow-y-auto">
-                    {savedBackups.map((backup) => (
+                {savedBackups.length > 0 && (
+                    <ToolbarPanel className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+                        <div className="flex items-center gap-2">
+                            <AppLabel htmlFor="limit-backups" className="mb-0 inline text-slate-600">
+                                Itens por página
+                            </AppLabel>
+                            <AppSelect id="limit-backups" value={backupLimit} onChange={(e) => setBackupLimit(Number(e.target.value))} className="w-auto min-w-[5rem]">
+                                <option value={4}>4</option>
+                                <option value={8}>8</option>
+                                <option value={16}>16</option>
+                            </AppSelect>
+                        </div>
+                    </ToolbarPanel>
+                )}
+                <div className="space-y-2">
+                    {paginatedBackups.map((backup) => (
                         <div key={backup.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                             <div>
                                 <p className="font-medium text-slate-800">{backup.name}</p>
@@ -294,6 +318,14 @@ const SettingsView: React.FC<SettingsViewProps> = ({ allData, setAllData, onAfte
                         <p className="text-sm text-slate-500 text-center py-4">Nenhum backup salvo no servidor.</p>
                     )}
                 </div>
+                {savedBackups.length > 0 && (
+                    <Pagination
+                        currentPage={backupPage}
+                        totalItems={savedBackups.length}
+                        itemsPerPage={backupLimit}
+                        onPageChange={setBackupPage}
+                    />
+                )}
             </div>
 
             {isImportConfirmOpen && (

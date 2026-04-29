@@ -177,10 +177,14 @@ const ExecutiveProfileModal: React.FC<ExecutiveProfileModalProps> = ({
                   <label className="block text-xs font-medium text-slate-700 mb-1">E-mail (login)</label>
                   <input
                     type="email"
+                    readOnly={!!currentUser.needsProfileCompletion}
                     value={accEmail}
                     onChange={(e) => setAccEmail(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                    className={`w-full px-3 py-2 border border-slate-300 rounded-lg text-sm ${currentUser.needsProfileCompletion ? 'cursor-not-allowed bg-slate-100' : ''}`}
                   />
+                  {currentUser.needsProfileCompletion && (
+                    <p className="mt-1 text-xs text-slate-500">Alterável após concluir o primeiro acesso.</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-700 mb-1">Telefone</label>
@@ -219,7 +223,8 @@ const ExecutiveProfileModal: React.FC<ExecutiveProfileModalProps> = ({
                 setApiError={setApiError}
                 openSections={openSections}
                 toggleSection={toggleSection}
-                workEmailReadOnly={false}
+                workEmailReadOnly={!!currentUser.needsProfileCompletion}
+                lockHrFields
               />
             </section>
           </div>

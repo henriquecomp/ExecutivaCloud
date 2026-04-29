@@ -56,15 +56,6 @@ const Dashboard: React.FC<DashboardProps> = ({ events, expenses, selectedExecuti
 
   return (
     <div className="space-y-8 animate-fade-in">
-      <header>
-        <h2 className="text-3xl font-bold text-slate-800">
-          {selectedExecutive ? `Painel de ${selectedExecutive.fullName}` : 'Painel de Controle'}
-        </h2>
-        <p className="text-slate-500 mt-1">
-          {selectedExecutive ? 'Resumo das atividades e informações do executivo.' : 'Visão geral da sua operação. Selecione um executivo para começar.'}
-        </p>
-      </header>
-
       {/* Executive Info Section */}
       {selectedExecutive && (
         <div className="bg-white p-6 rounded-xl shadow-md">

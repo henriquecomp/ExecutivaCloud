@@ -21,6 +21,7 @@ markdown-it-py==4.0.0
 MarkupSafe==3.0.3
 mdurl==0.1.2
 passlib==1.7.4
+bcrypt==4.3.0
 pydantic==2.12.3
 python-jose[cryptography]==3.3.0
 pydantic_core==2.41.4

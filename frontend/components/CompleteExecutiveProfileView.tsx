@@ -130,6 +130,7 @@ const CompleteExecutiveProfileView: React.FC<CompleteExecutiveProfileViewProps> 
             openSections={openSections}
             toggleSection={toggleSection}
             workEmailReadOnly
+            lockHrFields
           />
           <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-slate-200">
             <button

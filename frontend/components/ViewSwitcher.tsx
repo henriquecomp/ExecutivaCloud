@@ -15,14 +15,16 @@ const ViewSwitcher: React.FC<ViewSwitcherProps> = ({ layout, setLayout }) => {
   ];
 
   return (
-    <div className="flex items-center gap-1 bg-slate-200 rounded-lg p-1">
+    <div className="flex items-center gap-1 rounded-lg bg-slate-200 p-1 text-sm">
       {options.map((option) => (
         <button
           key={option.name}
+          type="button"
           onClick={() => setLayout(option.name)}
           title={option.label}
           aria-label={option.label}
-          className={`p-2 rounded-md transition-colors duration-200 ${
+          aria-pressed={layout === option.name}
+          className={`rounded-md p-2 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 ${
             layout === option.name
               ? 'bg-white text-indigo-600 shadow-sm'
               : 'text-slate-500 hover:bg-slate-300/50 hover:text-slate-700'

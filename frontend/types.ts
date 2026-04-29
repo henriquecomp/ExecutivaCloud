@@ -187,15 +187,6 @@ export interface Event {
   recurrence?: RecurrenceRule;
 }
 
-// FIX: Add missing 'Appointment' type to resolve compilation error in components/AppointmentsView.tsx.
-export interface Appointment {
-  id: string;
-  title: string;
-  location: string;
-  date: string;
-  time: string;
-}
-
 export interface ContactType {
     id: string; // UUID
     name: string;
@@ -222,6 +213,8 @@ export interface ExpenseCategory {
   id: string;
   name: string;
   color: string;
+  /** Escopo do executivo dono da categoria (API). */
+  executiveId: string;
 }
 
 export interface Expense {

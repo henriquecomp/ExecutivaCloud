@@ -2,6 +2,7 @@ import os
 from typing import Optional
 
 from fastapi import Depends, HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -60,6 +61,11 @@ class AuthService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Este e-mail já está cadastrado.",
             )
+        if self.legal_orgs.get_by_cnpj(body.legalCnpj):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Este CNPJ já está cadastrado.",
+            )
         lo_data = {
             "name": body.legalName,
             "cnpj": body.legalCnpj,
@@ -70,7 +76,14 @@ class AuthService:
             "state": body.legalState,
             "zipCode": body.legalZipCode,
         }
-        lo = self.legal_orgs.create(lo_data)
+        try:
+            lo = self.legal_orgs.create(lo_data)
+        except IntegrityError:
+            self.db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Este CNPJ já está cadastrado.",
+            ) from None
         hashed = hash_password(body.adminPassword)
         db_user = self.users.create(
             {

@@ -1,6 +1,19 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Executive, Event, Expense, Task, Contact } from '../types';
 import { reportService, SavedReport } from '../services/reportService';
+import {
+  DataTable,
+  DataTableBody,
+  DataTableEmptyRow,
+  DataTableHead,
+  DataTableRow,
+  DataTableTd,
+  DataTableTh,
+} from './ui/DataTable';
+import AppLabel from './ui/AppLabel';
+import AppSelect from './ui/AppSelect';
+import ToolbarPanel from './ui/ToolbarPanel';
+import Pagination from './Pagination';
 
 interface ReportsViewProps {
   executives: Executive[];
@@ -30,8 +43,11 @@ const ReportsView: React.FC<ReportsViewProps> = ({ executives, events, expenses,
     const [dataTypes, setDataTypes] = useState({ events: true, expenses: true, tasks: true, contacts: true });
     
     const [fullReport, setFullReport] = useState<ReportData[]>([]);
-    const [displayReport, setDisplayReport] = useState<ReportData[]>([]);
     const [reportGenerated, setReportGenerated] = useState(false);
+    const [reportPage, setReportPage] = useState(1);
+    const [reportLimit, setReportLimit] = useState(25);
+    const [savedReportPage, setSavedReportPage] = useState(1);
+    const [savedReportLimit, setSavedReportLimit] = useState(10);
     const [savedReports, setSavedReports] = useState<SavedReport[]>([]);
     const [isSavingReport, setIsSavingReport] = useState(false);
     const [isLoadingSavedReports, setIsLoadingSavedReports] = useState(false);
@@ -70,6 +86,24 @@ const ReportsView: React.FC<ReportsViewProps> = ({ executives, events, expenses,
     useEffect(() => {
         loadSavedReports();
     }, []);
+
+    const displayReport = useMemo(() => {
+        const start = (reportPage - 1) * reportLimit;
+        return fullReport.slice(start, start + reportLimit);
+    }, [fullReport, reportPage, reportLimit]);
+
+    useEffect(() => {
+        setReportPage(1);
+    }, [fullReport, reportLimit]);
+
+    const paginatedSavedReports = useMemo(() => {
+        const start = (savedReportPage - 1) * savedReportLimit;
+        return savedReports.slice(start, start + savedReportLimit);
+    }, [savedReports, savedReportPage, savedReportLimit]);
+
+    useEffect(() => {
+        setSavedReportPage(1);
+    }, [savedReports, savedReportLimit]);
 
     const handleGenerateReport = async () => {
         const execsToReport = selectedExecIds.length > 0 
@@ -181,7 +215,6 @@ const ReportsView: React.FC<ReportsViewProps> = ({ executives, events, expenses,
         const finalReportData: ReportData[] = generatedData.map(({ sortDate, ...rest }) => rest);
 
         setFullReport(finalReportData);
-        setDisplayReport(finalReportData.slice(-50));
         setReportGenerated(true);
 
         try {
@@ -212,7 +245,6 @@ const ReportsView: React.FC<ReportsViewProps> = ({ executives, events, expenses,
     const handleLoadSavedReport = (report: SavedReport) => {
         const rows = (report.generatedData || []) as ReportData[];
         setFullReport(rows);
-        setDisplayReport(rows.slice(-50));
         setReportGenerated(true);
     };
 
@@ -258,11 +290,6 @@ const ReportsView: React.FC<ReportsViewProps> = ({ executives, events, expenses,
     
     return (
         <div className="space-y-6 animate-fade-in">
-            <header>
-                <h2 className="text-3xl font-bold text-slate-800">Gerador de Relatórios</h2>
-                <p className="text-slate-500 mt-1">Filtre e extraia os dados que você precisa.</p>
-            </header>
-
             <div className="bg-white p-6 rounded-xl shadow-md">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                     {/* Executive Filter */}
@@ -339,8 +366,8 @@ const ReportsView: React.FC<ReportsViewProps> = ({ executives, events, expenses,
                     <h3 className="text-xl font-bold text-slate-700">Relatórios Salvos</h3>
                     {isLoadingSavedReports && <span className="text-sm text-slate-500">Carregando...</span>}
                 </div>
-                <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {savedReports.slice(0, 20).map((report) => (
+                <div className="space-y-2">
+                    {paginatedSavedReports.map((report) => (
                         <div key={report.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                             <div>
                                 <p className="font-medium text-slate-800">{report.name}</p>
@@ -362,6 +389,33 @@ const ReportsView: React.FC<ReportsViewProps> = ({ executives, events, expenses,
                         <p className="text-sm text-slate-500 text-center py-3">Nenhum relatório salvo ainda.</p>
                     )}
                 </div>
+                {savedReports.length > 0 && (
+                    <>
+                        <ToolbarPanel className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+                            <div className="flex items-center gap-2">
+                                <AppLabel htmlFor="limit-saved-reports" className="mb-0 inline text-slate-600">
+                                    Itens por página
+                                </AppLabel>
+                                <AppSelect
+                                    id="limit-saved-reports"
+                                    value={savedReportLimit}
+                                    onChange={(e) => setSavedReportLimit(Number(e.target.value))}
+                                    className="w-auto min-w-[5rem]"
+                                >
+                                    <option value={5}>5</option>
+                                    <option value={10}>10</option>
+                                    <option value={20}>20</option>
+                                </AppSelect>
+                            </div>
+                        </ToolbarPanel>
+                        <Pagination
+                            currentPage={savedReportPage}
+                            totalItems={savedReports.length}
+                            itemsPerPage={savedReportLimit}
+                            onPageChange={setSavedReportPage}
+                        />
+                    </>
+                )}
             </div>
 
             {reportGenerated && (
@@ -369,9 +423,9 @@ const ReportsView: React.FC<ReportsViewProps> = ({ executives, events, expenses,
                     <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
                         <div>
                             <h3 className="text-xl font-bold text-slate-700">Resultado do Relatório</h3>
-                            {fullReport.length > 50 && (
+                            {fullReport.length > 0 && (
                                 <p className="text-sm text-slate-500 mt-1">
-                                    Mostrando os últimos 50 de {fullReport.length} registros. A exportação CSV incluirá todos os dados.
+                                    {fullReport.length} registro(s) no total. A exportação CSV inclui todos os dados.
                                 </p>
                             )}
                         </div>
@@ -379,23 +433,68 @@ const ReportsView: React.FC<ReportsViewProps> = ({ executives, events, expenses,
                             Exportar para CSV
                         </button>
                     </div>
-                     <div className="overflow-auto max-h-[500px] border border-slate-200 rounded-lg">
-                        <table className="w-full text-left">
-                            <thead className="border-b-2 border-slate-200 text-sm text-slate-500 sticky top-0 bg-white/95 backdrop-blur-sm">
-                                <tr>
-                                    {displayReport.length > 0 && Object.keys(displayReport[0]).map(header => <th key={header} className="p-3 whitespace-nowrap">{header}</th>)}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {displayReport.map((row, index) => (
-                                    <tr key={index} className="border-b border-slate-100 hover:bg-slate-50 text-sm">
-                                        {Object.values(row).map((value, i) => <td key={i} className="p-3 text-slate-700 whitespace-nowrap">{value}</td>)}
+                    {fullReport.length > 0 && (
+                        <ToolbarPanel className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex items-center gap-2">
+                                <AppLabel htmlFor="limit-report-result" className="mb-0 inline text-slate-600">
+                                    Itens por página
+                                </AppLabel>
+                                <AppSelect
+                                    id="limit-report-result"
+                                    value={reportLimit}
+                                    onChange={(e) => setReportLimit(Number(e.target.value))}
+                                    className="w-auto min-w-[5rem]"
+                                >
+                                    <option value={10}>10</option>
+                                    <option value={25}>25</option>
+                                    <option value={50}>50</option>
+                                    <option value={100}>100</option>
+                                </AppSelect>
+                            </div>
+                        </ToolbarPanel>
+                    )}
+                    <DataTable innerClassName="max-h-[500px] overflow-auto">
+                        {displayReport.length > 0 ? (
+                            <>
+                                <DataTableHead sticky>
+                                    <tr>
+                                        {Object.keys(displayReport[0]).map((header) => (
+                                            <DataTableTh key={header} className="whitespace-nowrap">
+                                                {header}
+                                            </DataTableTh>
+                                        ))}
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                        {fullReport.length === 0 && <p className="text-center p-6 text-slate-500">Nenhum dado encontrado para os filtros selecionados.</p>}
-                    </div>
+                                </DataTableHead>
+                                <DataTableBody>
+                                    {displayReport.map((row, index) => (
+                                        <DataTableRow key={index}>
+                                            {Object.values(row).map((value, i) => (
+                                                <DataTableTd key={i} className="whitespace-nowrap text-slate-700">
+                                                    {String(value)}
+                                                </DataTableTd>
+                                            ))}
+                                        </DataTableRow>
+                                    ))}
+                                </DataTableBody>
+                            </>
+                        ) : (
+                            <DataTableBody>
+                                <DataTableEmptyRow colSpan={1}>
+                                    {fullReport.length === 0
+                                        ? 'Nenhum dado encontrado para os filtros selecionados.'
+                                        : 'Nenhum registro a exibir.'}
+                                </DataTableEmptyRow>
+                            </DataTableBody>
+                        )}
+                    </DataTable>
+                    {fullReport.length > 0 && (
+                        <Pagination
+                            currentPage={reportPage}
+                            totalItems={fullReport.length}
+                            itemsPerPage={reportLimit}
+                            onPageChange={setReportPage}
+                        />
+                    )}
                 </div>
             )}
         </div>
