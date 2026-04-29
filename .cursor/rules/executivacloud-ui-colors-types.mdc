@@ -1,12 +1,14 @@
 ---
-description: Cores e tipos — swatches em listas, TypeColorFormField nos formulários, sem campo hex solto.
+description: Type/category colors — list swatches, TypeColorFormField in forms, no loose hex text field.
 globs: frontend/**/*.tsx
 alwaysApply: false
 ---
 
-# Cores nos tipos/categorias (Executiva Cloud)
+# Type/category colors (Executiva Cloud)
 
-- **Listas (modais Tipos de contato, evento, categorias finanças/documentos)**: `TypeColorSwatch` de `components/ui/TypeColorSwatch.tsx`, `size="md"`, + `truncate` no nome. Não exibir `#hex` na linha.
-- **Formulários de criação/edição de tipo**: `TypeColorFormField` (`components/ui/TypeColorFormField.tsx`) = `input type="color"` + círculo de pré-visualização. **Não** usar `AppInput` de texto para cor/hex.
-- **Defaults**: fallback visual `#64748b`; agenda pode usar `defaultColor="#3b82f6"` no `TypeColorFormField` onde já existir essa convenção.
-- Categorias de **documentos** no backend têm coluna `color`; serviços TS mapeiam fallback se a API omitir.
+**UI copy** may stay pt-BR where the product uses it. Technical rules below are in English.
+
+- **Lists** (contact/event type modals, finance/document category modals): use `TypeColorSwatch` from `components/ui/TypeColorSwatch.tsx`, `size="md"`, and `truncate` on the name. Do not show raw `#hex` on the row.
+- **Create/edit type forms**: use `TypeColorFormField` (`components/ui/TypeColorFormField.tsx`) — `input type="color"` plus preview circle. **Do not** use a plain `AppInput` for color/hex.
+- **Defaults**: visual fallback `#64748b`; agenda may use `defaultColor="#3b82f6"` on `TypeColorFormField` where that convention already exists.
+- **Document categories** in the backend have a `color` column; TS services map a fallback when the API omits it.

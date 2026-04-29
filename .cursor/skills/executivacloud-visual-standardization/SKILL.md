@@ -1,63 +1,65 @@
 ---
 name: executivacloud-visual-standardization
 description: >-
-  Aplica os padrões visuais do frontend Executiva Cloud: cores em tipos (swatches
-  e formulários sem campo hex), botões Editar/Excluir via typeManagementStyles,
-  colunas de ações alinhadas, ícones de domínio (cadeado, proibido, refresh), e
-  acessibilidade em botões só ícone. Usar ao criar ou alterar componentes em
-  frontend/components, modais de categorias/tipos, tabelas com ações, ou quando
-  o utilizador pedir padronização visual alinhada ao projeto.
+  Applies Executiva Cloud frontend visual standards: type colors (swatches and
+  forms without a loose hex field), Edit/Delete via typeManagementStyles,
+  aligned action columns, domain icons (lock, ban, refresh), and a11y on
+  icon-only buttons. Use when creating or editing components under
+  frontend/components, category/type modals, tables with actions, or when the
+  user asks for visual alignment with the project.
 ---
 
-# Executiva Cloud — padronização visual (skill)
+# Executiva Cloud — visual standardization (skill)
 
-## Quando usar esta skill
+**Product UI strings** remain **pt-BR** where the app uses Portuguese (e.g. tooltips, button labels). This skill text is in English.
 
-- Novos modais de **gestão de tipos/categorias** (cor + nome).
-- Novas tabelas ou linhas com **editar / excluir / ações específicas**.
-- Alterações em **ContactsView, AgendaView, DocumentsView, ExpensesView, TasksView, UserManagementView** ou UI em `components/ui/` relacionada com cores e ícones.
+## When to use this skill
 
-## Checklist — cores
+- New **type/category management** modals (color + name).
+- New tables or rows with **edit / delete / specific actions**.
+- Changes to **ContactsView, AgendaView, DocumentsView, ExpensesView, TasksView, UserManagementView** or `components/ui/` related to colors and icons.
 
-1. Na **lista** do modal de tipos: `TypeColorSwatch` com `size="md"` + nome; layout `flex min-w-0 flex-1 items-center gap-3` + `truncate` no texto.
-2. No **formulário** do tipo: `TypeColorFormField` com `id` único; não adicionar segundo campo de texto para `#RRGGBB`.
-3. Após mudanças no backend de categorias, garantir migração + tipo TS + `map*` no service com fallback `#64748b` quando aplicável.
+## Checklist — colors
 
-## Checklist — ícones Editar / Excluir
+1. In the type modal **list**: `TypeColorSwatch` with `size="md"` + name; layout `flex min-w-0 flex-1 items-center gap-3` + `truncate` on the text.
+2. In the type **form**: `TypeColorFormField` with a unique `id`; do not add a second text field for `#RRGGBB`.
+3. After backend category changes: ensure migration + TS type + `map*` in the service with fallback `#64748b` when applicable.
 
-1. `import { typeMgmtEditIconBtn, typeMgmtDeleteIconBtn } from './ui/typeManagementStyles'` (ajustar path relativo ao ficheiro).
-2. `<button type="button" className={typeMgmtEditIconBtn} aria-label="..."><EditIcon /></button>` e análogo para delete.
-3. Não reintroduzir classes locais `text-slate-400`, `hover:bg-slate-200` só para estes pares salvo excepção documentada (ex.: cartão com fundo especial — pode compor com ` ${typeMgmtEditIconBtn} bg-white/80 ...`).
+## Checklist — Edit / Delete icons
 
-## Checklist — coluna Ações (tabelas densas)
+1. `import { typeMgmtEditIconBtn, typeMgmtDeleteIconBtn } from './ui/typeManagementStyles'` (adjust relative path).
+2. `<button type="button" className={typeMgmtEditIconBtn} aria-label="..."><EditIcon /></button>` and the same pattern for delete (`aria-label` in pt-BR if shown to users).
+3. Do not reintroduce local `text-slate-400` / `hover:bg-slate-200` only for these pairs unless documented (e.g. special card background — may compose with ` ${typeMgmtEditIconBtn} bg-white/80 ...`).
 
-1. Cabeçalho: `text-right`, `whitespace-nowrap`, `min-w-[10rem]` ou valor que caiba todos os ícones sem wrap.
-2. Célula: `align-middle whitespace-nowrap text-right`.
-3. Grupo de ícones: `inline-flex flex-row flex-nowrap items-center justify-end gap-0.5`.
+## Checklist — Actions column (dense tables)
 
-## Checklist — UserManagement (ações de conta)
+1. Header: `text-right`, `whitespace-nowrap`, `min-w-[10rem]` or enough width so all icons stay on one row.
+2. Cell: `align-middle whitespace-nowrap text-right`.
+3. Icon group: `inline-flex flex-row flex-nowrap items-center justify-end gap-0.5`.
 
-1. Editar: `typeMgmtEditIconBtn` + `EditIcon` com `h-5 w-5` se necessário.
-2. Reenviar primeiro acesso / reset senha: `LockClosedIcon`; estados de loading com `aria-busy`, `disabled={!!mailBusy}`, tooltip “Enviando…” quando aplicável.
-3. Inativar: `NoSymbolIcon`, não só texto vermelho.
-4. Atualizar lista: botão com `RefreshIcon`; evitar animação de spinner infinito no ícone; opcional `active:scale-95` no botão.
+## Checklist — UserManagement (account actions)
 
-## Checklist — acessibilidade
+1. Edit: `typeMgmtEditIconBtn` + `EditIcon` with `h-5 w-5` if needed.
+2. Resend first-access / reset password: `LockClosedIcon`; loading with `aria-busy`, `disabled={!!mailBusy}`, tooltip e.g. “Enviando…” (pt-BR) when applicable.
+3. Deactivate: `NoSymbolIcon`, not red text alone.
+4. Refresh list: button with `RefreshIcon`; avoid infinite spinner on the icon; optional `active:scale-95` on the button.
 
-- Todo botão só com ícone: `aria-label` + idealmente `title` coerente (tooltip).
+## Checklist — accessibility
 
-## Ficheiros de referência no repo
+- Every icon-only button: `aria-label` + preferably a coherent `title` (tooltip).
 
-| Conceito | Caminho |
-|----------|---------|
+## Reference files
+
+| Concept | Path |
+|---------|------|
 | Swatch | `frontend/components/ui/TypeColorSwatch.tsx` |
-| Campo cor formulário | `frontend/components/ui/TypeColorFormField.tsx` |
-| Classes edit/delete | `frontend/components/ui/typeManagementStyles.ts` |
-| Ícones partilhados | `frontend/components/Icons.tsx` |
+| Color form field | `frontend/components/ui/TypeColorFormField.tsx` |
+| Edit/delete classes | `frontend/components/ui/typeManagementStyles.ts` |
+| Shared icons | `frontend/components/Icons.tsx` |
 
-## Anti-padrões (evitar)
+## Anti-patterns (avoid)
 
-- Hex visível num formulário e só círculo noutro — **um só padrão**: `TypeColorFormField`.
-- Listas de tipos só com nome, sem swatch, quando o modelo tem cor.
-- `flex-wrap` na coluna de ações quando o desenho pede uma linha única de ícones.
-- Substituir `RefreshIcon` por ícone de “recorrência” ou traço que possa ler-se como outro objeto.
+- Hex visible in one form and only a circle elsewhere — **single pattern**: `TypeColorSwatch` / `TypeColorFormField`.
+- Type lists with name only and no swatch when the model has color.
+- `flex-wrap` on the actions column when the design requires a single row of icons.
+- Replacing `RefreshIcon` with a recurrence-style icon or stroke that reads as a different affordance.

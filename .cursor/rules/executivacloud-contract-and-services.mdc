@@ -1,0 +1,99 @@
+---
+description: FE↔BE contract, service layers, anti-regression, and delivery process.
+globs: "{frontend,backend}/**/*.{ts,tsx,py}"
+alwaysApply: false
+---
+
+# Executiva Cloud — frontend/backend contract and service patterns
+
+**Product language:** User-visible API errors and UI copy stay **pt-BR**. This rule file is in English for contributors.
+
+## Overall architecture
+
+```
+Backend (FastAPI)                          Frontend (React 19 + Vite)
+─────────────────                          ──────────────────────────
+model (SQLAlchemy)                         types.ts  (domain interfaces)
+  ↕                                            ↑
+schema (Pydantic, camelCase aliases)       services/*Service.ts  (map* + axios)
+  ↕                                            ↑
+repository → service → router             components/*View.tsx / ui/*
+```
+
+- Request/response JSON between frontend and backend uses **camelCase** (Pydantic `alias` with `populate_by_name=True`).
+- API query parameters use **snake_case** (`executive_id`, `skip`, `limit`). Rebuild queries in TS services with `URLSearchParams`.
+- Path segment IDs: backend often expects `int`; in TS services convert with `Number(id)`.
+
+## Frontend service layer
+
+Each domain has a file `frontend/services/<name>Service.ts`. Required pattern:
+
+1. Import `api` from `./api` — never instantiate axios or use `fetch` directly.
+2. Declare a private `map*` function that maps API responses to TS types (e.g. `mapTask`, `mapContact`). Normalize IDs to `string` with `String(item.id)`.
+3. Export a constant object with `getAll`, `create`, `update`, `delete` (and variants like `createBulk`, `deleteByRecurrence` where applicable).
+4. Type return values using interfaces from `frontend/types.ts`.
+5. List filters: `URLSearchParams` with `skip` and `limit`, plus optional filters (e.g. `executive_id`).
+
+Canonical example: `frontend/services/taskService.ts`.
+
+### When changing a service
+
+- New field → update **mapper** (`map*`) **and** `types.ts` in the same change.
+- New domain → add `frontend/services/<name>Service.ts` following the pattern above; **never** put HTTP calls in a view.
+
+## Backend schemas and routers
+
+- Pydantic schemas in `backend/app/schemas/<name>_schema.py` with `Field(alias="camelCase")` and `ConfigDict(populate_by_name=True, from_attributes=True)`.
+- Routers in `backend/app/routers/<name>.py` with `APIRouter(prefix="/<resource>", tags=[...])`.
+- Services in `backend/app/services/<name>_service.py` receive `db: Session` via `Depends(get_db)`.
+- Repositories in `backend/app/repositories/<name>_repository.py`.
+- Error `detail` strings for users: **pt-BR**, aligned with `getApiErrorMessage` on the frontend (`frontend/utils/apiError.ts`).
+
+### When changing an endpoint
+
+In the same delivery (or explicitly linked PR), update **all** layers:
+
+1. SQLAlchemy model (`backend/app/models/`) + Alembic migration if the DB changes.
+2. Pydantic schema (`backend/app/schemas/`).
+3. Backend service + repository.
+4. Router.
+5. Frontend TS service (`map*` + methods).
+6. Interfaces in `frontend/types.ts`.
+7. View(s) that consume the service.
+
+**Never** merge with only half the flow (e.g. backend done but TS service outdated).
+
+## Error handling
+
+- On the frontend, use `getApiErrorMessage(err, 'fallback message')` from `frontend/utils/apiError.ts` for FastAPI `{ detail: string | ValidationError[] }`.
+- Show form errors with `FormDangerAlert` from `frontend/components/ui/FormDangerAlert.tsx`.
+- On the backend, `HTTPException` with `detail` in **pt-BR**. Use message content to distinguish 404 vs 400 when needed.
+
+## Payload normalization
+
+- When a helper already exists (e.g. `normalizeExecutivePayload` in `frontend/utils/executivePayload.ts`), reuse it instead of duplicating cleanup logic.
+- Trim text fields; send empty strings as `null` to the API when that matches existing behavior.
+
+## Forbidden anti-patterns
+
+- Importing `api` (axios) directly in a view/component (except centralized auth concerns via `authService`).
+- Using native `fetch()` anywhere in the frontend.
+- Creating a second axios instance outside `frontend/services/api.ts`.
+- Sending string IDs in URL paths without `Number()` when the route expects a number.
+- Defining domain interfaces outside `frontend/types.ts` (service-specific param types may live in the service file).
+- Duplicating SVGs — add icons in `frontend/components/Icons.tsx` with `createIcon` or `IconWrapper`.
+- Omitting camelCase `alias` on new Pydantic schemas.
+- Adding an Alembic migration without updating the corresponding TS service.
+- User-facing error `detail` in English — keep **pt-BR**.
+
+## CORS and configuration
+
+- Allowed origins in `backend/app/main.py` via `CORS_ORIGINS` or static list. Local regex covers `localhost:*`.
+- Frontend uses `VITE_API_URL` (default `http://localhost:8098/`). Re-check when changing ports or hosts.
+
+## Authentication
+
+- JWT stored in `localStorage` under `accessToken`.
+- Request interceptor in `frontend/services/api.ts` attaches `Authorization: Bearer <token>`.
+- `authService` in `frontend/services/authService.ts` centralizes login, logout, invite, and profile completion.
+- Do not duplicate token persistence outside `authService`.

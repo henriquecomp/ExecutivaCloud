@@ -1,28 +1,30 @@
 ---
-description: Ícones Editar/Excluir, colunas de ações, ícones de domínio (cadeado, proibido, refresh) e a11y.
+description: Edit/Delete icons, action columns, domain icons (lock, ban, refresh), and a11y.
 globs: frontend/**/*.tsx
 alwaysApply: false
 ---
 
-# Ícones, ações e tabelas (Executiva Cloud)
+# Icons, actions, and tables (Executiva Cloud)
 
-## Editar / Excluir
+**Accessible labels** (`aria-label`, `title`) should match the product language (**pt-BR**) where user-facing.
 
-- Importar `typeMgmtEditIconBtn` e `typeMgmtDeleteIconBtn` de `components/ui/typeManagementStyles.ts`.
-- Traço dos ícones vem de `EditIcon`/`DeleteIcon` (`Icons.tsx`) via `currentColor`; não duplicar SVGs com tons fixos por ecrã.
-- Padrão: `rounded-full`, `text-slate-500`, hover `bg-slate-100` + indigo/vermelho. Evitar `text-slate-400` + `hover:bg-slate-200` para estes pares após padronização.
+## Edit / Delete
 
-## Coluna “Ações”
+- Import `typeMgmtEditIconBtn` and `typeMgmtDeleteIconBtn` from `components/ui/typeManagementStyles.ts`.
+- Stroke color comes from `EditIcon`/`DeleteIcon` (`Icons.tsx`) via `currentColor`; do not duplicate SVGs with per-screen fixed colors.
+- Pattern: `rounded-full`, `text-slate-500`, hover `bg-slate-100` + indigo/red. After standardization, avoid `text-slate-400` + `hover:bg-slate-200` for these pairs unless documented.
 
-- `inline-flex flex-row flex-nowrap items-center justify-end`, célula `whitespace-nowrap text-right`, TH com `text-right` e `min-w-*` para caber ícones sem quebra.
-- Não adicionar colunas informativas sem dados úteis de forma sustentada.
+## “Actions” column
 
-## Ações específicas (ex. Usuários)
+- `inline-flex flex-row flex-nowrap items-center justify-end`, cell `whitespace-nowrap text-right`, `<th>` `text-right` and `min-w-*` so icons stay on one line.
+- Do not add informational columns without sustainable data.
 
-- **Refresh lista**: `RefreshIcon` (setas reload em `Icons.tsx`); `title` + `aria-label`; evitar spinner como botão principal.
-- **Convite / senha**: `LockClosedIcon`; `title`/`aria-label` explicativos; loading com `aria-busy` / opacidade, não confundir com loader genérico.
-- **Inativar**: `NoSymbolIcon` se o padrão do ecrã for ícones.
+## Domain-specific actions (e.g. Users)
 
-## Botão só ícone
+- **Refresh list**: `RefreshIcon` (`Icons.tsx`); `title` + `aria-label`; avoid an infinite spinner as the primary control.
+- **Invite / password**: `LockClosedIcon`; explanatory `title`/`aria-label`; loading with `aria-busy` / opacity — do not mimic a generic loader.
+- **Deactivate**: `NoSymbolIcon` when the screen uses icon actions.
 
-- Sempre `type="button"` fora de submit, e **`aria-label`** (+ `title` para tooltip quando fizer sentido).
+## Icon-only buttons
+
+- Always `type="button"` outside submit flows, and **`aria-label`** (+ `title` for tooltip when useful).
