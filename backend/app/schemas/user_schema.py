@@ -70,6 +70,7 @@ class UserManagementPatch(BaseModel):
     email: Optional[EmailStr] = None
     phone: Optional[str] = None
     is_active: Optional[bool] = Field(None, alias="isActive")
+    organization_id: Optional[int] = Field(None, alias="organizationId")
 
 
 class UserManagementListResponse(BaseModel):
@@ -77,3 +78,7 @@ class UserManagementListResponse(BaseModel):
 
     items: List[Usuario]
     total: int
+
+
+class UserManagementMessageResponse(BaseModel):
+    message: str

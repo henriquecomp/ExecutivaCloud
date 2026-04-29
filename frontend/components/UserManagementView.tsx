@@ -1,13 +1,16 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { LegalOrganization, Organization, User } from '../types';
 import Modal from './Modal';
 import ConfirmationModal from './ConfirmationModal';
 import InviteUserForm from './InviteUserForm';
-import { EditIcon } from './Icons';
+import { EditIcon, LockClosedIcon, NoSymbolIcon, RefreshIcon } from './Icons';
+import { typeMgmtEditIconBtn } from './ui/typeManagementStyles';
 import {
   deactivateManagedUser,
   listManagedUsers,
   patchManagedUser,
+  resendFirstAccessEmail,
+  sendManagedUserPasswordReset,
   type ManagedUserRow,
 } from '../services/userManagementService';
 import {
@@ -85,10 +88,14 @@ const UserManagementView: React.FC<UserManagementViewProps> = ({
   const [editName, setEditName] = useState('');
   const [editEmail, setEditEmail] = useState('');
   const [editPhone, setEditPhone] = useState('');
+  const [editOrgId, setEditOrgId] = useState('');
   const [editActive, setEditActive] = useState(true);
   const [editSaving, setEditSaving] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [mailBusy, setMailBusy] = useState<{ userId: number; kind: 'first' | 'reset' } | null>(
+    null,
+  );
 
   useEffect(() => {
     const t = window.setTimeout(() => setQApplied(qInput.trim()), 350);
@@ -128,24 +135,52 @@ const UserManagementView: React.FC<UserManagementViewProps> = ({
     if (currentPage > totalPages) setCurrentPage(totalPages);
   }, [total, pageSize, currentPage]);
 
+  const canReassignCompany =
+    currentUser.role === 'master' ||
+    (currentUser.role === 'admin_legal_organization' && !!currentUser.legalOrganizationId);
+
+  const companyOptions = useMemo(() => {
+    if (currentUser.role === 'master') {
+      return [...organizations].sort((a, b) => a.name.localeCompare(b.name, 'pt'));
+    }
+    if (currentUser.role === 'admin_legal_organization' && currentUser.legalOrganizationId) {
+      return organizations
+        .filter((o) => o.legalOrganizationId === currentUser.legalOrganizationId)
+        .sort((a, b) => a.name.localeCompare(b.name, 'pt'));
+    }
+    return [];
+  }, [currentUser.role, currentUser.legalOrganizationId, organizations]);
+
   const openEdit = (u: ManagedUserRow) => {
     setEditRow(u);
     setEditName(u.fullName);
     setEditEmail(u.email);
     setEditPhone(u.phone ?? '');
+    setEditOrgId(u.organizationId != null ? String(u.organizationId) : '');
     setEditActive(u.isActive);
   };
 
   const submitEdit = async () => {
     if (!editRow) return;
+    const isExecOrSec = editRow.role === 'executive' || editRow.role === 'secretary';
+    const showOrgField = canReassignCompany && isExecOrSec;
+    if (showOrgField && !editOrgId.trim()) {
+      setError('Selecione a empresa (alocação do executivo ou da secretária).');
+      return;
+    }
     setEditSaving(true);
     setError(null);
     try {
+      const initialOrg = editRow.organizationId ?? null;
+      const nextOrg = showOrgField ? Number(editOrgId) : null;
+      const orgChanged = showOrgField && nextOrg !== initialOrg;
+
       const updated = await patchManagedUser(editRow.id, {
         fullName: editName.trim(),
         email: editEmail.trim(),
         phone: editPhone.trim() === '' ? null : editPhone.trim(),
         isActive: editActive,
+        ...(orgChanged && nextOrg != null && !Number.isNaN(nextOrg) ? { organizationId: nextOrg } : {}),
       });
       setRows((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
       setEditRow(null);
@@ -156,6 +191,44 @@ const UserManagementView: React.FC<UserManagementViewProps> = ({
       setError(typeof ax.response?.data?.detail === 'string' ? ax.response.data.detail : 'Falha ao salvar.');
     } finally {
       setEditSaving(false);
+    }
+  };
+
+  const runResendFirstAccess = async (u: ManagedUserRow) => {
+    setMailBusy({ userId: u.id, kind: 'first' });
+    setError(null);
+    try {
+      const msg = await resendFirstAccessEmail(u.id);
+      setFlash(msg);
+      window.setTimeout(() => setFlash(null), 5000);
+    } catch (e: unknown) {
+      const ax = e as { response?: { data?: { detail?: string } } };
+      setError(
+        typeof ax.response?.data?.detail === 'string'
+          ? ax.response.data.detail
+          : 'Não foi possível reenviar o e-mail.',
+      );
+    } finally {
+      setMailBusy(null);
+    }
+  };
+
+  const runSendPasswordReset = async (u: ManagedUserRow) => {
+    setMailBusy({ userId: u.id, kind: 'reset' });
+    setError(null);
+    try {
+      const msg = await sendManagedUserPasswordReset(u.id);
+      setFlash(msg);
+      window.setTimeout(() => setFlash(null), 5000);
+    } catch (e: unknown) {
+      const ax = e as { response?: { data?: { detail?: string } } };
+      setError(
+        typeof ax.response?.data?.detail === 'string'
+          ? ax.response.data.detail
+          : 'Não foi possível enviar o e-mail de redefinição.',
+      );
+    } finally {
+      setMailBusy(null);
     }
   };
 
@@ -182,9 +255,11 @@ const UserManagementView: React.FC<UserManagementViewProps> = ({
         <button
           type="button"
           onClick={() => void refresh()}
-          className="px-4 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 text-sm font-medium"
+          className="rounded-lg border border-slate-300 bg-white p-2 text-slate-700 hover:bg-slate-50 active:scale-95 transition-transform duration-150"
+          title="Atualizar lista de usuários"
+          aria-label="Atualizar lista de usuários"
         >
-          Atualizar
+          <RefreshIcon className="h-5 w-5" />
         </button>
         <button
           type="button"
@@ -243,15 +318,14 @@ const UserManagementView: React.FC<UserManagementViewProps> = ({
             <DataTableTh className="min-w-[12rem]">Organização / Empresa</DataTableTh>
             <DataTableTh>Papel</DataTableTh>
             <DataTableTh>Status</DataTableTh>
-            <DataTableTh className="hidden sm:table-cell">Perfil</DataTableTh>
-            <DataTableTh className="w-32">Ações</DataTableTh>
+            <DataTableTh className="min-w-[10rem] whitespace-nowrap text-right">Ações</DataTableTh>
           </tr>
         </DataTableHead>
         <DataTableBody>
           {loading ? (
-            <DataTableEmptyRow colSpan={8}>Carregando…</DataTableEmptyRow>
+            <DataTableEmptyRow colSpan={7}>Carregando…</DataTableEmptyRow>
           ) : rows.length === 0 ? (
-            <DataTableEmptyRow colSpan={8}>Nenhum usuário encontrado.</DataTableEmptyRow>
+            <DataTableEmptyRow colSpan={7}>Nenhum usuário encontrado.</DataTableEmptyRow>
           ) : (
             rows.map((u) => {
               const { legalName, companyName, title } = resolveUserAssociations(
@@ -259,6 +333,8 @@ const UserManagementView: React.FC<UserManagementViewProps> = ({
                 legalOrganizations,
                 organizations,
               );
+              const resendBusy = mailBusy?.userId === u.id && mailBusy.kind === 'first';
+              const resetBusy = mailBusy?.userId === u.id && mailBusy.kind === 'reset';
               return (
                 <DataTableRow key={u.id}>
                   <DataTableTd className="font-medium text-slate-800">{u.fullName}</DataTableTd>
@@ -286,27 +362,72 @@ const UserManagementView: React.FC<UserManagementViewProps> = ({
                       {u.isActive ? 'Ativo' : 'Inativo'}
                     </span>
                   </DataTableTd>
-                  <DataTableTd className="hidden sm:table-cell text-slate-600">
-                    {u.needsProfileCompletion ? <span className="text-amber-700">Pendente</span> : '—'}
-                  </DataTableTd>
-                  <DataTableTd>
-                    <div className="flex flex-wrap gap-1">
+                  <DataTableTd className="align-middle whitespace-nowrap text-right">
+                    <div className="inline-flex flex-row flex-nowrap items-center justify-end gap-0.5">
                       <button
                         type="button"
                         onClick={() => openEdit(u)}
-                        className="rounded-md p-1.5 text-indigo-600 hover:bg-indigo-50"
+                        className={typeMgmtEditIconBtn}
                         title="Editar"
                         aria-label="Editar"
                       >
                         <EditIcon className="h-5 w-5" />
                       </button>
+                      {u.isActive && u.id !== selfId && u.needsProfileCompletion && (
+                        <button
+                          type="button"
+                          onClick={() => void runResendFirstAccess(u)}
+                          disabled={!!mailBusy}
+                          aria-busy={resendBusy}
+                          className={`rounded-md p-1.5 text-amber-700 hover:bg-amber-50 disabled:opacity-50 ${
+                            resendBusy ? 'animate-pulse' : ''
+                          }`}
+                          title={
+                            resendBusy
+                              ? 'Enviando e-mail…'
+                              : 'Reenviar e-mail com link para definir a senha de primeiro acesso (convite pendente).'
+                          }
+                          aria-label={
+                            resendBusy
+                              ? 'Enviando e-mail de primeiro acesso'
+                              : 'Reenviar e-mail com link para definir a senha de primeiro acesso'
+                          }
+                        >
+                          <LockClosedIcon className="h-5 w-5" />
+                        </button>
+                      )}
+                      {u.isActive && u.id !== selfId && !u.needsProfileCompletion && (
+                        <button
+                          type="button"
+                          onClick={() => void runSendPasswordReset(u)}
+                          disabled={!!mailBusy}
+                          aria-busy={resetBusy}
+                          className={`rounded-md p-1.5 text-slate-600 hover:bg-slate-100 disabled:opacity-50 ${
+                            resetBusy ? 'animate-pulse' : ''
+                          }`}
+                          title={
+                            resetBusy
+                              ? 'Enviando e-mail…'
+                              : 'Enviar e-mail com link seguro para o usuário definir uma nova senha.'
+                          }
+                          aria-label={
+                            resetBusy
+                              ? 'Enviando e-mail de redefinição de senha'
+                              : 'Enviar e-mail com link para redefinir senha'
+                          }
+                        >
+                          <LockClosedIcon className="h-5 w-5" />
+                        </button>
+                      )}
                       {u.isActive && u.id !== selfId && (
                         <button
                           type="button"
                           onClick={() => setDeactivateRow(u)}
-                          className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50"
+                          className="rounded-md p-1.5 text-red-600 hover:bg-red-50"
+                          title="Inativar conta — bloqueia o acesso ao sistema."
+                          aria-label="Inativar usuário"
                         >
-                          Inativar
+                          <NoSymbolIcon className="h-5 w-5" />
                         </button>
                       )}
                     </div>
@@ -387,6 +508,32 @@ const UserManagementView: React.FC<UserManagementViewProps> = ({
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg"
                   />
                 </div>
+                {canReassignCompany &&
+                  (editRow.role === 'executive' || editRow.role === 'secretary') &&
+                  companyOptions.length > 0 && (
+                    <div>
+                      <AppLabel htmlFor="edit-user-org" className="mb-1">
+                        Empresa (alocação)
+                      </AppLabel>
+                      <AppSelect
+                        id="edit-user-org"
+                        value={editOrgId}
+                        onChange={(e) => setEditOrgId(e.target.value)}
+                        className="w-full mt-1"
+                      >
+                        <option value="">Selecione a empresa…</option>
+                        {companyOptions.map((o) => (
+                          <option key={o.id} value={o.id}>
+                            {o.name}
+                          </option>
+                        ))}
+                      </AppSelect>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Altera a empresa em que o cadastro de executivo ou secretária está vinculado nesta organização
+                        jurídica.
+                      </p>
+                    </div>
+                  )}
                 <label className="flex items-center gap-2 text-sm text-slate-700">
                   <input
                     type="checkbox"

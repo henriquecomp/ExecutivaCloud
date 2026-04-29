@@ -10,6 +10,9 @@ import AppInput from './ui/AppInput';
 import AppLabel from './ui/AppLabel';
 import AppSelect from './ui/AppSelect';
 import FormActions from './ui/FormActions';
+import TypeColorFormField from './ui/TypeColorFormField';
+import TypeColorSwatch from './ui/TypeColorSwatch';
+import { typeMgmtDeleteIconBtn, typeMgmtEditIconBtn } from './ui/typeManagementStyles';
 import ToolbarPanel from './ui/ToolbarPanel';
 import Pagination from './Pagination';
 import { documentCategoryService } from '../services/documentCategoryService';
@@ -28,11 +31,12 @@ interface DocumentsViewProps {
 // --- Category Management Components ---
 const CategoryForm: React.FC<{ category: Partial<DocumentCategory>, onSave: (cat: DocumentCategory) => void, onCancel: () => void }> = ({ category, onSave, onCancel }) => {
     const [name, setName] = useState(category.name || '');
+    const [color, setColor] = useState(category.color || '#64748b');
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!name) return;
-        onSave({ id: category.id || `dc_${new Date().getTime()}`, name });
+        onSave({ id: category.id || `dc_${new Date().getTime()}`, name, color });
     };
 
     return (
@@ -41,6 +45,12 @@ const CategoryForm: React.FC<{ category: Partial<DocumentCategory>, onSave: (cat
                 <AppLabel htmlFor="cat-name">Nome da Categoria</AppLabel>
                 <AppInput id="cat-name" type="text" value={name} onChange={e => setName(e.target.value)} required className="mt-1" />
             </div>
+            <TypeColorFormField
+                id="doc-cat-color"
+                label="Cor da etiqueta"
+                value={color}
+                onChange={setColor}
+            />
             <FormActions>
                 <AppButton type="button" variant="secondary" onClick={onCancel}>
                     Cancelar
@@ -69,9 +79,9 @@ const CategorySettingsModal: React.FC<{
         setCategoryActionError(null);
         try {
             if (editingCategory?.id) {
-                await documentCategoryService.update(category.id, { name: category.name });
+                await documentCategoryService.update(category.id, { name: category.name, color: category.color });
             } else {
-                await documentCategoryService.create({ name: category.name });
+                await documentCategoryService.create({ name: category.name, color: category.color });
             }
             await onRefresh();
             setFormOpen(false);
@@ -104,7 +114,7 @@ const CategorySettingsModal: React.FC<{
                 <div className="flex justify-end">
                     <AppButton
                         type="button"
-                        variant="ghost"
+                        variant="primary"
                         className="!p-2"
                         title="Adicionar categoria de documento"
                         aria-label="Adicionar categoria de documento"
@@ -115,11 +125,14 @@ const CategorySettingsModal: React.FC<{
                 </div>
                 <ul className="space-y-2 max-h-80 overflow-y-auto pr-2">
                     {categories.map(cat => (
-                       <li key={cat.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                            <span className="font-medium text-slate-800">{cat.name}</span>
-                            <div className="flex items-center gap-2">
-                                <button onClick={() => { setEditingCategory(cat); setFormOpen(true); }} className="p-2 text-slate-400 hover:text-indigo-600"><EditIcon /></button>
-                                <button onClick={() => setCategoryToDelete(cat)} className="p-2 text-slate-400 hover:text-red-600"><DeleteIcon /></button>
+                       <li key={cat.id} className="flex items-center justify-between gap-2 p-3 bg-slate-50 rounded-lg">
+                            <div className="flex min-w-0 flex-1 items-center gap-3">
+                                <TypeColorSwatch color={cat.color} size="md" />
+                                <span className="truncate font-medium text-slate-800">{cat.name}</span>
+                            </div>
+                            <div className="flex shrink-0 items-center gap-1">
+                                <button type="button" aria-label="Editar categoria" onClick={() => { setEditingCategory(cat); setFormOpen(true); }} className={typeMgmtEditIconBtn}><EditIcon /></button>
+                                <button type="button" aria-label="Excluir categoria" onClick={() => setCategoryToDelete(cat)} className={typeMgmtDeleteIconBtn}><DeleteIcon /></button>
                             </div>
                         </li>
                     ))}
@@ -381,8 +394,8 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({ documents, setDocuments, 
                                     <img src={doc.imageUrl} alt={doc.name} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
                                 </button>
                                  <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button onClick={() => handleEditDoc(doc)} className="p-2 bg-white/80 backdrop-blur-sm text-slate-700 hover:bg-white hover:text-indigo-600 rounded-full transition shadow"><EditIcon /></button>
-                                    <button onClick={() => setDocToDelete(doc)} className="p-2 bg-white/80 backdrop-blur-sm text-slate-700 hover:bg-white hover:text-red-600 rounded-full transition shadow"><DeleteIcon /></button>
+                                    <button type="button" aria-label="Editar documento" onClick={() => handleEditDoc(doc)} className={`${typeMgmtEditIconBtn} bg-white/80 backdrop-blur-sm shadow hover:bg-white`}><EditIcon /></button>
+                                    <button type="button" aria-label="Excluir documento" onClick={() => setDocToDelete(doc)} className={`${typeMgmtDeleteIconBtn} bg-white/80 backdrop-blur-sm shadow hover:bg-white`}><DeleteIcon /></button>
                                 </div>
                             </div>
                             <div className="p-4">

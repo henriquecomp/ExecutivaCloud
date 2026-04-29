@@ -49,3 +49,27 @@ def deactivate_managed_user(
     service: UserManagementService = Depends(UserManagementService),
 ):
     return service.deactivate_user(current, user_id)
+
+
+@router.post(
+    "/{user_id}/resend-first-access",
+    response_model=schemas.UserManagementMessageResponse,
+)
+def resend_first_access_email(
+    user_id: int,
+    current: user_models.Usuario = Depends(get_current_user),
+    service: UserManagementService = Depends(UserManagementService),
+):
+    return service.resend_first_access_email(current, user_id)
+
+
+@router.post(
+    "/{user_id}/send-password-reset",
+    response_model=schemas.UserManagementMessageResponse,
+)
+def send_managed_user_password_reset(
+    user_id: int,
+    current: user_models.Usuario = Depends(get_current_user),
+    service: UserManagementService = Depends(UserManagementService),
+):
+    return service.send_password_reset_email(current, user_id)

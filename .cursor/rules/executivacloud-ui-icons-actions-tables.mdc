@@ -1,0 +1,28 @@
+---
+description: Ícones Editar/Excluir, colunas de ações, ícones de domínio (cadeado, proibido, refresh) e a11y.
+globs: frontend/**/*.tsx
+alwaysApply: false
+---
+
+# Ícones, ações e tabelas (Executiva Cloud)
+
+## Editar / Excluir
+
+- Importar `typeMgmtEditIconBtn` e `typeMgmtDeleteIconBtn` de `components/ui/typeManagementStyles.ts`.
+- Traço dos ícones vem de `EditIcon`/`DeleteIcon` (`Icons.tsx`) via `currentColor`; não duplicar SVGs com tons fixos por ecrã.
+- Padrão: `rounded-full`, `text-slate-500`, hover `bg-slate-100` + indigo/vermelho. Evitar `text-slate-400` + `hover:bg-slate-200` para estes pares após padronização.
+
+## Coluna “Ações”
+
+- `inline-flex flex-row flex-nowrap items-center justify-end`, célula `whitespace-nowrap text-right`, TH com `text-right` e `min-w-*` para caber ícones sem quebra.
+- Não adicionar colunas informativas sem dados úteis de forma sustentada.
+
+## Ações específicas (ex. Usuários)
+
+- **Refresh lista**: `RefreshIcon` (setas reload em `Icons.tsx`); `title` + `aria-label`; evitar spinner como botão principal.
+- **Convite / senha**: `LockClosedIcon`; `title`/`aria-label` explicativos; loading com `aria-busy` / opacidade, não confundir com loader genérico.
+- **Inativar**: `NoSymbolIcon` se o padrão do ecrã for ícones.
+
+## Botão só ícone
+
+- Sempre `type="button"` fora de submit, e **`aria-label`** (+ `title` para tooltip quando fizer sentido).

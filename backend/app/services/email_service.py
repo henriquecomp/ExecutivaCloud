@@ -12,15 +12,19 @@ def build_set_password_link(raw_token: str) -> str:
     return f"{base}/?flow=set-password&token={raw_token}"
 
 
-def send_invite_email(to_email: str, full_name: str, set_password_link: str) -> None:
-    subject = "Executiva Cloud — defina sua senha"
+def send_password_reset_email(to_email: str, full_name: str, set_password_link: str) -> None:
+    subject = "Executiva Cloud — redefinição de senha"
     body = (
         f"Olá, {full_name}.\n\n"
-        "Você foi convidado para acessar o Executiva Cloud.\n"
-        "Clique no link abaixo para criar sua senha:\n\n"
+        "Foi solicitada a redefinição da sua senha no Executiva Cloud.\n"
+        "Clique no link abaixo para escolher uma nova senha:\n\n"
         f"{set_password_link}\n\n"
-        "Se você não esperava este e-mail, ignore-o.\n"
+        "Se você não solicitou, ignore este e-mail. Sua senha atual permanece ativa.\n"
     )
+    _send_smtp_text(to_email, subject, body)
+
+
+def _send_smtp_text(to_email: str, subject: str, body: str) -> None:
     host = os.getenv("SMTP_HOST", "").strip()
     if not host:
         print(f"[email dev] To: {to_email}\nSubject: {subject}\n{body}")
@@ -42,3 +46,15 @@ def send_invite_email(to_email: str, full_name: str, set_password_link: str) -> 
         if user:
             smtp.login(user, password)
         smtp.send_message(msg)
+
+
+def send_invite_email(to_email: str, full_name: str, set_password_link: str) -> None:
+    subject = "Executiva Cloud — defina sua senha"
+    body = (
+        f"Olá, {full_name}.\n\n"
+        "Você foi convidado para acessar o Executiva Cloud.\n"
+        "Clique no link abaixo para criar sua senha:\n\n"
+        f"{set_password_link}\n\n"
+        "Se você não esperava este e-mail, ignore-o.\n"
+    )
+    _send_smtp_text(to_email, subject, body)

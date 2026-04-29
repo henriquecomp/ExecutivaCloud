@@ -4,6 +4,7 @@ import { DocumentCategory } from "../types";
 const mapDocumentCategory = (item: any): DocumentCategory => ({
   ...item,
   id: String(item.id),
+  color: typeof item.color === "string" && item.color ? item.color : "#64748b",
 });
 
 export const documentCategoryService = {

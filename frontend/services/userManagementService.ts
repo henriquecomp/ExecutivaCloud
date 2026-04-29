@@ -55,7 +55,13 @@ export async function listManagedUsers(params?: {
 
 export async function patchManagedUser(
   userId: number,
-  body: { fullName?: string; email?: string; phone?: string | null; isActive?: boolean },
+  body: {
+    fullName?: string;
+    email?: string;
+    phone?: string | null;
+    isActive?: boolean;
+    organizationId?: number;
+  },
 ): Promise<ManagedUserRow> {
   const { data } = await api.patch<Record<string, unknown>>(`/users/management/${userId}`, body);
   return mapRow(data);
@@ -64,4 +70,18 @@ export async function patchManagedUser(
 export async function deactivateManagedUser(userId: number): Promise<ManagedUserRow> {
   const { data } = await api.post<Record<string, unknown>>(`/users/management/${userId}/deactivate`);
   return mapRow(data);
+}
+
+export async function resendFirstAccessEmail(userId: number): Promise<string> {
+  const { data } = await api.post<{ message: string }>(
+    `/users/management/${userId}/resend-first-access`,
+  );
+  return data.message ?? 'E-mail enviado.';
+}
+
+export async function sendManagedUserPasswordReset(userId: number): Promise<string> {
+  const { data } = await api.post<{ message: string }>(
+    `/users/management/${userId}/send-password-reset`,
+  );
+  return data.message ?? 'E-mail enviado.';
 }

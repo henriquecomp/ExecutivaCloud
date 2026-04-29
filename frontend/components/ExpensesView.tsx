@@ -19,6 +19,9 @@ import AppInput from './ui/AppInput';
 import AppLabel from './ui/AppLabel';
 import AppSelect from './ui/AppSelect';
 import FormActions from './ui/FormActions';
+import TypeColorFormField from './ui/TypeColorFormField';
+import TypeColorSwatch from './ui/TypeColorSwatch';
+import { typeMgmtDeleteIconBtn, typeMgmtEditIconBtn } from './ui/typeManagementStyles';
 import ToolbarPanel from './ui/ToolbarPanel';
 import { radioClass } from './ui/controlTokens';
 import { expenseService } from '../services/expenseService';
@@ -54,24 +57,12 @@ const CategoryForm: React.FC<{ category: Partial<ExpenseCategory>, onSave: (cat:
                 <AppLabel htmlFor="cat-name">Nome da Categoria</AppLabel>
                 <AppInput id="cat-name" type="text" value={name} onChange={e => setName(e.target.value)} required className="mt-1" />
             </div>
-            <div>
-                <AppLabel htmlFor="cat-color">Cor da Etiqueta</AppLabel>
-                <div className="mt-1 flex items-center gap-3">
-                    <input
-                        type="color"
-                        id="cat-color"
-                        value={color}
-                        onChange={e => setColor(e.target.value)}
-                        className="h-10 w-14 shrink-0 cursor-pointer rounded border border-slate-300 bg-white p-1"
-                    />
-                    <AppInput
-                        type="text"
-                        value={color}
-                        onChange={e => setColor(e.target.value)}
-                        placeholder="#64748b"
-                    />
-                </div>
-            </div>
+            <TypeColorFormField
+                id="exp-cat-color"
+                label="Cor da etiqueta"
+                value={color}
+                onChange={setColor}
+            />
             <FormActions>
                 <AppButton type="button" variant="secondary" onClick={onCancel}>
                     Cancelar
@@ -140,7 +131,7 @@ const CategorySettingsModal: React.FC<{
                 <FormDangerAlert message={categoryActionError} />
                 <div className="flex justify-end">
                     <AppButton
-                        variant="ghost"
+                        variant="primary"
                         type="button"
                         className="!p-2"
                         title="Adicionar categoria de finanças"
@@ -152,14 +143,14 @@ const CategorySettingsModal: React.FC<{
                 </div>
                 <ul className="space-y-2 max-h-80 overflow-y-auto pr-2">
                     {categories.map(cat => (
-                       <li key={cat.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                            <div className="flex items-center gap-2">
-                                <span className="inline-block h-3 w-3 rounded-full border border-slate-300" style={{ backgroundColor: cat.color || '#64748b' }} />
-                                <span className="font-medium text-slate-800">{cat.name}</span>
+                       <li key={cat.id} className="flex items-center justify-between gap-2 p-3 bg-slate-50 rounded-lg">
+                            <div className="flex min-w-0 flex-1 items-center gap-3">
+                                <TypeColorSwatch color={cat.color} size="md" />
+                                <span className="truncate font-medium text-slate-800">{cat.name}</span>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <button onClick={() => { setEditingCategory(cat); setFormOpen(true); }} className="p-2 text-slate-400 hover:text-indigo-600"><EditIcon /></button>
-                                <button onClick={() => setCategoryToDelete(cat)} className="p-2 text-slate-400 hover:text-red-600"><DeleteIcon /></button>
+                            <div className="flex shrink-0 items-center gap-1">
+                                <button type="button" aria-label="Editar categoria" onClick={() => { setEditingCategory(cat); setFormOpen(true); }} className={typeMgmtEditIconBtn}><EditIcon /></button>
+                                <button type="button" aria-label="Excluir categoria" onClick={() => setCategoryToDelete(cat)} className={typeMgmtDeleteIconBtn}><DeleteIcon /></button>
                             </div>
                         </li>
                     ))}

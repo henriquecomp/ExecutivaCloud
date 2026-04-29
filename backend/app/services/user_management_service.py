@@ -1,3 +1,6 @@
+import os
+import secrets
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Tuple
 
 from fastapi import Depends, HTTPException, status
@@ -6,14 +9,27 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.core.database import get_db
+from app.core.invite_token import hash_invite_token
+from app.models.department_model import Department
 from app.models.executive_model import Executive
 from app.models.organization_model import Organization
 from app.models.secretary_model import Secretary
+from app.models.user_invite_token_model import UserInviteToken
 from app.models import user_model as user_models
 from app.repositories.user_repository import UserRepository
 from app.schemas import user_schema as schemas
+from app.services.email_service import (
+    build_set_password_link,
+    send_invite_email,
+    send_password_reset_email,
+)
 
 MANAGER_ROLES = frozenset({"master", "admin_legal_organization", "admin_company"})
+INVITE_DAYS = int(os.getenv("INVITE_TOKEN_DAYS", "7"))
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
 
 # Escopo de listagem / edição em /users/management:
 # - master: todos os usuários do sistema (qualquer organização, empresa ou papel).
@@ -118,6 +134,56 @@ class UserManagementService:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sem permissão para este usuário.")
         return row
 
+    def _apply_organization_reallocation(
+        self,
+        actor: user_models.Usuario,
+        target: user_models.Usuario,
+        new_org_id: int,
+    ) -> Organization:
+        """Valida e atualiza empresa no perfil de executivo/secretária (mantém users.organization_id em sync)."""
+        if actor.role not in ("master", "admin_legal_organization"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Sem permissão para alterar a empresa deste usuário.",
+            )
+        if target.role not in ("executive", "secretary"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Alteração de empresa aplica-se apenas a executivos e secretárias.",
+            )
+        org = self.db.query(Organization).filter(Organization.id == new_org_id).first()
+        if org is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Empresa não encontrada.")
+        if actor.role == "admin_legal_organization":
+            if actor.legal_organization_id is None or org.legalOrganizationId != actor.legal_organization_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Empresa fora do âmbito da sua organização jurídica.",
+                )
+
+        if target.executive_id:
+            ex = self.db.query(Executive).filter(Executive.id == target.executive_id).first()
+            if ex:
+                ex.organization_id = new_org_id
+                if ex.department_id:
+                    dept = self.db.query(Department).filter(Department.id == ex.department_id).first()
+                    if dept is None or getattr(dept, "organizationId", None) != new_org_id:
+                        ex.department_id = None
+                self.db.add(ex)
+
+        if target.secretary_external_id:
+            try:
+                sid = int(target.secretary_external_id)
+            except ValueError:
+                sid = None
+            if sid is not None:
+                sec = self.db.query(Secretary).filter(Secretary.id == sid).first()
+                if sec:
+                    sec.organization_id = new_org_id
+                    self.db.add(sec)
+
+        return org
+
     def patch_user(
         self,
         actor: user_models.Usuario,
@@ -151,6 +217,22 @@ class UserManagementService:
                     detail="Não é possível inativar a própria conta por aqui.",
                 )
             updates["is_active"] = data["is_active"]
+
+        if "organization_id" in data:
+            if actor.role == "admin_company":
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Sem permissão para alterar a empresa pelo cadastro de usuários.",
+                )
+            if data["organization_id"] is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Selecione uma empresa.",
+                )
+            new_org_id = int(data["organization_id"])
+            org_row = self._apply_organization_reallocation(actor, target, new_org_id)
+            updates["organization_id"] = new_org_id
+            updates["legal_organization_id"] = org_row.legalOrganizationId
 
         if not updates:
             raise HTTPException(
@@ -193,3 +275,111 @@ class UserManagementService:
                 detail="Não é possível inativar a própria conta.",
             )
         return self.users.update(target, {"is_active": False})
+
+    def _issue_new_set_password_token(self, user_id: int) -> str:
+        """Remove tokens não usados do usuário, cria um novo e devolve o token em texto plano (para o link)."""
+        self.db.query(UserInviteToken).filter(
+            UserInviteToken.user_id == user_id,
+            UserInviteToken.used_at.is_(None),
+        ).delete(synchronize_session=False)
+
+        raw_token = secrets.token_urlsafe(32)
+        token_hash = hash_invite_token(raw_token)
+        expires_at = _utcnow() + timedelta(days=INVITE_DAYS)
+        invite_row = UserInviteToken(
+            user_id=user_id,
+            token_hash=token_hash,
+            expires_at=expires_at,
+            used_at=None,
+        )
+        self.db.add(invite_row)
+        self.db.flush()
+        return raw_token
+
+    def resend_first_access_email(
+        self,
+        actor: user_models.Usuario,
+        user_id: int,
+    ) -> schemas.UserManagementMessageResponse:
+        """Reenvia o e-mail com link de primeiro acesso (definir senha) para perfil ainda pendente."""
+        assert_user_manager(actor)
+        target = self.get_user(actor, user_id)
+
+        if target.id == actor.id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Não é possível reenviar o convite para a própria conta.",
+            )
+        if not target.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Usuário inativo.",
+            )
+        if not bool(getattr(target, "needs_profile_completion", False)):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Reenvio disponível apenas para usuários com primeiro acesso pendente.",
+            )
+
+        try:
+            raw_token = self._issue_new_set_password_token(target.id)
+            link = build_set_password_link(raw_token)
+            send_invite_email(str(target.email), str(target.name).strip(), link)
+            self.db.commit()
+        except HTTPException:
+            self.db.rollback()
+            raise
+        except Exception as e:
+            self.db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Falha ao enviar e-mail: {e!s}",
+            ) from e
+
+        return schemas.UserManagementMessageResponse(
+            message="E-mail de primeiro acesso reenviado.",
+        )
+
+    def send_password_reset_email(
+        self,
+        actor: user_models.Usuario,
+        user_id: int,
+    ) -> schemas.UserManagementMessageResponse:
+        """Envia link para redefinir senha (usuários que já concluíram o primeiro acesso)."""
+        assert_user_manager(actor)
+        target = self.get_user(actor, user_id)
+
+        if target.id == actor.id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Não é possível solicitar redefinição para a própria conta por aqui.",
+            )
+        if not target.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Usuário inativo.",
+            )
+        if bool(getattr(target, "needs_profile_completion", False)):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Este usuário ainda tem primeiro acesso pendente. Use «Reenviar primeiro acesso».",
+            )
+
+        try:
+            raw_token = self._issue_new_set_password_token(target.id)
+            link = build_set_password_link(raw_token)
+            send_password_reset_email(str(target.email), str(target.name).strip(), link)
+            self.db.commit()
+        except HTTPException:
+            self.db.rollback()
+            raise
+        except Exception as e:
+            self.db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Falha ao enviar e-mail: {e!s}",
+            ) from e
+
+        return schemas.UserManagementMessageResponse(
+            message="E-mail com link de redefinição de senha enviado.",
+        )

@@ -8,6 +8,9 @@ import { FormDangerAlert } from './ui/FormDangerAlert';
 import AppButton from './ui/AppButton';
 import AppInput from './ui/AppInput';
 import AppLabel from './ui/AppLabel';
+import TypeColorFormField from './ui/TypeColorFormField';
+import TypeColorSwatch from './ui/TypeColorSwatch';
+import { typeMgmtDeleteIconBtn, typeMgmtEditIconBtn } from './ui/typeManagementStyles';
 import AppSelect from './ui/AppSelect';
 import AppTextarea from './ui/AppTextarea';
 import FormActions from './ui/FormActions';
@@ -44,13 +47,13 @@ const EventTypeForm: React.FC<{ eventType: Partial<EventType>, onSave: (et: Even
                 <AppLabel htmlFor="et-name">Nome do Tipo</AppLabel>
                 <AppInput id="et-name" type="text" value={name} onChange={e => setName(e.target.value)} required className="mt-1" />
             </div>
-            <div>
-                <AppLabel htmlFor="et-color">Cor</AppLabel>
-                <div className="mt-1 flex items-center gap-3">
-                    <input type="color" id="et-color" value={color} onChange={e => setColor(e.target.value)} className="block h-10 w-10 shrink-0 cursor-pointer rounded-md border border-slate-300 bg-white p-1" />
-                    <AppInput type="text" value={color} onChange={e => setColor(e.target.value)} placeholder="#3b82f6" />
-                </div>
-            </div>
+            <TypeColorFormField
+                id="et-color"
+                label="Cor da etiqueta"
+                value={color}
+                onChange={setColor}
+                defaultColor="#3b82f6"
+            />
             <FormActions>
                 <AppButton type="button" variant="secondary" onClick={onCancel}>
                     Cancelar
@@ -120,7 +123,7 @@ const EventTypeSettingsModal: React.FC<{
                 <div className="flex justify-end">
                     <AppButton
                         type="button"
-                        variant="ghost"
+                        variant="primary"
                         className="!p-2"
                         title="Adicionar tipo de evento"
                         aria-label="Adicionar tipo de evento"
@@ -131,14 +134,14 @@ const EventTypeSettingsModal: React.FC<{
                 </div>
                 <ul className="space-y-2 max-h-80 overflow-y-auto pr-2">
                     {eventTypes.map(et => (
-                        <li key={et.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                            <div className="flex items-center gap-3">
-                                <span className="w-4 h-4 rounded-full" style={{ backgroundColor: et.color }}></span>
-                                <span className="font-medium text-slate-800">{et.name}</span>
+                        <li key={et.id} className="flex items-center justify-between gap-2 p-3 bg-slate-50 rounded-lg">
+                            <div className="flex min-w-0 flex-1 items-center gap-3">
+                                <TypeColorSwatch color={et.color} size="md" />
+                                <span className="truncate font-medium text-slate-800">{et.name}</span>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <button onClick={() => { setEditingEventType(et); setFormModalOpen(true); }} className="p-2 text-slate-400 hover:text-indigo-600"><EditIcon /></button>
-                                <button onClick={() => setEventTypeToDelete(et)} className="p-2 text-slate-400 hover:text-red-600"><DeleteIcon /></button>
+                            <div className="flex shrink-0 items-center gap-1">
+                                <button type="button" aria-label="Editar tipo" onClick={() => { setEditingEventType(et); setFormModalOpen(true); }} className={typeMgmtEditIconBtn}><EditIcon /></button>
+                                <button type="button" aria-label="Excluir tipo" onClick={() => setEventTypeToDelete(et)} className={typeMgmtDeleteIconBtn}><DeleteIcon /></button>
                             </div>
                         </li>
                     ))}
@@ -756,10 +759,10 @@ const AgendaView: React.FC<AgendaViewProps> = ({ events, setEvents, eventTypes, 
                               <p className="text-sm text-slate-400 mt-1">{formatFullDate(event.startTime)}</p>
                           </div>
                           <div className="flex flex-col sm:flex-row items-center gap-1">
-                              <button onClick={() => handleEditEvent(event)} className="p-2 text-slate-500 hover:text-indigo-600 rounded-full hover:bg-slate-200 transition" aria-label="Editar evento">
+                              <button type="button" onClick={() => handleEditEvent(event)} className={typeMgmtEditIconBtn} aria-label="Editar evento">
                                   <EditIcon />
                               </button>
-                              <button onClick={() => handleDeleteClick(event)} className="p-2 text-slate-500 hover:text-red-600 rounded-full hover:bg-slate-200 transition" aria-label="Excluir evento">
+                              <button type="button" onClick={() => handleDeleteClick(event)} className={typeMgmtDeleteIconBtn} aria-label="Excluir evento">
                                   <DeleteIcon />
                               </button>
                           </div>

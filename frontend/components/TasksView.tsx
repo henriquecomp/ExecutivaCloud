@@ -22,6 +22,7 @@ import AppLabel from './ui/AppLabel';
 import AppSelect from './ui/AppSelect';
 import AppTextarea from './ui/AppTextarea';
 import FormActions from './ui/FormActions';
+import { typeMgmtDeleteIconBtn, typeMgmtEditIconBtn } from './ui/typeManagementStyles';
 import ToolbarPanel from './ui/ToolbarPanel';
 import { checkboxClass, radioClass } from './ui/controlTokens';
 
@@ -489,8 +490,8 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, executiveId, onRefresh }) 
                                     <p className="text-sm text-slate-500 mt-2">Vencimento: {formatDate(task.dueDate)}</p>
                                 </div>
                                 <div className="flex justify-end items-center gap-1 mt-4">
-                                    <button onClick={() => handleEditTask(task)} className="p-2 text-slate-500 hover:text-indigo-600 rounded-full hover:bg-slate-200 transition"><EditIcon /></button>
-                                    <button onClick={() => handleDeleteClick(task)} className="p-2 text-slate-500 hover:text-red-600 rounded-full hover:bg-slate-200 transition"><DeleteIcon /></button>
+                                    <button onClick={() => handleEditTask(task)} className={typeMgmtEditIconBtn}><EditIcon /></button>
+                                    <button onClick={() => handleDeleteClick(task)} className={typeMgmtDeleteIconBtn}><DeleteIcon /></button>
                                 </div>
                             </div>
                         ))}
@@ -513,8 +514,8 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, executiveId, onRefresh }) 
                                     <span className={`mt-2 inline-block text-xs font-semibold px-2 py-1 rounded-full ${getPriorityBadgeClass(task.priority)}`}>{task.priority}</span>
                                 </div>
                                 <div className="flex flex-col sm:flex-row items-center gap-1">
-                                    <button onClick={() => handleEditTask(task)} className="p-2 text-slate-500 hover:text-indigo-600 rounded-full hover:bg-slate-200 transition"><EditIcon /></button>
-                                    <button onClick={() => handleDeleteClick(task)} className="p-2 text-slate-500 hover:text-red-600 rounded-full hover:bg-slate-200 transition"><DeleteIcon /></button>
+                                    <button onClick={() => handleEditTask(task)} className={typeMgmtEditIconBtn}><EditIcon /></button>
+                                    <button onClick={() => handleDeleteClick(task)} className={typeMgmtDeleteIconBtn}><DeleteIcon /></button>
                                 </div>
                             </div>
                         ))}
@@ -552,8 +553,8 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, executiveId, onRefresh }) 
                                     </DataTableTd>
                                     <DataTableTd className="text-right">
                                         <div className="flex justify-end items-center gap-2">
-                                            <button type="button" onClick={() => handleEditTask(task)} className="rounded-full p-2 text-slate-500 transition hover:bg-slate-200 hover:text-indigo-600" aria-label="Editar"><EditIcon /></button>
-                                            <button type="button" onClick={() => handleDeleteClick(task)} className="rounded-full p-2 text-slate-500 transition hover:bg-slate-200 hover:text-red-600" aria-label="Excluir"><DeleteIcon /></button>
+                                            <button type="button" onClick={() => handleEditTask(task)} className={typeMgmtEditIconBtn} aria-label="Editar"><EditIcon /></button>
+                                            <button type="button" onClick={() => handleDeleteClick(task)} className={typeMgmtDeleteIconBtn} aria-label="Excluir"><DeleteIcon /></button>
                                         </div>
                                     </DataTableTd>
                                 </DataTableRow>

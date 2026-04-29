@@ -20,6 +20,9 @@ import {
 import AppButton from './ui/AppButton';
 import AppInput from './ui/AppInput';
 import AppLabel from './ui/AppLabel';
+import TypeColorFormField from './ui/TypeColorFormField';
+import TypeColorSwatch from './ui/TypeColorSwatch';
+import { typeMgmtDeleteIconBtn, typeMgmtEditIconBtn } from './ui/typeManagementStyles';
 import AppSelect from './ui/AppSelect';
 import AppTextarea from './ui/AppTextarea';
 import FormActions from './ui/FormActions';
@@ -49,24 +52,13 @@ const ContactTypeForm: React.FC<{ contactType: Partial<ContactType>, onSave: (ct
                 <AppLabel htmlFor="ct-name">Nome do Tipo</AppLabel>
                 <AppInput id="ct-name" type="text" value={name} onChange={e => setName(e.target.value)} required className="mt-1" />
             </div>
-            <div>
-                <AppLabel htmlFor="ct-color">Cor da Etiqueta</AppLabel>
-                <div className="mt-1 flex items-center gap-3">
-                    <input
-                        type="color"
-                        id="ct-color"
-                        value={color}
-                        onChange={e => setColor(e.target.value)}
-                        className="h-10 w-14 shrink-0 cursor-pointer rounded border border-slate-300 bg-white p-1"
-                    />
-                    <AppInput
-                        type="text"
-                        value={color}
-                        onChange={e => setColor(e.target.value)}
-                        placeholder="#64748b"
-                    />
-                </div>
-            </div>
+            <TypeColorFormField
+                id="ct-color"
+                label="Cor da etiqueta"
+                value={color}
+                onChange={setColor}
+                defaultColor="#64748b"
+            />
             <FormActions>
                 <AppButton type="button" variant="secondary" onClick={onCancel}>
                     Cancelar
@@ -129,7 +121,7 @@ const ContactTypeSettingsModal: React.FC<{
                 <div className="flex justify-end">
                     <AppButton
                         type="button"
-                        variant="ghost"
+                        variant="primary"
                         className="!p-2"
                         title="Adicionar tipo de contato"
                         aria-label="Adicionar tipo de contato"
@@ -140,11 +132,14 @@ const ContactTypeSettingsModal: React.FC<{
                 </div>
                 <ul className="space-y-2 max-h-80 overflow-y-auto pr-2">
                     {contactTypes.map(ct => (
-                       <li key={ct.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                            <span className="font-medium text-slate-800">{ct.name}</span>
-                            <div className="flex items-center gap-2">
-                                <button onClick={() => { setEditingContactType(ct); setFormModalOpen(true); }} className="p-2 text-slate-400 hover:text-indigo-600"><EditIcon /></button>
-                                <button onClick={() => setContactTypeToDelete(ct)} className="p-2 text-slate-400 hover:text-red-600"><DeleteIcon /></button>
+                       <li key={ct.id} className="flex items-center justify-between gap-2 p-3 bg-slate-50 rounded-lg">
+                            <div className="flex min-w-0 flex-1 items-center gap-3">
+                                <TypeColorSwatch color={ct.color} size="md" />
+                                <span className="truncate font-medium text-slate-800">{ct.name}</span>
+                            </div>
+                            <div className="flex shrink-0 items-center gap-1">
+                                <button type="button" aria-label="Editar tipo" onClick={() => { setEditingContactType(ct); setFormModalOpen(true); }} className={typeMgmtEditIconBtn}><EditIcon /></button>
+                                <button type="button" aria-label="Excluir tipo" onClick={() => setContactTypeToDelete(ct)} className={typeMgmtDeleteIconBtn}><DeleteIcon /></button>
                             </div>
                         </li>
                     ))}
@@ -339,12 +334,16 @@ const ContactsView: React.FC<ContactsViewProps> = ({ contacts, contactTypes, exe
         }
     };
 
-    const normalizeContactPayload = (contact: Partial<Contact>) => {
+    const normalizeContactPayload = (contact: Partial<Contact>): Partial<Contact> => {
         const cleanText = (value?: string) => {
             if (value == null) return undefined;
             const trimmed = value.trim();
-            return trimmed === '' ? null : trimmed;
+            return trimmed === '' ? undefined : trimmed;
         };
+        const contactTypeId =
+            contact.contactTypeId == null || contact.contactTypeId === ''
+                ? undefined
+                : String(contact.contactTypeId);
         return {
             fullName: cleanText(contact.fullName) ?? '',
             company: cleanText(contact.company),
@@ -352,11 +351,11 @@ const ContactsView: React.FC<ContactsViewProps> = ({ contacts, contactTypes, exe
             email: cleanText(contact.email),
             phone: cleanText(contact.phone),
             notes: cleanText(contact.notes),
-            contactTypeId:
-                contact.contactTypeId == null || contact.contactTypeId === ''
-                    ? null
-                    : Number(contact.contactTypeId),
-            executiveId: Number(contact.executiveId),
+            contactTypeId,
+            executiveId:
+                contact.executiveId != null && contact.executiveId !== ''
+                    ? String(contact.executiveId)
+                    : undefined,
         };
     };
 
@@ -415,8 +414,8 @@ const ContactsView: React.FC<ContactsViewProps> = ({ contacts, contactTypes, exe
                                     </DataTableTd>
                                     <DataTableTd className="text-right">
                                         <div className="flex justify-end items-center gap-2">
-                                            <button type="button" onClick={() => handleEditContact(contact)} className="rounded-full p-2 text-slate-500 transition hover:bg-slate-200 hover:text-indigo-600"><EditIcon /></button>
-                                            <button type="button" onClick={() => handleDeleteContact(contact)} className="rounded-full p-2 text-slate-500 transition hover:bg-slate-200 hover:text-red-600"><DeleteIcon /></button>
+                                            <button type="button" onClick={() => handleEditContact(contact)} className={typeMgmtEditIconBtn}><EditIcon /></button>
+                                            <button type="button" onClick={() => handleDeleteContact(contact)} className={typeMgmtDeleteIconBtn}><DeleteIcon /></button>
                                         </div>
                                     </DataTableTd>
                                 </DataTableRow>
@@ -449,8 +448,8 @@ const ContactsView: React.FC<ContactsViewProps> = ({ contacts, contactTypes, exe
                                     {contact.phone && <p className="flex items-center text-slate-600 text-sm"><PhoneIcon className="text-slate-400" /> <span className="ml-2">{contact.phone}</span></p>}
                                 </div>
                                 <div className="flex flex-col sm:flex-row items-center gap-1">
-                                    <button onClick={() => handleEditContact(contact)} className="p-2 text-slate-500 hover:text-indigo-600 rounded-full hover:bg-slate-200 transition"><EditIcon /></button>
-                                    <button onClick={() => handleDeleteContact(contact)} className="p-2 text-slate-500 hover:text-red-600 rounded-full hover:bg-slate-200 transition"><DeleteIcon /></button>
+                                    <button onClick={() => handleEditContact(contact)} className={typeMgmtEditIconBtn}><EditIcon /></button>
+                                    <button onClick={() => handleDeleteContact(contact)} className={typeMgmtDeleteIconBtn}><DeleteIcon /></button>
                                 </div>
                             </div>
                         ))}
@@ -488,8 +487,8 @@ const ContactsView: React.FC<ContactsViewProps> = ({ contacts, contactTypes, exe
                                     </div>
                                 </div>
                                 <div className="flex justify-end items-center gap-1 mt-4">
-                                    <button onClick={() => handleEditContact(contact)} className="p-2 text-slate-500 hover:text-indigo-600 rounded-full hover:bg-slate-200 transition" aria-label="Editar contato"><EditIcon /></button>
-                                    <button onClick={() => handleDeleteContact(contact)} className="p-2 text-slate-500 hover:text-red-600 rounded-full hover:bg-slate-200 transition" aria-label="Excluir contato"><DeleteIcon /></button>
+                                    <button onClick={() => handleEditContact(contact)} className={typeMgmtEditIconBtn} aria-label="Editar contato"><EditIcon /></button>
+                                    <button onClick={() => handleDeleteContact(contact)} className={typeMgmtDeleteIconBtn} aria-label="Excluir contato"><DeleteIcon /></button>
                                 </div>
                             </div>
                         ))}

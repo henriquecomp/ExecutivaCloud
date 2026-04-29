@@ -161,7 +161,10 @@ class DatabaseRestoreService:
             for dc in data.document_categories:
                 old_id = str(dc.get("id", ""))
                 body = {k: v for k, v in dc.items() if k != "id"}
-                row = DocumentCategory(name=body["name"])
+                row = DocumentCategory(
+                    name=body["name"],
+                    color=(body.get("color") or "#64748b"),
+                )
                 self.db.add(row)
                 self.db.flush()
                 if old_id:

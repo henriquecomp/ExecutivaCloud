@@ -260,6 +260,8 @@ export interface Task {
 export interface DocumentCategory {
   id: string;
   name: string;
+  /** Hex, ex.: #64748b */
+  color: string;
 }
 
 export interface Document {
