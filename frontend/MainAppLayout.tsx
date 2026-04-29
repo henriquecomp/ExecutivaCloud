@@ -34,6 +34,8 @@ import ExecutiveProfileModal from './components/ExecutiveProfileModal';
 import SecretaryProfileModal from './components/SecretaryProfileModal';
 import DocumentsView from './components/DocumentsView';
 import LegalOrganizationsView from './components/LegalOrganizationsView';
+import ReportProblemModal from './components/ReportProblemModal';
+import { ExclamationTriangleIcon } from './components/Icons';
 import { legalOrganizationService } from './services/legalOrganizationService';
 import { organizationService } from './services/organizationService';
 import { departmentService } from './services/departmentService';
@@ -58,6 +60,7 @@ export interface MainAppLayoutProps {
 const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout, onUserUpdated }) => {
   const [executiveProfileOpen, setExecutiveProfileOpen] = useState(false);
   const [secretaryProfileOpen, setSecretaryProfileOpen] = useState(false);
+  const [reportProblemOpen, setReportProblemOpen] = useState(false);
   const [currentView, setCurrentView] = useState<View>(() =>
     currentUser.role === 'secretary' ? 'executives' : 'dashboard',
   );
@@ -583,6 +586,17 @@ const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout, on
               </select>
             </div>
 
+            <button
+              type="button"
+              onClick={() => setReportProblemOpen(true)}
+              className="flex shrink-0 items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-950 hover:bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-1 transition-colors"
+              title="Reportar um problema nesta tela"
+              aria-label="Reportar um problema"
+            >
+              <ExclamationTriangleIcon className="h-5 w-5 text-amber-700" />
+              <span className="hidden sm:inline">Reportar problema</span>
+            </button>
+
             <UserMenu
               user={currentUser}
               onLogout={onLogout}
@@ -605,6 +619,15 @@ const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout, on
         onClose={() => setSecretaryProfileOpen(false)}
         currentUser={currentUser}
         onUserUpdated={onUserUpdated}
+      />
+
+      <ReportProblemModal
+        isOpen={reportProblemOpen}
+        onClose={() => setReportProblemOpen(false)}
+        context="app"
+        defaultEmail={currentUser.email}
+        defaultName={currentUser.fullName}
+        screenLabel={viewTitles[currentView]}
       />
     </div>
   );

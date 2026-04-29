@@ -7,17 +7,41 @@ export function isWeb3FormsConfigured(): boolean {
   return typeof key === 'string' && key.trim().length > 0;
 }
 
-export interface SubmitLoginContactParams {
-  fromEmail: string;
-  fromName: string;
-  message: string;
+export type ProblemReportContext = 'login' | 'app';
+
+export const PROBLEM_REPORT_CATEGORIES = ['Bug', 'Acesso / login', 'Sugestão', 'Outro'] as const;
+export type ProblemReportCategory = (typeof PROBLEM_REPORT_CATEGORIES)[number];
+
+export interface SubmitProblemReportParams {
+  context: ProblemReportContext;
+  category: ProblemReportCategory | string;
+  email: string;
+  name: string;
+  description: string;
+  /** Nome amigável da tela (apenas quando context === 'app') */
+  screenLabel?: string;
+}
+
+function buildReportMessage(params: SubmitProblemReportParams): string {
+  const lines: string[] = [
+    `Categoria: ${params.category}`,
+    params.context === 'app' && params.screenLabel?.trim()
+      ? `Tela / módulo: ${params.screenLabel.trim()}`
+      : params.context === 'login'
+        ? 'Origem: Tela de login (usuário não autenticado)'
+        : null,
+    typeof window !== 'undefined' ? `URL: ${window.location.href}` : '',
+    typeof navigator !== 'undefined' ? `Navegador: ${navigator.userAgent}` : '',
+    '---',
+    params.description.trim(),
+  ];
+  return lines.filter(Boolean).join('\n');
 }
 
 /**
- * Envia mensagem pela API do Web3Forms (e-mail recebido na caixa cadastrada na chave).
- * Requer VITE_WEB3FORMS_ACCESS_KEY no .env do frontend.
+ * Envia relatório de problema via Web3Forms (e-mail na caixa configurada na Access Key).
  */
-export async function submitLoginContactForm(params: SubmitLoginContactParams): Promise<void> {
+export async function submitProblemReport(params: SubmitProblemReportParams): Promise<void> {
   const accessKey = import.meta.env.VITE_WEB3FORMS_ACCESS_KEY;
   if (!accessKey || !String(accessKey).trim()) {
     throw new Error(
@@ -25,19 +49,23 @@ export async function submitLoginContactForm(params: SubmitLoginContactParams): 
     );
   }
 
+  const subjectSuffix =
+    params.context === 'login' ? 'Login' : params.screenLabel?.trim() || 'App';
+  const subject = `[Executiva Cloud] Report — ${subjectSuffix} — ${params.category}`;
+
   const { data } = await axios.post<{ success: boolean; message?: string }>(
     WEB3FORMS_URL,
     {
       access_key: accessKey.trim(),
-      subject: '[Executiva Cloud] Contato pela tela de login',
-      name: params.fromName.trim() || params.fromEmail.trim(),
-      email: params.fromEmail.trim(),
-      message: params.message.trim(),
+      subject,
+      name: params.name.trim() || params.email.trim(),
+      email: params.email.trim(),
+      message: buildReportMessage(params),
     },
     { headers: { 'Content-Type': 'application/json' } },
   );
 
   if (!data.success) {
-    throw new Error(data.message || 'Não foi possível enviar a mensagem.');
+    throw new Error(data.message || 'Não foi possível enviar o relatório.');
   }
 }
