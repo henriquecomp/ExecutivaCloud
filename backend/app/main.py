@@ -34,6 +34,7 @@ from app.routers import (
     contact,
     task,
     report,
+    support,
     expense_category,
     expense,
 )
@@ -103,6 +104,7 @@ app.include_router(contact_type.router)
 app.include_router(contact.router)
 app.include_router(task.router)
 app.include_router(report.router)
+app.include_router(support.router)
 app.include_router(expense_category.router)
 app.include_router(expense.router)
 

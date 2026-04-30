@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import Modal from './Modal';
 import {
-  isWeb3FormsConfigured,
   PROBLEM_REPORT_CATEGORIES,
   ProblemReportCategory,
   ProblemReportContext,
   submitProblemReport,
-} from '../services/web3formsService';
+} from '../services/problemReportService';
+import { PaperAirplaneIcon } from './Icons';
+import { getApiErrorMessage } from '../utils/apiError';
 
 export interface ReportProblemModalProps {
   isOpen: boolean;
@@ -50,13 +51,6 @@ const ReportProblemModal: React.FC<ReportProblemModalProps> = ({
       setFeedback({ type: 'err', text: 'Preencha e-mail e descrição do problema.' });
       return;
     }
-    if (!isWeb3FormsConfigured()) {
-      setFeedback({
-        type: 'err',
-        text: 'Envio não configurado. Defina VITE_WEB3FORMS_ACCESS_KEY no .env do frontend e reinicie o Vite.',
-      });
-      return;
-    }
     setSending(true);
     try {
       await submitProblemReport({
@@ -66,6 +60,8 @@ const ReportProblemModal: React.FC<ReportProblemModalProps> = ({
         name: name.trim(),
         description: description.trim(),
         screenLabel,
+        pageUrl: typeof window !== 'undefined' ? window.location.href : undefined,
+        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
       });
       setFeedback({
         type: 'ok',
@@ -76,7 +72,7 @@ const ReportProblemModal: React.FC<ReportProblemModalProps> = ({
         onClose();
       }, 1800);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Não foi possível enviar.';
+      const msg = getApiErrorMessage(err, 'Não foi possível enviar o relatório.');
       setFeedback({ type: 'err', text: msg });
     } finally {
       setSending(false);
@@ -95,13 +91,6 @@ const ReportProblemModal: React.FC<ReportProblemModalProps> = ({
           ? 'Descreva o que aconteceu. Inclua mensagens de erro se aparecerem na tela.'
           : 'Seu relatório incluirá automaticamente a tela em que você está e o endereço da página.'}
       </p>
-      {!isWeb3FormsConfigured() && (
-        <p className="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 mb-4">
-          Configure <code className="font-mono">VITE_WEB3FORMS_ACCESS_KEY</code> em{' '}
-          <code className="font-mono">frontend/.env</code>. Veja também{' '}
-          <code className="font-mono">frontend/docs/email-setup.md</code>.
-        </p>
-      )}
       {feedback && (
         <p
           className={`text-sm px-3 py-2 rounded-md border mb-4 ${
@@ -184,9 +173,11 @@ const ReportProblemModal: React.FC<ReportProblemModalProps> = ({
           <button
             type="submit"
             disabled={sending}
-            className="px-4 py-2 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-400"
+            className="inline-flex items-center justify-center rounded-md bg-indigo-600 p-2 text-white transition-colors hover:bg-indigo-700 disabled:bg-slate-400"
+            title={sending ? 'Enviando relatório…' : 'Enviar relatório'}
+            aria-label={sending ? 'Enviando relatório' : 'Enviar relatório'}
           >
-            {sending ? 'Enviando…' : 'Enviar relatório'}
+            <PaperAirplaneIcon className={`${sending ? 'animate-pulse' : ''}`} />
           </button>
         </div>
       </form>

@@ -125,10 +125,11 @@ const LoginView: React.FC<LoginViewProps> = ({ onSuccess, onGoRegister }) => {
           <button
             type="button"
             onClick={() => setReportOpen(true)}
-            className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-lg border-2 border-amber-200 bg-amber-50/80 text-amber-950 text-sm font-semibold hover:bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 transition-colors"
+            className="w-full inline-flex items-center justify-center rounded-lg border-2 border-amber-200 bg-amber-50/80 p-2 text-amber-950 hover:bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 transition-colors"
+            title="Reportar um problema"
+            aria-label="Reportar um problema"
           >
             <ExclamationTriangleIcon className="h-5 w-5 shrink-0 text-amber-700" />
-            Reportar um problema
           </button>
           <p className="mt-2 text-center text-xs text-slate-500">
             Erro ao entrar ou algo estranho nesta página? Envie um relatório à equipe.

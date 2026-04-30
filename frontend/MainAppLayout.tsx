@@ -589,12 +589,11 @@ const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout, on
             <button
               type="button"
               onClick={() => setReportProblemOpen(true)}
-              className="flex shrink-0 items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-950 hover:bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-1 transition-colors"
+              className="inline-flex shrink-0 items-center justify-center rounded-lg border border-amber-200 bg-amber-50 p-2 text-amber-950 hover:bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-1 transition-colors"
               title="Reportar um problema nesta tela"
               aria-label="Reportar um problema"
             >
               <ExclamationTriangleIcon className="h-5 w-5 text-amber-700" />
-              <span className="hidden sm:inline">Reportar problema</span>
             </button>
 
             <UserMenu

@@ -13,7 +13,7 @@ Ela permite:
 - administrar usuários por perfil (`master`, `admin`, `secretary`, `executive`);
 - convidar usuários por link seguro para primeiro acesso;
 - gerar dados de apoio para relatórios operacionais;
-- exportar/restaurar backup das configurações e dados suportados.
+- receber relatórios de problema por e-mail via backend (SMTP/Brevo).
 
 ## Stack e arquitetura em uso
 
@@ -49,7 +49,7 @@ As áreas abaixo possuem tela no frontend, serviço HTTP e rota FastAPI ativa:
   - documentos + categorias de documentos
 - **Apoio e administração**
   - relatórios
-  - backup e restauração de dados de configuração
+  - reportar problema por e-mail
 
 ## Rotas FastAPI ativas na aplicação
 
@@ -71,6 +71,7 @@ Carregadas em `backend/app/main.py`:
 - `/contacts`
 - `/tasks`
 - `/reports`
+- `/support`
 
 ## Como executar
 
@@ -92,6 +93,9 @@ Acessos:
 - `VITE_API_URL`: URL da API acessível pelo navegador
 - `CORS_ORIGINS`: origens permitidas no backend
 - `FRONTEND_BASE_URL`: base usada em fluxos de convite
+- `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`, `BREVO_SENDER_NAME`: envio de e-mail no backend via API Brevo
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`: fallback SMTP opcional
+- `SUPPORT_REPORT_TO`: caixa de destino dos relatórios de problema
 
 ## Limpeza cirúrgica aplicada
 
