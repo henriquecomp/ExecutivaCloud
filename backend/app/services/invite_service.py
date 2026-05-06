@@ -372,11 +372,6 @@ class InviteService:
 
         merged = {**secretary_to_dict(sec), **body}
         full_name, org_id, work_email, job_title, profile, exec_ids = _body_to_parts(merged)
-        if len(exec_ids) < 1:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Selecione ao menos um executivo vinculado.",
-            )
 
         sec.full_name = full_name
         sec.organization_id = org_id

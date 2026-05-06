@@ -1,4 +1,4 @@
-from typing import Literal, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
 
@@ -80,6 +80,7 @@ class InviteUserRequest(BaseModel):
     email_confirm: EmailStr = Field(..., alias="emailConfirm")
     invited_role: InvitedRoleLiteral = Field(..., alias="invitedRole")
     organization_id: Optional[int] = Field(None, alias="organizationId")
+    secretary_executive_ids: Optional[List[int]] = Field(None, alias="secretaryExecutiveIds")
 
 
 class InviteUserResponse(BaseModel):
