@@ -17,7 +17,11 @@ def login(body: schemas.LoginRequest, service: AuthService = Depends(AuthService
     return service.login(body.email, body.password)
 
 
-@router.post("/register-organization", response_model=schemas.TokenResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/register-organization",
+    response_model=schemas.RegisterOrganizationResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 def register_organization(
     body: schemas.RegisterOrganizationRequest,
     service: AuthService = Depends(AuthService),

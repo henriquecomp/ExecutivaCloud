@@ -13,7 +13,7 @@ Ela permite:
 - administrar usuários por perfil (`master`, `admin`, `secretary`, `executive`);
 - convidar usuários por link seguro para primeiro acesso;
 - gerar dados de apoio para relatórios operacionais;
-- receber relatórios de problema por e-mail via backend (SMTP/Brevo).
+- receber relatórios de problema por e-mail via backend (SMTP Gmail).
 
 ## Stack e arquitetura em uso
 
@@ -93,8 +93,8 @@ Acessos:
 - `VITE_API_URL`: URL da API acessível pelo navegador
 - `CORS_ORIGINS`: origens permitidas no backend
 - `FRONTEND_BASE_URL`: base usada em fluxos de convite
-- `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`, `BREVO_SENDER_NAME`: envio de e-mail no backend via API Brevo
-- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`: fallback SMTP opcional
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`: envio de e-mail no backend via SMTP Gmail
+- para Gmail, usar senha de app em `SMTP_PASSWORD` (não a senha comum da conta)
 - `SUPPORT_REPORT_TO`: caixa de destino dos relatórios de problema
 
 ## Limpeza cirúrgica aplicada

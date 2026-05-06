@@ -6,13 +6,18 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.invite_token import hash_invite_token
 from app.core.security import create_access_token, hash_password, verify_password
 from app.models.executive_model import Executive
 from app.models.secretary_model import Secretary
+from app.models.user_invite_token_model import UserInviteToken
 from app.models import user_model as user_models
 from app.repositories.legal_organization_repository import LegalOrganizationRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas import auth_schema as auth_schemas
+from app.services.email_service import build_set_password_link, send_invite_email
+import secrets
+from datetime import datetime, timedelta, timezone
 
 
 def _user_to_public(u: user_models.Usuario) -> auth_schemas.CurrentUserOut:
@@ -55,7 +60,9 @@ class AuthService:
             user=_user_to_public(user),
         )
 
-    def register_organization(self, body: auth_schemas.RegisterOrganizationRequest) -> auth_schemas.TokenResponse:
+    def register_organization(
+        self, body: auth_schemas.RegisterOrganizationRequest
+    ) -> auth_schemas.RegisterOrganizationResponse:
         if self.users.get_by_email(body.adminEmail):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -84,24 +91,61 @@ class AuthService:
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Este CNPJ já está cadastrado.",
             ) from None
-        hashed = hash_password(body.adminPassword)
-        db_user = self.users.create(
-            {
-                "name": body.adminName,
-                "email": body.adminEmail,
-                "phone": None,
-                "hashed_password": hashed,
-                "is_active": True,
-                "needs_profile_completion": False,
-                "role": "admin_legal_organization",
-                "legal_organization_id": lo.id,
-                "organization_id": None,
-                "executive_id": None,
-                "secretary_external_id": None,
-            }
+        placeholder_pw = secrets.token_urlsafe(48)
+        hashed = hash_password(placeholder_pw)
+        raw_token = secrets.token_urlsafe(32)
+        token_hash = hash_invite_token(raw_token)
+        expires_at = datetime.now(timezone.utc) + timedelta(days=int(os.getenv("INVITE_TOKEN_DAYS", "7")))
+
+        try:
+            db_user = self.users.create(
+                {
+                    "name": body.adminName,
+                    "email": body.adminEmail,
+                    "phone": None,
+                    "hashed_password": hashed,
+                    "is_active": True,
+                    "needs_profile_completion": False,
+                    "role": "admin_legal_organization",
+                    "legal_organization_id": lo.id,
+                    "organization_id": None,
+                    "executive_id": None,
+                    "secretary_external_id": None,
+                }
+            )
+            self.db.query(UserInviteToken).filter(
+                UserInviteToken.user_id == db_user.id,
+                UserInviteToken.used_at.is_(None),
+            ).delete(synchronize_session=False)
+
+            invite_row = UserInviteToken(
+                user_id=db_user.id,
+                token_hash=token_hash,
+                expires_at=expires_at,
+                used_at=None,
+            )
+            self.db.add(invite_row)
+            self.db.flush()
+
+            link = build_set_password_link(raw_token)
+            send_invite_email(str(body.adminEmail), body.adminName.strip(), link)
+            self.db.commit()
+        except HTTPException:
+            self.db.rollback()
+            raise
+        except Exception as e:
+            self.db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Falha ao enviar e-mail de primeiro acesso: {e!s}",
+            ) from e
+
+        return auth_schemas.RegisterOrganizationResponse(
+            message=(
+                "Cadastro criado com sucesso. Enviamos um e-mail para definir sua senha e "
+                "validar o primeiro acesso."
+            )
         )
-        token = create_access_token(str(db_user.id))
-        return auth_schemas.TokenResponse(accessToken=token, tokenType="bearer", user=_user_to_public(db_user))
 
     def bootstrap_master(
         self,

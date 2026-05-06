@@ -317,9 +317,6 @@ const UserManagementView: React.FC<UserManagementViewProps> = ({
             aria-label="Buscar usuários"
           />
         </div>
-        <p className="text-sm text-slate-500 shrink-0">
-          {loading ? 'Carregando…' : `${total} registro(s)`}
-        </p>
       </ToolbarPanel>
 
       {layout === 'table' && (

@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
 import { LogoIcon } from './Icons';
-import { mapApiUserToAppUser, registerOrganization, RegisterOrganizationPayload } from '../services/authService';
-import { User } from '../types';
+import { registerOrganization, RegisterOrganizationPayload } from '../services/authService';
 import axios from 'axios';
 
 interface RegisterOrganizationViewProps {
-  onSuccess: (user: User) => void;
+  onSuccess: (message: string) => void;
   onBack: () => void;
 }
 
@@ -21,7 +20,6 @@ const RegisterOrganizationView: React.FC<RegisterOrganizationViewProps> = ({ onS
     legalZipCode: '',
     adminName: '',
     adminEmail: '',
-    adminPassword: '',
   });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -46,7 +44,7 @@ const RegisterOrganizationView: React.FC<RegisterOrganizationViewProps> = ({ onS
         legalZipCode: form.legalZipCode?.trim() || undefined,
       };
       const data = await registerOrganization(payload);
-      onSuccess(mapApiUserToAppUser(data.user));
+      onSuccess(data.message);
     } catch (err) {
       if (axios.isAxiosError(err) && err.response?.data?.detail != null) {
         const d = err.response.data.detail;
@@ -72,7 +70,7 @@ const RegisterOrganizationView: React.FC<RegisterOrganizationViewProps> = ({ onS
         </div>
         <h1 className="text-2xl font-bold text-slate-800">Cadastro de organização</h1>
         <p className="text-slate-500 mt-1 text-sm max-w-md mx-auto">
-          Crie a organização jurídica e o usuário administrador da organização. O acesso ao sistema é por e-mail e senha.
+          Crie a organização jurídica e o usuário administrador. O primeiro acesso será liberado por link enviado no e-mail informado.
         </p>
       </div>
 
@@ -184,18 +182,6 @@ const RegisterOrganizationView: React.FC<RegisterOrganizationViewProps> = ({ onS
                 className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm"
               />
             </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Senha * (mín. 6 caracteres)</label>
-              <input
-                type="password"
-                required
-                minLength={6}
-                autoComplete="new-password"
-                value={form.adminPassword}
-                onChange={(e) => update('adminPassword', e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm"
-              />
-            </div>
           </fieldset>
 
           <div className="flex flex-col sm:flex-row gap-3 pt-2">
@@ -211,7 +197,7 @@ const RegisterOrganizationView: React.FC<RegisterOrganizationViewProps> = ({ onS
               disabled={loading}
               className="flex-1 py-2.5 px-4 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-400"
             >
-              {loading ? 'Cadastrando…' : 'Criar organização e entrar'}
+              {loading ? 'Cadastrando…' : 'Criar organização'}
             </button>
           </div>
         </form>

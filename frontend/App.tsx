@@ -17,6 +17,7 @@ const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [sessionReady, setSessionReady] = useState(false);
   const [authScreen, setAuthScreen] = useState<'login' | 'register'>('login');
+  const [authFlashMessage, setAuthFlashMessage] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -59,6 +60,12 @@ const App: React.FC = () => {
   const handleAuthSuccess = (user: User) => {
     setCurrentUser(user);
     setAuthScreen('login');
+    setAuthFlashMessage(null);
+  };
+
+  const handleOrganizationRegistered = (message: string) => {
+    setAuthScreen('login');
+    setAuthFlashMessage(message);
   };
 
   const handleLogout = () => {
@@ -86,10 +93,20 @@ const App: React.FC = () => {
   if (!currentUser) {
     if (authScreen === 'register') {
       return (
-        <RegisterOrganizationView onSuccess={handleAuthSuccess} onBack={() => setAuthScreen('login')} />
+        <RegisterOrganizationView
+          onSuccess={handleOrganizationRegistered}
+          onBack={() => setAuthScreen('login')}
+        />
       );
     }
-    return <LoginView onSuccess={handleAuthSuccess} onGoRegister={() => setAuthScreen('register')} />;
+    return (
+      <LoginView
+        onSuccess={handleAuthSuccess}
+        onGoRegister={() => setAuthScreen('register')}
+        flashMessage={authFlashMessage}
+        onClearFlashMessage={() => setAuthFlashMessage(null)}
+      />
+    );
   }
 
   if (currentUser.needsProfileCompletion && currentUser.role === 'executive') {

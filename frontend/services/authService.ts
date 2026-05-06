@@ -33,7 +33,10 @@ export interface RegisterOrganizationPayload {
   legalZipCode?: string;
   adminName: string;
   adminEmail: string;
-  adminPassword: string;
+}
+
+export interface RegisterOrganizationResponse {
+  message: string;
 }
 
 export function mapApiUserToAppUser(apiUser: ApiCurrentUser): User {
@@ -116,9 +119,8 @@ export async function updateMeProfile(body: {
 
 export async function registerOrganization(
   payload: RegisterOrganizationPayload,
-): Promise<TokenPayload> {
-  const { data } = await api.post<TokenPayload>('/auth/register-organization', payload);
-  persistToken(data.accessToken);
+): Promise<RegisterOrganizationResponse> {
+  const { data } = await api.post<RegisterOrganizationResponse>('/auth/register-organization', payload);
   return data;
 }
 

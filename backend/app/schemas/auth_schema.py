@@ -24,7 +24,10 @@ class RegisterOrganizationRequest(BaseModel):
 
     adminName: str = Field(..., min_length=2, max_length=100)
     adminEmail: EmailStr
-    adminPassword: str = Field(..., min_length=6)
+
+
+class RegisterOrganizationResponse(BaseModel):
+    message: str
 
 
 class CurrentUserOut(BaseModel):

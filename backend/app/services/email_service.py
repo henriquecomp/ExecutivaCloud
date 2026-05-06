@@ -1,7 +1,13 @@
 import os
 import smtplib
 from email.message import EmailMessage
-import httpx
+
+def _clean_env_secret(raw: str) -> str:
+    """Strip whitespace, UTF-8 BOM, and optional surrounding quotes from .env values."""
+    s = raw.strip().lstrip("\ufeff")
+    if len(s) >= 2 and s[0] == s[-1] and s[0] in "\"'":
+        s = s[1:-1].strip()
+    return s
 
 
 def _frontend_base_url() -> str:
@@ -25,53 +31,33 @@ def send_password_reset_email(to_email: str, full_name: str, set_password_link: 
     _send_email_text(to_email, subject, body)
 
 
-def _send_via_brevo_api(to_email: str, subject: str, body: str) -> bool:
-    api_key = os.getenv("BREVO_API_KEY", "").strip()
-    if not api_key:
-        return False
-
-    sender_email = (
-        os.getenv("BREVO_SENDER_EMAIL", "").strip()
-        or os.getenv("SMTP_FROM", "").strip()
-        or os.getenv("SMTP_USER", "").strip()
+def _smtp_settings() -> tuple[str, int, str, str, str]:
+    host = _clean_env_secret(os.getenv("SMTP_HOST", ""))
+    user = _clean_env_secret(os.getenv("SMTP_USER", ""))
+    password = _clean_env_secret(os.getenv("SMTP_PASSWORD", ""))
+    from_addr = _clean_env_secret(
+        os.getenv("SMTP_FROM", "") or user or "noreply@localhost"
     )
-    sender_name = os.getenv("BREVO_SENDER_NAME", "Executiva Cloud").strip() or "Executiva Cloud"
-    if not sender_email:
-        raise RuntimeError(
-            "BREVO_API_KEY configurada, mas remetente ausente. "
-            "Defina BREVO_SENDER_EMAIL (ou SMTP_FROM)."
-        )
+    port = int(_clean_env_secret(os.getenv("SMTP_PORT", "587")) or "587")
 
-    payload = {
-        "sender": {"email": sender_email, "name": sender_name},
-        "to": [{"email": to_email}],
-        "subject": subject,
-        "textContent": body,
-    }
-    headers = {
-        "accept": "application/json",
-        "content-type": "application/json",
-        "api-key": api_key,
-    }
-    response = httpx.post(
-        "https://api.brevo.com/v3/smtp/email",
-        json=payload,
-        headers=headers,
-        timeout=30.0,
-    )
-    response.raise_for_status()
-    return True
-
-
-def _send_smtp_text(to_email: str, subject: str, body: str) -> bool:
-    host = os.getenv("SMTP_HOST", "").strip()
+    missing = []
     if not host:
-        return False
+        missing.append("SMTP_HOST")
+    if not user:
+        missing.append("SMTP_USER")
+    if not password:
+        missing.append("SMTP_PASSWORD")
 
-    port = int(os.getenv("SMTP_PORT", "587"))
-    user = os.getenv("SMTP_USER", "").strip()
-    password = os.getenv("SMTP_PASSWORD", "").strip()
-    from_addr = os.getenv("SMTP_FROM", user or "noreply@localhost")
+    if missing:
+        raise RuntimeError(
+            "Configuração SMTP incompleta para envio de e-mail. "
+            f"Defina: {', '.join(missing)}."
+        )
+    return host, port, user, password, from_addr
+
+
+def _send_smtp_text(to_email: str, subject: str, body: str) -> None:
+    host, port, user, password, from_addr = _smtp_settings()
 
     msg = EmailMessage()
     msg["Subject"] = subject
@@ -81,18 +67,12 @@ def _send_smtp_text(to_email: str, subject: str, body: str) -> bool:
 
     with smtplib.SMTP(host, port, timeout=30) as smtp:
         smtp.starttls()
-        if user:
-            smtp.login(user, password)
+        smtp.login(user, password)
         smtp.send_message(msg)
-    return True
 
 
 def _send_email_text(to_email: str, subject: str, body: str) -> None:
-    if _send_via_brevo_api(to_email, subject, body):
-        return
-    if _send_smtp_text(to_email, subject, body):
-        return
-    print(f"[email dev] To: {to_email}\nSubject: {subject}\n{body}")
+    _send_smtp_text(to_email, subject, body)
 
 
 def send_invite_email(to_email: str, full_name: str, set_password_link: str) -> None:
@@ -110,7 +90,6 @@ def send_invite_email(to_email: str, full_name: str, set_password_link: str) -> 
 def _support_target_email() -> str:
     return (
         os.getenv("SUPPORT_REPORT_TO", "").strip()
-        or os.getenv("BREVO_SENDER_EMAIL", "").strip()
         or os.getenv("SMTP_FROM", "").strip()
         or os.getenv("SMTP_USER", "").strip()
         or "suporte@localhost"

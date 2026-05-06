@@ -200,7 +200,7 @@ const EventForm: React.FC<{
     const [recurrence, setRecurrence] = useState<RecurrenceRule>(event.recurrence || {
         frequency: 'weekly',
         interval: 1,
-        daysOfWeek: event.startTime ? [new Date(event.startTime).getUTCDay()] : [],
+        daysOfWeek: event.startTime ? [new Date(event.startTime).getDay()] : [],
         count: 10
     });
     const [endType, setEndType] = useState(event.recurrence?.endDate ? 'on' : 'after');
@@ -210,10 +210,7 @@ const EventForm: React.FC<{
     // Handle datetime-local input which requires YYYY-MM-DDTHH:mm format
     const formatDateTimeForInput = (isoString?: string) => {
         if (!isoString) return '';
-        const date = new Date(isoString);
-        const tzoffset = (new Date()).getTimezoneOffset() * 60000;
-        const localISOTime = (new Date(date.getTime() - tzoffset)).toISOString().slice(0, 16);
-        return localISOTime;
+        return toDatetimeLocalInputValue(new Date(isoString));
     };
 
     const minDatetimeLocal = useMemo(() => toDatetimeLocalInputValue(new Date()), []);
@@ -316,7 +313,7 @@ const EventForm: React.FC<{
                 if (!finalRecurrence.count) finalRecurrence.count = 1;
             } else {
                 delete finalRecurrence.count;
-                if (!finalRecurrence.endDate) finalRecurrence.endDate = new Date().toISOString().split('T')[0];
+                if (!finalRecurrence.endDate) finalRecurrence.endDate = todayDateInputValue();
             }
             if (finalRecurrence.frequency !== 'weekly') {
                 delete finalRecurrence.daysOfWeek;
@@ -438,7 +435,7 @@ const EventForm: React.FC<{
                                     setRecurrence(prev => {
                                         const updated = { ...prev, frequency: newFrequency };
                                         if (newFrequency === 'weekly' && (!updated.daysOfWeek || updated.daysOfWeek.length === 0) && startTime) {
-                                            const dayOfWeek = new Date(startTime).getUTCDay();
+                                            const dayOfWeek = new Date(startTime).getDay();
                                             updated.daysOfWeek = [dayOfWeek];
                                         }
                                         return updated;
@@ -509,7 +506,7 @@ const generateRecurringEvents = (baseEvent: Partial<Event>, rule: RecurrenceRule
     const duration = baseEndTime.getTime() - baseStartTime.getTime();
     
     let cursorDate = new Date(baseStartTime);
-    const finalDate = rule.endDate ? new Date(rule.endDate + 'T23:59:59') : null;
+    const finalDate = rule.endDate ? new Date(`${rule.endDate}T23:59:59.999`) : null;
     const maxOccurrences = rule.count || 100; // Safety limit
     let occurrences = 0;
 
@@ -530,12 +527,12 @@ const generateRecurringEvents = (baseEvent: Partial<Event>, rule: RecurrenceRule
     if (rule.frequency === 'weekly') {
         if (!rule.daysOfWeek || rule.daysOfWeek.length === 0) return [];
         let weekStartDate = new Date(cursorDate);
-        weekStartDate.setUTCDate(weekStartDate.getUTCDate() - weekStartDate.getUTCDay()); // Start of the week (Sunday)
+        weekStartDate.setDate(weekStartDate.getDate() - weekStartDate.getDay()); // Start of the week (Sunday)
         
         while (occurrences < maxOccurrences && (!finalDate || weekStartDate <= finalDate)) {
             for (const day of rule.daysOfWeek) {
                  let nextOccurrenceDate = new Date(weekStartDate);
-                 nextOccurrenceDate.setUTCDate(nextOccurrenceDate.getUTCDate() + day);
+                 nextOccurrenceDate.setDate(nextOccurrenceDate.getDate() + day);
 
                  if(nextOccurrenceDate >= cursorDate) {
                      if (occurrences < maxOccurrences && (!finalDate || nextOccurrenceDate <= finalDate)) {
@@ -543,16 +540,16 @@ const generateRecurringEvents = (baseEvent: Partial<Event>, rule: RecurrenceRule
                      }
                  }
             }
-            weekStartDate.setUTCDate(weekStartDate.getUTCDate() + (7 * rule.interval));
+            weekStartDate.setDate(weekStartDate.getDate() + (7 * rule.interval));
         }
 
     } else {
          while (occurrences < maxOccurrences && (!finalDate || cursorDate <= finalDate)) {
              createEventOnDate(cursorDate);
              switch (rule.frequency) {
-                case 'daily': cursorDate.setUTCDate(cursorDate.getUTCDate() + rule.interval); break;
-                case 'monthly': cursorDate.setUTCMonth(cursorDate.getUTCMonth() + rule.interval); break;
-                case 'annually': cursorDate.setUTCFullYear(cursorDate.getUTCFullYear() + rule.interval); break;
+                case 'daily': cursorDate.setDate(cursorDate.getDate() + rule.interval); break;
+                case 'monthly': cursorDate.setMonth(cursorDate.getMonth() + rule.interval); break;
+                case 'annually': cursorDate.setFullYear(cursorDate.getFullYear() + rule.interval); break;
             }
          }
     }

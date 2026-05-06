@@ -5,5 +5,7 @@ export function toDatetimeLocalInputValue(d: Date): string {
 }
 
 export function todayDateInputValue(): string {
-  return new Date().toISOString().split('T')[0];
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }

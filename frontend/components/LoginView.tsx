@@ -8,9 +8,16 @@ import { User } from '../types';
 interface LoginViewProps {
   onSuccess: (user: User) => void;
   onGoRegister: () => void;
+  flashMessage?: string | null;
+  onClearFlashMessage?: () => void;
 }
 
-const LoginView: React.FC<LoginViewProps> = ({ onSuccess, onGoRegister }) => {
+const LoginView: React.FC<LoginViewProps> = ({
+  onSuccess,
+  onGoRegister,
+  flashMessage,
+  onClearFlashMessage,
+}) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -53,6 +60,27 @@ const LoginView: React.FC<LoginViewProps> = ({ onSuccess, onGoRegister }) => {
 
       <div className="w-full max-w-md mx-auto mt-10 bg-white p-8 rounded-xl shadow-lg">
         <form onSubmit={handleSubmit} className="space-y-5">
+          {flashMessage && (
+            <div
+              className="rounded-md bg-emerald-50 text-emerald-800 text-sm px-3 py-2 border border-emerald-200"
+              role="status"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <span>{flashMessage}</span>
+                {onClearFlashMessage && (
+                  <button
+                    type="button"
+                    onClick={onClearFlashMessage}
+                    className="text-emerald-700 hover:text-emerald-900"
+                    aria-label="Fechar aviso"
+                    title="Fechar aviso"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
           {error && (
             <div className="rounded-md bg-red-50 text-red-800 text-sm px-3 py-2 border border-red-200" role="alert">
               {error}
@@ -122,18 +150,18 @@ const LoginView: React.FC<LoginViewProps> = ({ onSuccess, onGoRegister }) => {
         </form>
 
         <div className="mt-8 pt-6 border-t border-slate-200">
-          <button
-            type="button"
-            onClick={() => setReportOpen(true)}
-            className="w-full inline-flex items-center justify-center rounded-lg border-2 border-amber-200 bg-amber-50/80 p-2 text-amber-950 hover:bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 transition-colors"
-            title="Reportar um problema"
-            aria-label="Reportar um problema"
-          >
-            <ExclamationTriangleIcon className="h-5 w-5 shrink-0 text-amber-700" />
-          </button>
-          <p className="mt-2 text-center text-xs text-slate-500">
-            Erro ao entrar ou algo estranho nesta página? Envie um relatório à equipe.
-          </p>
+          <div className="flex items-center justify-center gap-2 text-xs text-slate-500">
+            <button
+              type="button"
+              onClick={() => setReportOpen(true)}
+              className="inline-flex items-center justify-center rounded-md p-1 text-slate-400 hover:text-amber-700 hover:bg-amber-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 transition-colors"
+              title="Reportar um problema"
+              aria-label="Reportar um problema"
+            >
+              <ExclamationTriangleIcon className="h-4 w-4 shrink-0" />
+            </button>
+            <p>Erro ao entrar ou algo estranho nesta página? Envie um relatório à equipe.</p>
+          </div>
         </div>
       </div>
 
