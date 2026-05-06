@@ -35,6 +35,44 @@ def _parse_executive_ids(raw: Any) -> List[int]:
     return out
 
 
+def validated_secretary_executive_ids_for_org(
+    db: Session,
+    organization_id: int,
+    raw_ids: Optional[List[int]],
+    *,
+    require_at_least_one: bool,
+) -> List[int]:
+    """Deduplica IDs, valida existência e organization_id do executivo. Levanta HTTPException se inválido."""
+    seen: set[int] = set()
+    ids: List[int] = []
+    for x in raw_ids or []:
+        try:
+            i = int(x)
+        except (TypeError, ValueError):
+            continue
+        if i not in seen:
+            seen.add(i)
+            ids.append(i)
+    if require_at_least_one and len(ids) < 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Informe ao menos um executivo da empresa para a secretária.",
+        )
+    for eid in ids:
+        ex = db.query(Executive).filter(Executive.id == eid).first()
+        if ex is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Executivo inválido (id={eid}).",
+            )
+        if ex.organization_id != organization_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Todos os executivos devem pertencer à mesma empresa da secretária.",
+            )
+    return ids
+
+
 def _body_to_parts(body: Dict[str, Any]) -> tuple[str, Optional[int], Optional[str], Optional[str], Optional[str], List[int]]:
     full_name = (body.get("fullName") or body.get("full_name") or "").strip()
     if not full_name:

@@ -12,6 +12,7 @@ export interface ManagedUserRow {
   executiveId: number | null;
   secretaryId: string | null;
   needsProfileCompletion: boolean;
+  secretaryExecutiveIds?: number[];
 }
 
 function mapRow(raw: Record<string, unknown>): ManagedUserRow {
@@ -32,6 +33,9 @@ function mapRow(raw: Record<string, unknown>): ManagedUserRow {
     executiveId: r.executiveId != null && r.executiveId !== '' ? Number(r.executiveId) : null,
     secretaryId: r.secretaryId != null ? String(r.secretaryId) : null,
     needsProfileCompletion: Boolean(r.needsProfileCompletion ?? r.needs_profile_completion ?? false),
+    secretaryExecutiveIds: Array.isArray(r.secretaryExecutiveIds)
+      ? (r.secretaryExecutiveIds as unknown[]).map((x) => Number(x)).filter((n) => !Number.isNaN(n))
+      : undefined,
   };
 }
 
@@ -61,6 +65,7 @@ export async function patchManagedUser(
     phone?: string | null;
     isActive?: boolean;
     organizationId?: number;
+    secretaryExecutiveIds?: number[];
   },
 ): Promise<ManagedUserRow> {
   const { data } = await api.patch<Record<string, unknown>>(`/users/management/${userId}`, body);

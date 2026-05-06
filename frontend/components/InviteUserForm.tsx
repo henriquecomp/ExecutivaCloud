@@ -1,12 +1,14 @@
 import React, { useMemo, useState } from 'react';
 import { inviteUser } from '../services/authService';
-import type { LegalOrganization, Organization, User } from '../types';
+import type { Executive, LegalOrganization, Organization, User } from '../types';
 
 export interface InviteUserFormProps {
   currentUser: User;
   organizations: Organization[];
   /** Para o master: cascata organização jurídica → empresa. */
   legalOrganizations?: LegalOrganization[];
+  /** Executivos da plataforma (filtrados por empresa ao convidar secretária). */
+  executives?: Executive[];
   /** Chamado após convite enviado com sucesso (mensagem do servidor). */
   onSuccess?: (message: string) => void;
 }
@@ -15,6 +17,7 @@ const InviteUserForm: React.FC<InviteUserFormProps> = ({
   currentUser,
   organizations,
   legalOrganizations = [],
+  executives = [],
   onSuccess,
 }) => {
   const [fullName, setFullName] = useState('');
@@ -26,6 +29,7 @@ const InviteUserForm: React.FC<InviteUserFormProps> = ({
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [secretaryExecutiveIds, setSecretaryExecutiveIds] = useState<number[]>([]);
 
   const isMaster = currentUser.role === 'master';
 
@@ -70,6 +74,35 @@ const InviteUserForm: React.FC<InviteUserFormProps> = ({
     invitedRole === 'admin_company' || invitedRole === 'executive' || invitedRole === 'secretary';
   const needsOrgPicker = !singleCompanyAdmin && orgRequired;
 
+  const resolvedOrganizationId = useMemo(() => {
+    let org: string | undefined = organizationId;
+    if (currentUser.role === 'admin' && currentUser.organizationId && !currentUser.legalOrganizationId) {
+      org = currentUser.organizationId;
+    }
+    return org != null && String(org).trim() !== '' ? String(org) : undefined;
+  }, [currentUser.role, currentUser.organizationId, currentUser.legalOrganizationId, organizationId]);
+
+  const executivesForInviteCompany = useMemo(() => {
+    if (!resolvedOrganizationId) return [];
+    return executives.filter((e) => e.organizationId === resolvedOrganizationId);
+  }, [executives, resolvedOrganizationId]);
+
+  React.useEffect(() => {
+    if (invitedRole !== 'secretary') setSecretaryExecutiveIds([]);
+  }, [invitedRole]);
+
+  React.useEffect(() => {
+    setSecretaryExecutiveIds((prev) =>
+      prev.filter((id) => executivesForInviteCompany.some((e) => Number(e.id) === id)),
+    );
+  }, [executivesForInviteCompany]);
+
+  const toggleInviteExecutive = (execNumericId: number) => {
+    setSecretaryExecutiveIds((prev) =>
+      prev.includes(execNumericId) ? prev.filter((x) => x !== execNumericId) : [...prev, execNumericId],
+    );
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -94,6 +127,10 @@ const InviteUserForm: React.FC<InviteUserFormProps> = ({
       setError('Selecione a empresa.');
       return;
     }
+    if (invitedRole === 'secretary' && secretaryExecutiveIds.length < 1) {
+      setError('Selecione ao menos um executivo da empresa para a secretária.');
+      return;
+    }
     setLoading(true);
     try {
       const res = await inviteUser({
@@ -102,6 +139,7 @@ const InviteUserForm: React.FC<InviteUserFormProps> = ({
         emailConfirm: emailConfirm.trim(),
         invitedRole,
         organizationId: org != null && org !== '' ? org : undefined,
+        ...(invitedRole === 'secretary' ? { secretaryExecutiveIds: secretaryExecutiveIds } : {}),
       });
       if (onSuccess) {
         onSuccess(res.message);
@@ -113,6 +151,7 @@ const InviteUserForm: React.FC<InviteUserFormProps> = ({
       setEmailConfirm('');
       setLegalOrganizationId('');
       setOrganizationId('');
+      setSecretaryExecutiveIds([]);
     } catch (err: unknown) {
       const ax = err as { response?: { data?: { detail?: string } } };
       setError(typeof ax.response?.data?.detail === 'string' ? ax.response.data.detail : 'Falha ao enviar convite.');
@@ -228,6 +267,38 @@ const InviteUserForm: React.FC<InviteUserFormProps> = ({
               </option>
             ))}
           </select>
+        </div>
+      )}
+      {invitedRole === 'secretary' && resolvedOrganizationId && (
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Executivos atendidos</label>
+          <p className="text-xs text-slate-500 mb-2">
+            Obrigatório: selecione ao menos um executivo da empresa escolhido acima.
+          </p>
+          <div className="max-h-48 space-y-2 overflow-y-auto rounded-md border border-slate-300 p-3">
+            {executivesForInviteCompany.length === 0 ? (
+              <p className="text-sm text-slate-500">Nenhum executivo cadastrado nesta empresa.</p>
+            ) : (
+              executivesForInviteCompany.map((ex) => {
+                const nid = Number(ex.id);
+                return (
+                  <div key={ex.id} className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id={`invite-exec-${ex.id}`}
+                      checked={secretaryExecutiveIds.includes(nid)}
+                      onChange={() => toggleInviteExecutive(nid)}
+                      className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <label htmlFor={`invite-exec-${ex.id}`} className="text-sm text-slate-700 cursor-pointer">
+                      {ex.fullName}
+                      {ex.jobTitle ? ` — ${ex.jobTitle}` : ''}
+                    </label>
+                  </div>
+                );
+              })
+            )}
+          </div>
         </div>
       )}
       <button

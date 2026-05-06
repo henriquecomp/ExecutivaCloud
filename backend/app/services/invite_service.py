@@ -19,6 +19,7 @@ from app.schemas import auth_schema as auth_schemas
 from app.schemas.executive_schema import ExecutiveCreate
 from app.services.auth_service import _user_to_public
 from app.services.email_service import build_set_password_link, send_invite_email
+from app.services.secretary_service import SecretaryService, validated_secretary_executive_ids_for_org
 
 
 InvitedRole = Literal["admin_company", "executive", "secretary"]
@@ -174,6 +175,15 @@ class InviteService:
                 )
                 self.db.add(sec)
                 self.db.flush()
+
+                exec_ids = validated_secretary_executive_ids_for_org(
+                    self.db,
+                    org.id,
+                    body.secretary_executive_ids,
+                    require_at_least_one=True,
+                )
+                SecretaryService(self.db)._set_executives(sec, exec_ids)
+                self.db.add(sec)
 
                 user_row = user_models.Usuario(
                     name=body.full_name.strip(),

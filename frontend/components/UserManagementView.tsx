@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import type { LayoutView, LegalOrganization, Organization, User } from '../types';
+import type { Executive, LayoutView, LegalOrganization, Organization, User } from '../types';
 import Modal from './Modal';
 import ConfirmationModal from './ConfirmationModal';
 import InviteUserForm from './InviteUserForm';
@@ -67,6 +67,7 @@ export interface UserManagementViewProps {
   currentUser: User;
   organizations: Organization[];
   legalOrganizations: LegalOrganization[];
+  executives: Executive[];
   layout: LayoutView;
 }
 
@@ -74,6 +75,7 @@ const UserManagementView: React.FC<UserManagementViewProps> = ({
   currentUser,
   organizations,
   legalOrganizations,
+  executives,
   layout,
 }) => {
   const [qInput, setQInput] = useState('');
@@ -93,6 +95,7 @@ const UserManagementView: React.FC<UserManagementViewProps> = ({
   const [editPhone, setEditPhone] = useState('');
   const [editOrgId, setEditOrgId] = useState('');
   const [editActive, setEditActive] = useState(true);
+  const [editSecretaryExecutiveIds, setEditSecretaryExecutiveIds] = useState<number[]>([]);
   const [editSaving, setEditSaving] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -161,7 +164,16 @@ const UserManagementView: React.FC<UserManagementViewProps> = ({
     setEditPhone(u.phone ?? '');
     setEditOrgId(u.organizationId != null ? String(u.organizationId) : '');
     setEditActive(u.isActive);
+    setEditSecretaryExecutiveIds(
+      u.role === 'secretary' && Array.isArray(u.secretaryExecutiveIds) ? [...u.secretaryExecutiveIds] : [],
+    );
   };
+
+  const editModalExecutives = useMemo(() => {
+    if (!editRow?.organizationId) return [];
+    const oid = String(editRow.organizationId);
+    return executives.filter((e) => e.organizationId === oid);
+  }, [editRow?.organizationId, executives]);
 
   const submitEdit = async () => {
     if (!editRow) return;
@@ -169,6 +181,10 @@ const UserManagementView: React.FC<UserManagementViewProps> = ({
     const showOrgField = canReassignCompany && isExecOrSec;
     if (showOrgField && !editOrgId.trim()) {
       setError('Selecione a empresa (alocação do executivo ou da secretária).');
+      return;
+    }
+    if (editRow.role === 'secretary' && editSecretaryExecutiveIds.length < 1) {
+      setError('Selecione ao menos um executivo da empresa para a secretária.');
       return;
     }
     setEditSaving(true);
@@ -184,6 +200,7 @@ const UserManagementView: React.FC<UserManagementViewProps> = ({
         phone: editPhone.trim() === '' ? null : editPhone.trim(),
         isActive: editActive,
         ...(orgChanged && nextOrg != null && !Number.isNaN(nextOrg) ? { organizationId: nextOrg } : {}),
+        ...(editRow.role === 'secretary' ? { secretaryExecutiveIds: editSecretaryExecutiveIds } : {}),
       });
       setRows((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
       setEditRow(null);
@@ -679,6 +696,7 @@ const UserManagementView: React.FC<UserManagementViewProps> = ({
               currentUser={currentUser}
               organizations={organizations}
               legalOrganizations={legalOrganizations}
+              executives={executives}
               onSuccess={(msg) => {
                 setInviteOpen(false);
                 setFlash(msg);
@@ -760,6 +778,45 @@ const UserManagementView: React.FC<UserManagementViewProps> = ({
                       </p>
                     </div>
                   )}
+                {editRow.role === 'secretary' && editRow.organizationId != null && (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Executivos atendidos</label>
+                    <p className="text-xs text-slate-500 mb-2">
+                      Selecione um ou mais executivos da empresa da secretária.
+                    </p>
+                    <div className="max-h-48 space-y-2 overflow-y-auto rounded-md border border-slate-300 p-3">
+                      {editModalExecutives.length === 0 ? (
+                        <p className="text-sm text-slate-500">Nenhum executivo nesta empresa.</p>
+                      ) : (
+                        editModalExecutives.map((ex) => {
+                          const nid = Number(ex.id);
+                          return (
+                            <div key={ex.id} className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                id={`edit-exec-${editRow.id}-${ex.id}`}
+                                checked={editSecretaryExecutiveIds.includes(nid)}
+                                onChange={() =>
+                                  setEditSecretaryExecutiveIds((prev) =>
+                                    prev.includes(nid) ? prev.filter((x) => x !== nid) : [...prev, nid],
+                                  )
+                                }
+                                className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                              />
+                              <label
+                                htmlFor={`edit-exec-${editRow.id}-${ex.id}`}
+                                className="text-sm text-slate-700 cursor-pointer"
+                              >
+                                {ex.fullName}
+                                {ex.jobTitle ? ` — ${ex.jobTitle}` : ''}
+                              </label>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
                 <label className="flex items-center gap-2 text-sm text-slate-700">
                   <input
                     type="checkbox"

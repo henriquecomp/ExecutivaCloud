@@ -153,6 +153,7 @@ export async function inviteUser(payload: {
   emailConfirm: string;
   invitedRole: 'admin_company' | 'executive' | 'secretary';
   organizationId?: string | number | null;
+  secretaryExecutiveIds?: number[];
 }): Promise<{ userId: number; message: string }> {
   const { data } = await api.post<{ userId: number; message: string }>('/auth/invite-user', {
     fullName: payload.fullName,
@@ -163,6 +164,9 @@ export async function inviteUser(payload: {
       payload.organizationId != null && String(payload.organizationId).trim() !== ''
         ? Number(payload.organizationId)
         : undefined,
+    ...(payload.invitedRole === 'secretary'
+      ? { secretaryExecutiveIds: payload.secretaryExecutiveIds ?? [] }
+      : {}),
   });
   return data;
 }

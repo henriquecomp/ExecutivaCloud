@@ -5,7 +5,7 @@ from typing import List, Optional, Tuple
 
 from fastapi import Depends, HTTPException, status
 from sqlalchemy import func, or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.api.deps import get_current_user
 from app.core.database import get_db
@@ -23,6 +23,7 @@ from app.services.email_service import (
     send_invite_email,
     send_password_reset_email,
 )
+from app.services.secretary_service import SecretaryService, validated_secretary_executive_ids_for_org
 
 MANAGER_ROLES = frozenset({"master", "admin_legal_organization", "admin_company"})
 INVITE_DAYS = int(os.getenv("INVITE_TOKEN_DAYS", "7"))
@@ -92,6 +93,87 @@ def _scoped_users_query(db: Session, actor: user_models.Usuario):
             conds.append(user_models.Usuario.organization_id.in_(org_ids))
         return q.filter(or_(*conds), user_models.Usuario.role != "master")
     return q.filter(False)
+
+
+def _batch_secretary_executive_ids_by_secretary_pk(
+    db: Session, users: List[user_models.Usuario]
+) -> dict[int, List[int]]:
+    sids: List[int] = []
+    for u in users:
+        if u.role != "secretary" or not u.secretary_external_id:
+            continue
+        try:
+            sids.append(int(u.secretary_external_id))
+        except ValueError:
+            continue
+    if not sids:
+        return {}
+    secs = (
+        db.query(Secretary)
+        .options(joinedload(Secretary.executives))
+        .filter(Secretary.id.in_(sids))
+        .all()
+    )
+    return {s.id: [e.id for e in (s.executives or [])] for s in secs}
+
+
+def serialize_management_user(db: Session, u: user_models.Usuario) -> schemas.Usuario:
+    batch = _batch_secretary_executive_ids_by_secretary_pk(db, [u])
+    sec_ids: Optional[List[int]] = None
+    if u.role == "secretary" and u.secretary_external_id:
+        try:
+            sid = int(u.secretary_external_id)
+            sec_ids = batch.get(sid)
+        except ValueError:
+            sec_ids = None
+    return schemas.Usuario.model_validate(
+        {
+            "id": u.id,
+            "fullName": u.name,
+            "email": u.email,
+            "phone": u.phone,
+            "isActive": u.is_active,
+            "role": u.role,
+            "legalOrganizationId": u.legal_organization_id,
+            "organizationId": u.organization_id,
+            "executiveId": u.executive_id,
+            "secretaryId": u.secretary_external_id,
+            "needsProfileCompletion": bool(getattr(u, "needs_profile_completion", False)),
+            "secretaryExecutiveIds": sec_ids,
+        }
+    )
+
+
+def serialize_management_users(db: Session, rows: List[user_models.Usuario]) -> List[schemas.Usuario]:
+    batch = _batch_secretary_executive_ids_by_secretary_pk(db, rows)
+    out: List[schemas.Usuario] = []
+    for u in rows:
+        sec_ids: Optional[List[int]] = None
+        if u.role == "secretary" and u.secretary_external_id:
+            try:
+                sid = int(u.secretary_external_id)
+                sec_ids = batch.get(sid)
+            except ValueError:
+                sec_ids = None
+        out.append(
+            schemas.Usuario.model_validate(
+                {
+                    "id": u.id,
+                    "fullName": u.name,
+                    "email": u.email,
+                    "phone": u.phone,
+                    "isActive": u.is_active,
+                    "role": u.role,
+                    "legalOrganizationId": u.legal_organization_id,
+                    "organizationId": u.organization_id,
+                    "executiveId": u.executive_id,
+                    "secretaryId": u.secretary_external_id,
+                    "needsProfileCompletion": bool(getattr(u, "needs_profile_completion", False)),
+                    "secretaryExecutiveIds": sec_ids,
+                }
+            )
+        )
+    return out
 
 
 class UserManagementService:
@@ -189,7 +271,7 @@ class UserManagementService:
         actor: user_models.Usuario,
         user_id: int,
         body: schemas.UserManagementPatch,
-    ) -> user_models.Usuario:
+    ) -> schemas.Usuario:
         assert_user_manager(actor)
         target = self.get_user(actor, user_id)
         if actor.role != "master" and target.role == "master":
@@ -234,13 +316,32 @@ class UserManagementService:
             updates["organization_id"] = new_org_id
             updates["legal_organization_id"] = org_row.legalOrganizationId
 
-        if not updates:
+        exec_ids_patch: Optional[List[int]] = None
+        if "secretary_executive_ids" in data:
+            if target.role != "secretary":
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Vínculos de executivo aplicam-se apenas a usuários com perfil secretária.",
+                )
+            if target.organization_id is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Usuário secretária sem empresa alocada.",
+                )
+            exec_ids_patch = validated_secretary_executive_ids_for_org(
+                self.db,
+                target.organization_id,
+                data["secretary_executive_ids"],
+                require_at_least_one=True,
+            )
+
+        if not updates and exec_ids_patch is None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Nenhum dado para atualizar.",
             )
 
-        db_user = self.users.update(target, updates)
+        db_user = self.users.update(target, updates) if updates else target
 
         new_email = updates.get("email")
         touched = False
@@ -264,7 +365,29 @@ class UserManagementService:
         if touched:
             self.db.commit()
             self.db.refresh(db_user)
-        return db_user
+
+        if exec_ids_patch is not None:
+            try:
+                sid = int(db_user.secretary_external_id or "")
+            except ValueError:
+                sid = None
+            if sid is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Secretária inválida.",
+                )
+            sec = self.db.query(Secretary).filter(Secretary.id == sid).first()
+            if sec is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Registro de secretária não encontrado.",
+                )
+            SecretaryService(self.db)._set_executives(sec, exec_ids_patch)
+            self.db.add(sec)
+            self.db.commit()
+            self.db.refresh(db_user)
+
+        return serialize_management_user(self.db, db_user)
 
     def deactivate_user(self, actor: user_models.Usuario, user_id: int) -> user_models.Usuario:
         assert_user_manager(actor)

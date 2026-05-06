@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Query
 from app.api.deps import get_current_user, get_invite_frontend_base
 from app.models import user_model as user_models
 from app.schemas import user_schema as schemas
-from app.services.user_management_service import UserManagementService
+from app.services.user_management_service import UserManagementService, serialize_management_user, serialize_management_users
 
 
 router = APIRouter(prefix="/users/management", tags=["users-management"])
@@ -20,7 +20,8 @@ def list_managed_users(
     service: UserManagementService = Depends(UserManagementService),
 ):
     rows, total = service.list_users(current, q=q, skip=skip, limit=limit)
-    return schemas.UserManagementListResponse(items=rows, total=total)
+    items = serialize_management_users(service.db, rows)
+    return schemas.UserManagementListResponse(items=items, total=total)
 
 
 @router.get("/{user_id}", response_model=schemas.Usuario)
@@ -29,7 +30,8 @@ def get_managed_user(
     current: user_models.Usuario = Depends(get_current_user),
     service: UserManagementService = Depends(UserManagementService),
 ):
-    return service.get_user(current, user_id)
+    row = service.get_user(current, user_id)
+    return serialize_management_user(service.db, row)
 
 
 @router.patch("/{user_id}", response_model=schemas.Usuario)

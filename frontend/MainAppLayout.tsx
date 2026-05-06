@@ -477,6 +477,7 @@ const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout, on
             currentUser={currentUser}
             organizations={organizations}
             legalOrganizations={legalOrganizations}
+            executives={executives}
           />
         );
       case 'agenda':

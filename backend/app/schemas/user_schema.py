@@ -61,6 +61,7 @@ class Usuario(UsuarioBase):
     executive_id: Optional[int] = Field(None, alias="executiveId")
     secretary_external_id: Optional[str] = Field(None, alias="secretaryId")
     needs_profile_completion: bool = Field(default=False, alias="needsProfileCompletion")
+    secretary_executive_ids: Optional[List[int]] = Field(None, alias="secretaryExecutiveIds")
 
 
 class UserManagementPatch(BaseModel):
@@ -71,6 +72,7 @@ class UserManagementPatch(BaseModel):
     phone: Optional[str] = None
     is_active: Optional[bool] = Field(None, alias="isActive")
     organization_id: Optional[int] = Field(None, alias="organizationId")
+    secretary_executive_ids: Optional[List[int]] = Field(None, alias="secretaryExecutiveIds")
 
 
 class UserManagementListResponse(BaseModel):
