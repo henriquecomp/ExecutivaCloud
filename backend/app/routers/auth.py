@@ -2,7 +2,7 @@ from typing import Any, Optional
 
 from fastapi import APIRouter, Body, Depends, Header, HTTPException, status
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, get_invite_frontend_base
 from app.models import user_model as user_models
 from app.schemas import auth_schema as schemas
 from app.schemas.executive_schema import ExecutiveCreate
@@ -25,9 +25,10 @@ def login(body: schemas.LoginRequest, service: AuthService = Depends(AuthService
 def register_organization(
     body: schemas.RegisterOrganizationRequest,
     service: AuthService = Depends(AuthService),
+    frontend_base: str = Depends(get_invite_frontend_base),
 ):
     """Cadastro público: organização jurídica + administrador da organização."""
-    return service.register_organization(body)
+    return service.register_organization(body, frontend_base)
 
 
 @router.post("/bootstrap-master", response_model=schemas.TokenResponse, status_code=status.HTTP_201_CREATED)
@@ -63,8 +64,9 @@ def invite_user(
     body: schemas.InviteUserRequest,
     current: user_models.Usuario = Depends(get_current_user),
     service: InviteService = Depends(InviteService),
+    frontend_base: str = Depends(get_invite_frontend_base),
 ):
-    return service.invite_user(current, body)
+    return service.invite_user(current, body, frontend_base)
 
 
 @router.get("/invite-status", response_model=schemas.InviteTokenStatusResponse)

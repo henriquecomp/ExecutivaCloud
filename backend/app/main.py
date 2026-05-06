@@ -1,6 +1,4 @@
 # main.py
-import os
-import re
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -15,6 +13,8 @@ _env_path = Path(__file__).resolve().parents[2] / ".env"
 if _env_path.is_file():
     load_dotenv(_env_path)
 from fastapi.middleware.cors import CORSMiddleware
+
+from app.core.allowed_origins import LOCAL_ORIGIN_REGEX, get_cors_origins, origin_is_allowed
 
 # Importa o roteador de usuários que acabamos de criar
 from app.routers import (
@@ -41,34 +41,14 @@ from app.routers import (
 
 app = FastAPI(title="Executiva Cloud API", description="Executiva Cloud API")
 
-_cors = os.getenv("CORS_ORIGINS", "").strip()
-# Vite (3000/3001) costuma faltar quando CORS_ORIGINS vem só do Docker/produção
-_always_allow = ("http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:3001")
-if _cors:
-    origins = [o.strip() for o in _cors.split(",") if o.strip()]
-    for o in _always_allow:
-        if o not in origins:
-            origins.append(o)
-else:
-    origins = [
-        "http://localhost:3000",
-        "http://localhost:3001",
-        "http://localhost:80",
-        "http://127.0.0.1:80",
-        "http://localhost:8080",
-        "http://127.0.0.1:8080",
-    ]
-
-# Regex cobre qualquer porta do Vite/Webpack (ex.: 3000, 5173) sem depender só da lista acima
-_local_origin_regex = r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
-_local_origin_re = re.compile(_local_origin_regex)
+origins = get_cors_origins()
 
 
 def _cors_headers_for_request(request: Request) -> dict[str, str]:
     origin = request.headers.get("origin")
     if not origin:
         return {}
-    if origin in origins or _local_origin_re.match(origin):
+    if origin_is_allowed(origin):
         return {
             "Access-Control-Allow-Origin": origin,
             "Access-Control-Allow-Credentials": "true",
@@ -79,7 +59,7 @@ def _cors_headers_for_request(request: Request) -> dict[str, str]:
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_origin_regex=_local_origin_regex,
+    allow_origin_regex=LOCAL_ORIGIN_REGEX,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

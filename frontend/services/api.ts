@@ -13,6 +13,14 @@ api.interceptors.request.use((config) => {
   if (t) {
     config.headers.Authorization = `Bearer ${t}`;
   }
+  if (typeof window !== "undefined") {
+    const origin = window.location.origin;
+    const rawBase = import.meta.env.BASE_URL || "/";
+    const pathPart = rawBase.replace(/\/?$/, "");
+    const base = pathPart ? `${origin}${pathPart}` : origin;
+    const normalized = base.replace(/\/+$/, "") || origin;
+    config.headers["X-Frontend-Base-URL"] = normalized;
+  }
   return config;
 });
 

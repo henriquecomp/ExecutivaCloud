@@ -10,12 +10,8 @@ def _clean_env_secret(raw: str) -> str:
     return s
 
 
-def _frontend_base_url() -> str:
-    return os.getenv("FRONTEND_BASE_URL", "http://localhost:3000").rstrip("/")
-
-
-def build_set_password_link(raw_token: str) -> str:
-    base = _frontend_base_url()
+def build_set_password_link(raw_token: str, frontend_base: str) -> str:
+    base = frontend_base.rstrip("/")
     return f"{base}/?flow=set-password&token={raw_token}"
 
 

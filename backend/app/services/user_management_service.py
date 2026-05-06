@@ -300,6 +300,7 @@ class UserManagementService:
         self,
         actor: user_models.Usuario,
         user_id: int,
+        frontend_base: str,
     ) -> schemas.UserManagementMessageResponse:
         """Reenvia o e-mail com link de primeiro acesso (definir senha) para perfil ainda pendente."""
         assert_user_manager(actor)
@@ -323,7 +324,7 @@ class UserManagementService:
 
         try:
             raw_token = self._issue_new_set_password_token(target.id)
-            link = build_set_password_link(raw_token)
+            link = build_set_password_link(raw_token, frontend_base)
             send_invite_email(str(target.email), str(target.name).strip(), link)
             self.db.commit()
         except HTTPException:
@@ -344,6 +345,7 @@ class UserManagementService:
         self,
         actor: user_models.Usuario,
         user_id: int,
+        frontend_base: str,
     ) -> schemas.UserManagementMessageResponse:
         """Envia link para redefinir senha (usuários que já concluíram o primeiro acesso)."""
         assert_user_manager(actor)
@@ -367,7 +369,7 @@ class UserManagementService:
 
         try:
             raw_token = self._issue_new_set_password_token(target.id)
-            link = build_set_password_link(raw_token)
+            link = build_set_password_link(raw_token, frontend_base)
             send_password_reset_email(str(target.email), str(target.name).strip(), link)
             self.db.commit()
         except HTTPException:

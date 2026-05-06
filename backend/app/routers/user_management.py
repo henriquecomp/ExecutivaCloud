@@ -2,7 +2,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, get_invite_frontend_base
 from app.models import user_model as user_models
 from app.schemas import user_schema as schemas
 from app.services.user_management_service import UserManagementService
@@ -59,8 +59,9 @@ def resend_first_access_email(
     user_id: int,
     current: user_models.Usuario = Depends(get_current_user),
     service: UserManagementService = Depends(UserManagementService),
+    frontend_base: str = Depends(get_invite_frontend_base),
 ):
-    return service.resend_first_access_email(current, user_id)
+    return service.resend_first_access_email(current, user_id, frontend_base)
 
 
 @router.post(
@@ -71,5 +72,6 @@ def send_managed_user_password_reset(
     user_id: int,
     current: user_models.Usuario = Depends(get_current_user),
     service: UserManagementService = Depends(UserManagementService),
+    frontend_base: str = Depends(get_invite_frontend_base),
 ):
-    return service.send_password_reset_email(current, user_id)
+    return service.send_password_reset_email(current, user_id, frontend_base)

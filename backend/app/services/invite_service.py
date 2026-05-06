@@ -101,6 +101,7 @@ class InviteService:
         self,
         inviter: user_models.Usuario,
         body: auth_schemas.InviteUserRequest,
+        frontend_base: str,
     ) -> auth_schemas.InviteUserResponse:
         _assert_inviter_can_invite(inviter)
         if body.email != body.email_confirm:
@@ -222,7 +223,7 @@ class InviteService:
             self.db.add(invite_row)
             self.db.flush()
 
-            link = build_set_password_link(raw_token)
+            link = build_set_password_link(raw_token, frontend_base)
             send_invite_email(str(body.email), body.full_name.strip(), link)
 
             self.db.commit()

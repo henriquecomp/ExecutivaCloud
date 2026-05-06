@@ -61,7 +61,9 @@ class AuthService:
         )
 
     def register_organization(
-        self, body: auth_schemas.RegisterOrganizationRequest
+        self,
+        body: auth_schemas.RegisterOrganizationRequest,
+        frontend_base: str,
     ) -> auth_schemas.RegisterOrganizationResponse:
         if self.users.get_by_email(body.adminEmail):
             raise HTTPException(
@@ -127,7 +129,7 @@ class AuthService:
             self.db.add(invite_row)
             self.db.flush()
 
-            link = build_set_password_link(raw_token)
+            link = build_set_password_link(raw_token, frontend_base)
             send_invite_email(str(body.adminEmail), body.adminName.strip(), link)
             self.db.commit()
         except HTTPException:

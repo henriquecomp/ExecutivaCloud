@@ -91,8 +91,7 @@ Acessos:
 ### Variáveis importantes
 
 - `VITE_API_URL`: URL da API acessível pelo navegador
-- `CORS_ORIGINS`: origens permitidas no backend
-- `FRONTEND_BASE_URL`: base usada em fluxos de convite
+- `CORS_ORIGINS`: origens permitidas no backend (e validação do cabeçalho `X-Frontend-Base-URL` nos e-mails de convite / reset)
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`: envio de e-mail no backend via SMTP Gmail
 - para Gmail, usar senha de app em `SMTP_PASSWORD` (não a senha comum da conta)
 - `SUPPORT_REPORT_TO`: caixa de destino dos relatórios de problema
