@@ -4,6 +4,7 @@ import { departmentService } from '../services/departmentService';
 import { executiveService } from '../services/executiveService';
 import { organizationService } from '../services/organizationService';
 import { normalizeExecutivePayload } from '../utils/executivePayload';
+import { validateEmailFormat } from '../utils/brValidators';
 import { ExecutiveProfileForm } from './ExecutiveProfileForm';
 import type { Department, Executive, Organization, User } from '../types';
 
@@ -73,7 +74,18 @@ const CompleteExecutiveProfileView: React.FC<CompleteExecutiveProfileViewProps> 
     setApiError(null);
     const newErrors: { fullName?: string; workEmail?: string } = {};
     if (!currentExecutive.fullName?.trim()) newErrors.fullName = 'O nome completo é obrigatório.';
-    if (!currentExecutive.workEmail?.trim()) newErrors.workEmail = 'O e-mail corporativo é obrigatório.';
+    if (!currentExecutive.workEmail?.trim()) {
+      newErrors.workEmail = 'O e-mail corporativo é obrigatório.';
+    } else if (!validateEmailFormat(currentExecutive.workEmail)) {
+      newErrors.workEmail = 'Informe um e-mail corporativo válido (máx. 254 caracteres).';
+    }
+    if (
+      currentExecutive.personalEmail?.trim() &&
+      !validateEmailFormat(currentExecutive.personalEmail)
+    ) {
+      setApiError('Informe um e-mail pessoal válido (máx. 254 caracteres).');
+      return;
+    }
     if (Object.keys(newErrors).length) {
       setErrors(newErrors);
       return;

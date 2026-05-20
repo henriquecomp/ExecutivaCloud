@@ -95,6 +95,20 @@ Acessos:
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`: envio de e-mail no backend via SMTP Gmail
 - para Gmail, usar senha de app em `SMTP_PASSWORD` (não a senha comum da conta)
 - `SUPPORT_REPORT_TO`: caixa de destino dos relatórios de problema
+- `EXECUTIVA_SETUP_TOKEN`: token exigido no header `X-Setup-Token` para `POST /auth/bootstrap-master` (criação do primeiro usuário master)
+
+### Bootstrap do usuário master
+
+Com a API em execução e `EXECUTIVA_SETUP_TOKEN` definido no `.env` do backend:
+
+```bash
+curl -X POST "http://localhost:8098/auth/bootstrap-master" \
+  -H "Content-Type: application/json" \
+  -H "X-Setup-Token: SEU_TOKEN_AQUI" \
+  -d '{"email":"admin@example.com","password":"senha-segura","fullName":"Admin Master"}'
+```
+
+A rota pública `POST /users/` **não** aceita `role: "master"`; use apenas o bootstrap acima.
 
 ## Limpeza cirúrgica aplicada
 

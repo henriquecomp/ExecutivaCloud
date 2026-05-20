@@ -84,6 +84,7 @@ class AuthService:
             "city": body.legalCity,
             "state": body.legalState,
             "zipCode": body.legalZipCode,
+            "complement": body.legalComplement,
         }
         try:
             lo = self.legal_orgs.create(lo_data)
@@ -155,7 +156,8 @@ class AuthService:
         body: auth_schemas.BootstrapMasterRequest,
     ) -> auth_schemas.TokenResponse:
         expected = os.getenv("EXECUTIVA_SETUP_TOKEN", "")
-        if not expected or setup_token != expected:
+        provided = setup_token or ""
+        if not expected or not secrets.compare_digest(provided, expected):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Token de setup inválido.")
         existing = (
             self.db.query(user_models.Usuario)

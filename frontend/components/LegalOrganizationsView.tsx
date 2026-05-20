@@ -17,45 +17,8 @@ import { legalOrganizationService } from '@/services/legalOrganizationService';
 import { organizationService } from '@/services/organizationService';
 import AppSelect from './ui/AppSelect';
 import Pagination from './Pagination';
-
-// --- Helper Functions ---
-function validateCNPJ(cnpj: string): boolean {
-    const cnpjClean = cnpj.replace(/[^\d]+/g, '');
-    if (cnpjClean.length !== 14) return false;
-    if (/^(\d)\1+$/.test(cnpjClean)) return false;
-    let size = cnpjClean.length - 2;
-    let numbers = cnpjClean.substring(0, size);
-    const digits = cnpjClean.substring(size);
-    let sum = 0;
-    let pos = size - 7;
-    for (let i = size; i >= 1; i--) {
-        sum += parseInt(numbers.charAt(size - i)) * pos--;
-        if (pos < 2) pos = 9;
-    }
-    let result = sum % 11 < 2 ? 0 : 11 - (sum % 11);
-    if (result !== parseInt(digits.charAt(0))) return false;
-    size = size + 1;
-    numbers = cnpjClean.substring(0, size);
-    sum = 0;
-    pos = size - 7;
-    for (let i = size; i >= 1; i--) {
-        sum += parseInt(numbers.charAt(size - i)) * pos--;
-        if (pos < 2) pos = 9;
-    }
-    result = sum % 11 < 2 ? 0 : 11 - (sum % 11);
-    if (result !== parseInt(digits.charAt(1))) return false;
-    return true;
-}
-
-const maskCNPJ = (value: string) => {
-    if (!value) return "";
-    return value.replace(/\D/g, '').replace(/(\d{2})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1/$2').replace(/(\d{4})(\d)/, '$1-$2').replace(/(-\d{2})\d+?$/, '$1');
-};
-
-const maskCEP = (value: string) => {
-    if (!value) return "";
-    return value.replace(/\D/g, '').replace(/(\d{5})(\d)/, '$1-$2').replace(/(-\d{3})\d+?$/, '$1');
-};
+import { validateCNPJ, validateCEP, maskCNPJ, maskCEP } from '../utils/brValidators';
+import { FREE_TEXT_MAX, CNPJ_MASK_MAX, CEP_MASK_MAX, UF_MAX } from '../utils/fieldLimits';
 
 interface LegalOrgDeleteBlockerOrg {
     id: number;
@@ -149,6 +112,7 @@ const LegalOrganizationForm: React.FC<{
     const [city, setCity] = useState(legalOrganization.city || '');
     const [state, setState] = useState(legalOrganization.state || '');
     const [zipCode, setZipCode] = useState(legalOrganization.zipCode || '');
+    const [complement, setComplement] = useState(legalOrganization.complement || '');
 
     const [cnpjError, setCnpjError] = useState('');
     const [cepError, setCepError] = useState('');
@@ -161,7 +125,9 @@ const LegalOrganizationForm: React.FC<{
     };
 
     const handleCnpjBlur = () => {
-        if (cnpj && !validateCNPJ(cnpj)) {
+        if (!cnpj.trim()) {
+            setCnpjError('CNPJ é obrigatório.');
+        } else if (!validateCNPJ(cnpj)) {
             setCnpjError('CNPJ inválido. Verifique o número e tente novamente.');
         } else {
             setCnpjError('');
@@ -203,13 +169,30 @@ const LegalOrganizationForm: React.FC<{
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!name) return;
-        if (cnpj && !validateCNPJ(cnpj)) {
+        if (!cnpj.trim() || !validateCNPJ(cnpj)) {
             handleCnpjBlur();
             cnpjInputRef.current?.focus();
             return;
+        }
+        if (!validateCEP(zipCode)) {
+            setCepError('CEP é obrigatório e deve ter 8 dígitos.');
+            return;
+        }
+        if (!street.trim() || !number.trim() || !neighborhood.trim() || !city.trim() || !state.trim()) {
+            return;
+        }
+
+        const dataToSave: any = {
+            name,
+            cnpj,
+            street,
+            number,
+            neighborhood,
+            city,
+            state: state.trim().toUpperCase().slice(0, 2),
+            zipCode,
+            complement: complement.trim() || undefined,
         };
-        
-        const dataToSave: any = { name, cnpj, street, number, neighborhood, city, state, zipCode };
         if (legalOrganization.id) dataToSave.id = legalOrganization.id;
         onSave(dataToSave);
     };
@@ -227,42 +210,49 @@ const LegalOrganizationForm: React.FC<{
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                     <label htmlFor="name" className="block text-sm font-medium text-slate-700">Nome da Organização</label>
-                    <input type="text" id="name" value={name} onChange={e => setName(e.target.value)} required className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                    <input type="text" id="name" value={name} onChange={e => setName(e.target.value)} required maxLength={FREE_TEXT_MAX} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
                 </div>
                 <div className="flex items-start gap-4">
                     <div style={{ width: '190px' }}>
-                        <label htmlFor="cnpj" className="block text-sm font-medium text-slate-700">CNPJ</label>
-                        <input ref={cnpjInputRef} type="text" id="cnpj" value={cnpj} onChange={handleCnpjChange} onBlur={handleCnpjBlur} className={`mt-1 block w-full px-3 py-2 bg-white border ${cnpjError ? 'border-red-500' : 'border-slate-300'} rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`} />
+                        <label htmlFor="cnpj" className="block text-sm font-medium text-slate-700">CNPJ *</label>
+                        <input ref={cnpjInputRef} type="text" id="cnpj" value={cnpj} required maxLength={CNPJ_MASK_MAX} onChange={handleCnpjChange} onBlur={handleCnpjBlur} className={`mt-1 block w-full px-3 py-2 bg-white border ${cnpjError ? 'border-red-500' : 'border-slate-300'} rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`} />
                         {cnpjError && <p className="mt-1 text-xs text-red-600">{cnpjError}</p>}
                     </div>
                     <div style={{ width: '120px' }}>
-                        <label htmlFor="zipCode" className="block text-sm font-medium text-slate-700">CEP</label>
-                        <input type="text" id="zipCode" value={zipCode} onChange={handleCepChange} onBlur={handleCepBlur} className={`mt-1 block w-full px-3 py-2 bg-white border ${cepError ? 'border-red-500' : 'border-slate-300'} rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`} />
+                        <label htmlFor="zipCode" className="block text-sm font-medium text-slate-700">CEP *</label>
+                        <input type="text" id="zipCode" value={zipCode} required maxLength={CEP_MASK_MAX} onChange={handleCepChange} onBlur={handleCepBlur} className={`mt-1 block w-full px-3 py-2 bg-white border ${cepError ? 'border-red-500' : 'border-slate-300'} rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`} />
                         {cepError && <p className="mt-1 text-xs text-red-600">{cepError}</p>}
                     </div>
                 </div>
                 <div>
-                    <label htmlFor="street" className="block text-sm font-medium text-slate-700">Rua</label>
-                    <input type="text" id="street" value={street} onChange={e => setStreet(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                    <label htmlFor="street" className="block text-sm font-medium text-slate-700">Rua *</label>
+                    <input type="text" id="street" value={street} required maxLength={FREE_TEXT_MAX} onChange={e => setStreet(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="md:col-span-1">
-                        <label htmlFor="number" className="block text-sm font-medium text-slate-700">Número</label>
-                        <input type="text" id="number" value={number} onChange={e => setNumber(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                        <label htmlFor="number" className="block text-sm font-medium text-slate-700">Número *</label>
+                        <input type="text" id="number" value={number} required maxLength={FREE_TEXT_MAX} onChange={e => setNumber(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
                     </div>
                     <div className="md:col-span-2">
-                        <label htmlFor="neighborhood" className="block text-sm font-medium text-slate-700">Bairro</label>
-                        <input type="text" id="neighborhood" value={neighborhood} onChange={e => setNeighborhood(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                        <label htmlFor="complement" className="block text-sm font-medium text-slate-700">Complemento</label>
+                        <input type="text" id="complement" value={complement} maxLength={FREE_TEXT_MAX} onChange={e => setComplement(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
                     </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="md:col-span-2">
-                        <label htmlFor="city" className="block text-sm font-medium text-slate-700">Cidade</label>
-                        <input type="text" id="city" value={city} onChange={e => setCity(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                        <label htmlFor="neighborhood" className="block text-sm font-medium text-slate-700">Bairro *</label>
+                        <input type="text" id="neighborhood" value={neighborhood} required maxLength={FREE_TEXT_MAX} onChange={e => setNeighborhood(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                    </div>
+                    <div className="md:col-span-1" />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="md:col-span-2">
+                        <label htmlFor="city" className="block text-sm font-medium text-slate-700">Cidade *</label>
+                        <input type="text" id="city" value={city} required maxLength={FREE_TEXT_MAX} onChange={e => setCity(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
                     </div>
                     <div className="md:col-span-1">
-                        <label htmlFor="state" className="block text-sm font-medium text-slate-700">Estado (UF)</label>
-                        <input type="text" id="state" value={state} onChange={e => setState(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                        <label htmlFor="state" className="block text-sm font-medium text-slate-700">Estado (UF) *</label>
+                        <input type="text" id="state" value={state} required maxLength={UF_MAX} onChange={e => setState(e.target.value.toUpperCase())} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm uppercase" />
                     </div>
                 </div>
                 <div className="flex justify-end space-x-3 pt-4">

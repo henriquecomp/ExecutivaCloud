@@ -434,7 +434,14 @@ const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout, on
           />
         );
       case 'executives':
-        return <ExecutivesView layout={layout} />;
+        return (
+          <ExecutivesView
+            layout={layout}
+            executives={visibleExecutives}
+            organizations={organizations}
+            departments={departments}
+          />
+        );
       case 'organizations':
         return (
           <OrganizationsView

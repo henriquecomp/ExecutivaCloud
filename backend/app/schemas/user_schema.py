@@ -19,10 +19,17 @@ UserRoleLiteral = Literal[
     "secretary",
 ]
 
+UserRoleCreateLiteral = Literal[
+    "admin_legal_organization",
+    "admin_company",
+    "executive",
+    "secretary",
+]
+
 
 class UsuarioCreate(UsuarioBase):
     password: str = Field(..., min_length=6)
-    role: UserRoleLiteral = "admin_company"
+    role: UserRoleCreateLiteral = "admin_company"
     legal_organization_id: Optional[int] = Field(None, alias="legalOrganizationId")
     organization_id: Optional[int] = Field(None, alias="organizationId")
     executive_id: Optional[int] = Field(None, alias="executiveId")

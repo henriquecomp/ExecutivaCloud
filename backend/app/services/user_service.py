@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from fastapi import Depends
+from fastapi import Depends, HTTPException, status
 
 from app.core.database import get_db
 from app.core.security import hash_password
@@ -35,7 +35,12 @@ class UserService:
 
     def create_user(self, user_data: schemas.UsuarioCreate) -> models.Usuario:
         """ LÓGICA DE NEGÓCIO: Verifica unicidade, hasheia a senha e salva. """
-        
+        if getattr(user_data, "role", None) == "master":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Não é permitido criar usuário master por esta rota. Use POST /auth/bootstrap-master com X-Setup-Token.",
+            )
+
         # 1. Lógica de Negócio: Verificar se o email já existe
         if self.repository.get_by_email(user_data.email):
             raise ValueError("Email já registrado.")

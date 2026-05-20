@@ -2,6 +2,14 @@ from typing import List, Literal, Optional
 
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
 
+from app.core.br_validators import (
+    FREE_TEXT_MAX,
+    OptionalComplement,
+    RequiredCep,
+    RequiredCnpj,
+    RequiredUf,
+)
+
 
 class LoginRequest(BaseModel):
     email: EmailStr
@@ -13,14 +21,15 @@ class RegisterOrganizationRequest(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True)
 
-    legalName: str = Field(..., min_length=2, max_length=255)
-    legalCnpj: Optional[str] = None
-    legalStreet: Optional[str] = None
-    legalNumber: Optional[str] = None
-    legalNeighborhood: Optional[str] = None
-    legalCity: Optional[str] = None
-    legalState: Optional[str] = Field(None, max_length=2)
-    legalZipCode: Optional[str] = None
+    legalName: str = Field(..., min_length=2, max_length=FREE_TEXT_MAX)
+    legalCnpj: RequiredCnpj
+    legalStreet: str = Field(..., min_length=1, max_length=FREE_TEXT_MAX)
+    legalNumber: str = Field(..., min_length=1, max_length=FREE_TEXT_MAX)
+    legalNeighborhood: str = Field(..., min_length=1, max_length=FREE_TEXT_MAX)
+    legalCity: str = Field(..., min_length=1, max_length=FREE_TEXT_MAX)
+    legalState: RequiredUf
+    legalZipCode: RequiredCep
+    legalComplement: OptionalComplement = Field(None, alias="legalComplement")
 
     adminName: str = Field(..., min_length=2, max_length=100)
     adminEmail: EmailStr

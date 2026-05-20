@@ -11,6 +11,7 @@ export interface LegalOrganization {
   city?: string;
   state?: string;
   zipCode?: string;
+  complement?: string;
 }
 
 export interface Organization {
@@ -24,6 +25,7 @@ export interface Organization {
   city?: string;
   state?: string;
   zipCode?: string;
+  complement?: string;
 }
 
 export interface Department {

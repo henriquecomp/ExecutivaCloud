@@ -24,13 +24,14 @@ export interface TokenPayload {
 
 export interface RegisterOrganizationPayload {
   legalName: string;
-  legalCnpj?: string;
-  legalStreet?: string;
-  legalNumber?: string;
-  legalNeighborhood?: string;
-  legalCity?: string;
-  legalState?: string;
-  legalZipCode?: string;
+  legalCnpj: string;
+  legalStreet: string;
+  legalNumber: string;
+  legalNeighborhood: string;
+  legalCity: string;
+  legalState: string;
+  legalZipCode: string;
+  legalComplement?: string;
   adminName: string;
   adminEmail: string;
 }

@@ -19,8 +19,9 @@ def create_user_route(
 ):
     """ Cria um novo usuário no sistema. """
     try:
-        # 'service' é uma instância de UserService já com o 'db'
-        return service.create_user(user) # <-- Não precisa mais passar 'db'
+        return service.create_user(user)
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 

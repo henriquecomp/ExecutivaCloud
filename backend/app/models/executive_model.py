@@ -25,9 +25,7 @@ class Executive(Base):
     extension = Column(String, nullable=True)
     personal_email = Column(String, nullable=True)
     personal_phone = Column(String, nullable=True)
-    street = Column(
-        Text, nullable=True
-    )  # Corrigido: Mantendo nome original da propriedade
+    street = Column(String(100), nullable=True)
     linkedin_profile_url = Column(String, nullable=True)
     job_title = Column(String, nullable=True)
     cost_center = Column(String, nullable=True)

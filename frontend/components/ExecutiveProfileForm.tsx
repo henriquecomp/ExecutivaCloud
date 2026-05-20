@@ -1,4 +1,5 @@
 import React from 'react';
+import { EMAIL_MAX, FREE_TEXT_MAX, PHONE_MAX, URL_MAX } from '../utils/fieldLimits';
 import { Executive, Organization, Department } from '../types';
 import { User, Briefcase, Phone, FileText, DollarSign, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 
@@ -219,6 +220,7 @@ export const ExecutiveProfileForm: React.FC<ExecutiveProfileFormProps> = ({
                    </label>
                    <input
                      type="email"
+                     maxLength={EMAIL_MAX}
                      readOnly={workEmailReadOnly}
                      className={`mt-1 w-full p-2 border rounded focus:outline-none focus:ring-2 ${
                       errors.workEmail ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
@@ -257,6 +259,7 @@ export const ExecutiveProfileForm: React.FC<ExecutiveProfileFormProps> = ({
                    <label className="block text-sm font-medium text-gray-700">Email Pessoal</label>
                    <input
                      type="email"
+                     maxLength={EMAIL_MAX}
                      className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
                      value={currentExecutive.personalEmail || ''}
                      onChange={e => setCurrentExecutive({...currentExecutive, personalEmail: e.target.value})}
@@ -274,6 +277,7 @@ export const ExecutiveProfileForm: React.FC<ExecutiveProfileFormProps> = ({
                 <div className="col-span-2">
                    <label className="block text-sm font-medium text-gray-700">Endereço (Rua/Núm/Comp)</label>
                    <textarea
+                     maxLength={FREE_TEXT_MAX}
                      className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
                      rows={2}
                      value={currentExecutive.street || ''}

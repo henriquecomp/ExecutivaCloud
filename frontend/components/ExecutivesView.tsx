@@ -1,7 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { executiveService } from '../services/executiveService';
-import { organizationService } from '../services/organizationService';
-import { departmentService } from '../services/departmentService';
 import { Executive, Organization, Department, LayoutView } from '../types';
 import Pagination from './Pagination';
 import { PrinterIcon } from './Icons';
@@ -12,39 +9,23 @@ import AppSelect from './ui/AppSelect';
 import ToolbarPanel from './ui/ToolbarPanel';
 import { DataTable, DataTableBody, DataTableEmptyRow, DataTableHead, DataTableRow, DataTableTd, DataTableTh } from './ui/DataTable';
 
-interface ExecutivesViewProps { layout: LayoutView; }
+interface ExecutivesViewProps {
+  layout: LayoutView;
+  executives: Executive[];
+  organizations: Organization[];
+  departments: Department[];
+}
 
 /** Listagem somente leitura. Novos executivos são criados em Usuários (convite). */
-const ExecutivesView: React.FC<ExecutivesViewProps> = ({ layout }) => {
-  const [executives, setExecutives] = useState<Executive[]>([]);
-  const [loading, setLoading] = useState(true);
+const ExecutivesView: React.FC<ExecutivesViewProps> = ({
+  layout,
+  executives,
+  organizations,
+  departments,
+}) => {
   const [searchTerm, setSearchTerm] = useState('');
-
-  const [organizations, setOrganizations] = useState<Organization[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
-
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
-
-  useEffect(() => {
-    (async () => {
-      setLoading(true);
-      try {
-        const [execData, orgData, deptData] = await Promise.all([
-          executiveService.getAll(0, 1000),
-          organizationService.getAll(),
-          departmentService.getAll(),
-        ]);
-        setExecutives(execData);
-        setOrganizations(orgData);
-        setDepartments(deptData);
-      } catch (error) {
-        console.error('Erro ao buscar dados:', error);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
 
   const filteredExecutives = executives.filter((ex) => {
     const name = ex.fullName ? ex.fullName.toLowerCase() : '';
@@ -97,9 +78,7 @@ const ExecutivesView: React.FC<ExecutivesViewProps> = ({ layout }) => {
         </tr>
       </DataTableHead>
       <DataTableBody>
-        {loading ? (
-          <DataTableEmptyRow colSpan={4}>Carregando...</DataTableEmptyRow>
-        ) : filteredExecutives.length === 0 ? (
+        {filteredExecutives.length === 0 ? (
           <DataTableEmptyRow colSpan={4}>Nenhum executivo encontrado.</DataTableEmptyRow>
         ) : (
           paginatedExecutives.map((ex) => (
@@ -119,9 +98,7 @@ const ExecutivesView: React.FC<ExecutivesViewProps> = ({ layout }) => {
   );
 
   const renderCardView = () => (
-    loading ? (
-      <div className="text-center p-6 bg-white rounded-xl shadow-md"><p className="text-slate-500">Carregando...</p></div>
-    ) : filteredExecutives.length === 0 ? (
+    filteredExecutives.length === 0 ? (
       <div className="text-center p-6 bg-white rounded-xl shadow-md"><p className="text-slate-500">Nenhum executivo encontrado.</p></div>
     ) : (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -139,9 +116,7 @@ const ExecutivesView: React.FC<ExecutivesViewProps> = ({ layout }) => {
   );
 
   const renderListView = () => (
-    loading ? (
-      <div className="text-center p-6 bg-white rounded-xl shadow-md"><p className="text-slate-500">Carregando...</p></div>
-    ) : filteredExecutives.length === 0 ? (
+    filteredExecutives.length === 0 ? (
       <div className="text-center p-6 bg-white rounded-xl shadow-md"><p className="text-slate-500">Nenhum executivo encontrado.</p></div>
     ) : (
       <div className="bg-white rounded-xl shadow-md divide-y divide-slate-200">
@@ -192,7 +167,7 @@ const ExecutivesView: React.FC<ExecutivesViewProps> = ({ layout }) => {
       {layout === 'card' && renderCardView()}
       {layout === 'list' && renderListView()}
 
-      {!loading && (
+      {filteredExecutives.length > 0 && (
         <Pagination
           currentPage={currentPage}
           totalItems={filteredExecutives.length}
