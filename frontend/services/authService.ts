@@ -1,4 +1,4 @@
-import { User } from '../types';
+import { SystemRole, User } from '../types';
 import { api, setAuthToken } from './api';
 
 const TOKEN_KEY = 'accessToken';
@@ -40,16 +40,31 @@ export interface RegisterOrganizationResponse {
   message: string;
 }
 
+function apiRoleToSystemRole(role: string): SystemRole {
+  switch (role) {
+    case 'master':
+    case 'admin_legal_organization':
+    case 'admin_company':
+    case 'executive':
+    case 'secretary':
+      return role;
+    default:
+      return 'executive';
+  }
+}
+
 export function mapApiUserToAppUser(apiUser: ApiCurrentUser): User {
   const id = String(apiUser.id);
+  const systemRole = apiRoleToSystemRole(apiUser.role);
   const base = {
     id,
     fullName: apiUser.fullName,
     email: apiUser.email,
     phone: apiUser.phone != null && String(apiUser.phone).trim() !== '' ? String(apiUser.phone) : undefined,
     needsProfileCompletion: Boolean(apiUser.needsProfileCompletion),
+    systemRole,
   };
-  switch (apiUser.role) {
+  switch (systemRole) {
     case 'master':
       return { ...base, role: 'master' };
     case 'admin_legal_organization':
@@ -58,12 +73,15 @@ export function mapApiUserToAppUser(apiUser: ApiCurrentUser): User {
         role: 'admin',
         legalOrganizationId:
           apiUser.legalOrganizationId != null ? String(apiUser.legalOrganizationId) : undefined,
+        organizationId: undefined,
       };
     case 'admin_company':
       return {
         ...base,
         role: 'admin',
         organizationId: apiUser.organizationId != null ? String(apiUser.organizationId) : undefined,
+        legalOrganizationId:
+          apiUser.legalOrganizationId != null ? String(apiUser.legalOrganizationId) : undefined,
       };
     case 'executive':
       return {

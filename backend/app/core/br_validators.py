@@ -109,11 +109,19 @@ def _strip_optional_str(v: str | None) -> str | None:
     return s if s else None
 
 
-OptionalComplement = Annotated[
-    Optional[str],
-    BeforeValidator(_strip_optional_str),
-    Field(None, max_length=FREE_TEXT_MAX),
-]
+def _normalize_complement(v: str | None) -> str | None:
+    """Aceita null para limpar complemento; string vazia vira null."""
+    if v is None:
+        return None
+    s = str(v).strip()
+    if not s:
+        return None
+    if len(s) > FREE_TEXT_MAX:
+        raise ValueError(f"Complemento não pode exceder {FREE_TEXT_MAX} caracteres.")
+    return s
+
+
+OptionalComplement = Annotated[Optional[str], BeforeValidator(_normalize_complement)]
 
 RequiredCnpj = Annotated[str, BeforeValidator(validate_cnpj)]
 OptionalCnpj = Annotated[Optional[str], BeforeValidator(validate_cnpj_optional)]

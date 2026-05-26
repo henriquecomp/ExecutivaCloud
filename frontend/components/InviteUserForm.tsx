@@ -68,15 +68,14 @@ const InviteUserForm: React.FC<InviteUserFormProps> = ({
     }
   }, [isMaster, masterCompanies]);
 
-  const singleCompanyAdmin =
-    currentUser.role === 'admin' && !!currentUser.organizationId && !currentUser.legalOrganizationId;
+  const singleCompanyAdmin = currentUser.systemRole === 'admin_company';
   const orgRequired =
     invitedRole === 'admin_company' || invitedRole === 'executive' || invitedRole === 'secretary';
   const needsOrgPicker = !singleCompanyAdmin && orgRequired;
 
   const resolvedOrganizationId = useMemo(() => {
     let org: string | undefined = organizationId;
-    if (currentUser.role === 'admin' && currentUser.organizationId && !currentUser.legalOrganizationId) {
+    if (currentUser.systemRole === 'admin_company' && currentUser.organizationId) {
       org = currentUser.organizationId;
     }
     return org != null && String(org).trim() !== '' ? String(org) : undefined;
@@ -116,7 +115,7 @@ const InviteUserForm: React.FC<InviteUserFormProps> = ({
       return;
     }
     let org: string | undefined = organizationId;
-    if (currentUser.role === 'admin' && currentUser.organizationId && !currentUser.legalOrganizationId) {
+    if (currentUser.systemRole === 'admin_company' && currentUser.organizationId) {
       org = currentUser.organizationId;
     }
     if (isMaster && orgRequired && !legalOrganizationId) {

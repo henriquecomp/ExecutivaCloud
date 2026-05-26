@@ -3,6 +3,7 @@ from fastapi import Depends, HTTPException, status
 
 from app.core.database import get_db
 from app.core.security import hash_password
+from app.core.tenant_scope import normalize_user_scope_fields, validate_user_tenant_scope
 from app.repositories.user_repository import UserRepository
 from app.schemas import user_schema as schemas
 from app.models import user_model as models
@@ -50,6 +51,19 @@ class UserService:
 
         # 3. Prepara o dicionário para o Repository (nomes de coluna no banco)
         user_dict = user_data.model_dump(exclude_unset=True, by_alias=False)
+        role = user_dict.get("role", "admin_company")
+        validate_user_tenant_scope(
+            role=role,
+            legal_organization_id=user_dict.get("legal_organization_id"),
+            organization_id=user_dict.get("organization_id"),
+        )
+        user_dict.update(
+            normalize_user_scope_fields(
+                role=role,
+                legal_organization_id=user_dict.get("legal_organization_id"),
+                organization_id=user_dict.get("organization_id"),
+            )
+        )
         user_dict["hashed_password"] = hashed_pass
         user_dict.pop("password", None)
 
@@ -64,8 +78,24 @@ class UserService:
         if not db_user:
             raise ValueError("Usuário não encontrado.")
         
-        update_dict = update_data.model_dump(exclude_unset=True)
-        
+        update_dict = update_data.model_dump(exclude_unset=True, by_alias=False)
+
+        merged_role = update_dict.get("role", db_user.role)
+        merged_legal = update_dict.get("legal_organization_id", db_user.legal_organization_id)
+        merged_org = update_dict.get("organization_id", db_user.organization_id)
+        validate_user_tenant_scope(
+            role=merged_role,
+            legal_organization_id=merged_legal,
+            organization_id=merged_org,
+        )
+        normalized = normalize_user_scope_fields(
+            role=merged_role,
+            legal_organization_id=merged_legal,
+            organization_id=merged_org,
+        )
+        update_dict["legal_organization_id"] = normalized["legal_organization_id"]
+        update_dict["organization_id"] = normalized["organization_id"]
+
         # Lógica de Negócio: Se a senha for enviada, hasheie-a
         if "password" in update_dict:
             update_dict["hashed_password"] = hash_password(update_dict["password"])

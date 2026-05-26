@@ -1,0 +1,45 @@
+---
+description: Tenant hierarchy LegalOrganization → Organization → user roles; systemRole on frontend.
+globs: "{frontend,backend}/**/*.{ts,tsx,py}"
+alwaysApply: false
+---
+
+# Executiva Cloud — tenant hierarchy
+
+## Model
+
+```
+LegalOrganization (matriz / organização jurídica)
+  └── Organization (empresa / filial)
+        └── Users, executives, departments scoped by organization_id
+```
+
+## API roles (persist in DB `users.role`)
+
+| role | legal_organization_id | organization_id |
+|------|----------------------|-----------------|
+| `admin_legal_organization` | required | **must be NULL** |
+| `admin_company` | optional (mirror matriz) | required |
+| `executive` / `secretary` | optional | required (typical) |
+| `master` | NULL | NULL |
+
+Enforce in [`backend/app/core/tenant_scope.py`](backend/app/core/tenant_scope.py) on create/update (`user_service`, `auth_service.register_organization`, `invite_service`).
+
+## Frontend
+
+- Map API role to **`User.systemRole`** in [`mapApiUserToAppUser`](frontend/services/authService.ts). Do **not** infer admin type from `organizationId` alone.
+- Use [`frontend/utils/tenantScope.ts`](frontend/utils/tenantScope.ts): `isLegalOrgAdmin`, `isCompanyAdmin`.
+- [`getVisibleNavItems`](frontend/components/sidebar/getVisibleNavItems.ts): check **`systemRole` first** — `admin_legal_organization` sees Empresas; `admin_company` hides Empresas and Organizações jurídicas.
+
+## Anti-patterns
+
+- Setting `organization_id` on `admin_legal_organization` users.
+- Using `if (user.organizationId)` before `if (user.systemRole === 'admin_legal_organization')` for nav or scope.
+- Collapsing both admin types into `role: 'admin'` without `systemRole`.
+
+## Checklist when changing auth / users / invite
+
+1. Backend invariant via `validate_user_tenant_scope`.
+2. `mapApiUserToAppUser` sets `systemRole`.
+3. Views use `tenantScope` helpers, not raw IDs.
+4. pytest: register org → admin has `organization_id` null; nav scope for legal org admin.

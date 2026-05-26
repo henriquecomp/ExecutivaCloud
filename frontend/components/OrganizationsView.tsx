@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Organization, Department, Executive, User, Secretary, Event, Contact, Expense, Task, Document, LegalOrganization, OrganizationCreate, OrganizationUpdate, DepartmentCreate, DepartmentUpdate, LayoutView } from '../types';
 import Modal from './Modal';
 import ConfirmationModal from './ConfirmationModal';
@@ -19,8 +19,8 @@ import AppButton from './ui/AppButton';
 import AppSelect from './ui/AppSelect';
 import ToolbarPanel from './ui/ToolbarPanel';
 import Pagination from './Pagination';
-import { validateCNPJ, validateCEP, maskCNPJ, maskCEP } from '../utils/brValidators';
-import { FREE_TEXT_MAX, CNPJ_MASK_MAX, CEP_MASK_MAX, UF_MAX } from '../utils/fieldLimits';
+import { isCompanyAdmin, isLegalOrgAdmin } from '../utils/tenantScope';
+import OrganizationCompanyForm from './OrganizationCompanyForm';
 
 interface OrganizationsViewProps {
   currentUser: User;
@@ -41,288 +41,6 @@ interface OrganizationsViewProps {
   onRefresh: () => Promise<void>;
   layout: LayoutView;
 }
-
-const OrganizationForm: React.FC<{
-    organization: Partial<Organization>, 
-    onSave: (organization: OrganizationCreate | OrganizationUpdate) => void, 
-    onCancel: () => void, 
-    legalOrganizations: LegalOrganization[],
-    currentUser: User;
-}> = ({ organization, onSave, onCancel, legalOrganizations, currentUser }) => {
-    const [name, setName] = useState(organization.name || '');
-    const [cnpj, setCnpj] = useState(organization.cnpj || '');
-    const [street, setStreet] = useState(organization.street || '');
-    const [number, setNumber] = useState(organization.number || '');
-    const [neighborhood, setNeighborhood] = useState(organization.neighborhood || '');
-    const [city, setCity] = useState(organization.city || '');
-    const [state, setState] = useState(organization.state || '');
-    const [zipCode, setZipCode] = useState(organization.zipCode || '');
-    const [complement, setComplement] = useState(organization.complement || '');
-
-    const [cnpjError, setCnpjError] = useState('');
-    const [cepError, setCepError] = useState('');
-    const [isCepLoading, setIsCepLoading] = useState(false);
-    const cnpjInputRef = useRef<HTMLInputElement>(null);
-    const cepInputRef = useRef<HTMLInputElement>(null);
-
-    const [isCopyDataConfirmOpen, setCopyDataConfirmOpen] = useState(false);
-    const [dataToCopy, setDataToCopy] = useState<Partial<LegalOrganization> | null>(null);
-    const copyConfirmedRef = useRef(false);
-
-    const isAdminForLegalOrg = currentUser.role === 'admin' && !!currentUser.legalOrganizationId;
-    const isOrgAdmin = currentUser.role === 'admin' && !!currentUser.organizationId;
-    
-    const [legalOrganizationId, setLegalOrganizationId] = useState(
-        isAdminForLegalOrg ? currentUser.legalOrganizationId : organization.legalOrganizationId || ''
-    );
-
-    const visibleLegalOrgs = useMemo(() => {
-        if (isAdminForLegalOrg) {
-            return legalOrganizations.filter(lo => String(lo.id) === String(currentUser.legalOrganizationId));
-        }
-        return legalOrganizations;
-    }, [legalOrganizations, currentUser, isAdminForLegalOrg]);
-
-    const handleCnpjChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (cnpjError) setCnpjError('');
-        setCnpj(maskCNPJ(e.target.value));
-    };
-
-    const handleCnpjBlur = () => {
-        if (!cnpj.trim()) {
-            setCnpjError('CNPJ é obrigatório.');
-        } else if (!validateCNPJ(cnpj)) {
-            setCnpjError('CNPJ inválido. Verifique o número e tente novamente.');
-        } else {
-            setCnpjError('');
-        }
-    };
-
-    const handleCepChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (cepError) setCepError('');
-        setZipCode(maskCEP(e.target.value));
-    };
-
-    const handleCepBlur = async () => {
-        const cepClean = zipCode.replace(/\D/g, '');
-        if (cepClean.length !== 8) {
-            if (cepClean.length > 0) {
-                 setCepError('CEP incompleto ou inválido.');
-            }
-            return;
-        }
-
-        setIsCepLoading(true);
-        try {
-            const response = await fetch(`https://viacep.com.br/ws/${cepClean}/json/`);
-            if (!response.ok) throw new Error('Erro ao buscar CEP.');
-            
-            const data = await response.json();
-            if (data.erro) {
-                throw new Error('CEP não encontrado ou inválido.');
-            }
-
-            setStreet(data.logradouro || '');
-            setNeighborhood(data.bairro || '');
-            setCity(data.localidade || '');
-            setState(data.uf || '');
-            setCepError('');
-        } catch (error) {
-            setCepError('CEP inválido. Verifique e tente novamente.');
-            setStreet(''); setNeighborhood(''); setCity(''); setState('');
-        } finally {
-            setIsCepLoading(false);
-        }
-    };
-    
-    const handleCompanyNameBlur = () => {
-        if (!name || !legalOrganizationId || cnpj || zipCode) {
-            return;
-        }
-    
-        const selectedLegalOrg = legalOrganizations.find(lo => String(lo.id) === String(legalOrganizationId));
-        if (selectedLegalOrg && (selectedLegalOrg.cnpj || selectedLegalOrg.zipCode || selectedLegalOrg.street)) {
-            copyConfirmedRef.current = false;
-            setDataToCopy(selectedLegalOrg);
-            setCopyDataConfirmOpen(true);
-        }
-    };
-    
-    const handleConfirmCopyData = () => {
-        if (dataToCopy) {
-            setCnpj(maskCNPJ(dataToCopy.cnpj || ''));
-            setZipCode(maskCEP(dataToCopy.zipCode || ''));
-            setStreet(dataToCopy.street || '');
-            setNumber(dataToCopy.number || '');
-            setNeighborhood(dataToCopy.neighborhood || '');
-            setCity(dataToCopy.city || '');
-            setState(dataToCopy.state || '');
-            setComplement(dataToCopy.complement || '');
-            setCnpjError('');
-            setCepError('');
-        }
-        copyConfirmedRef.current = true;
-    };
-    
-    const handleCloseCopyModal = () => {
-        setCopyDataConfirmOpen(false);
-        if (!copyConfirmedRef.current) {
-            cnpjInputRef.current?.focus();
-        }
-        setDataToCopy(null);
-    };
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!name || !legalOrganizationId) return;
-        if (!cnpj.trim() || !validateCNPJ(cnpj)) {
-            handleCnpjBlur();
-            cnpjInputRef.current?.focus();
-            return;
-        }
-        if (!validateCEP(zipCode)) {
-            setCepError('CEP é obrigatório e deve ter 8 dígitos.');
-            cepInputRef.current?.focus();
-            return;
-        }
-        if (!street.trim() || !number.trim() || !neighborhood.trim() || !city.trim() || !state.trim()) {
-            return;
-        }
-
-        const data: any = {
-            name,
-            legalOrganizationId,
-            cnpj, street, number, neighborhood, city, state: state.trim().toUpperCase().slice(0, 2), zipCode,
-            complement: complement.trim() || undefined,
-        };
-        if (organization.id) {
-            data.id = organization.id;
-        }
-
-        onSave(data);
-    };
-
-    return (
-        <>
-            {isCepLoading && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
-                    <div className="bg-white p-6 rounded-lg shadow-xl text-center">
-                        <div className="w-8 h-8 border-4 border-slate-200 border-t-indigo-600 rounded-full animate-spin mx-auto mb-4"></div>
-                        <p className="text-slate-700 font-semibold">Buscando CEP...</p>
-                    </div>
-                </div>
-            )}
-            <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                    <label htmlFor="legalOrganizationId" className="block text-sm font-medium text-slate-700">Organização Matriz</label>
-                    <select 
-                        id="legalOrganizationId" 
-                        value={legalOrganizationId} 
-                        onChange={e => setLegalOrganizationId(e.target.value)} 
-                        required 
-                        disabled={isAdminForLegalOrg || isOrgAdmin}
-                        className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm disabled:bg-slate-100 disabled:cursor-not-allowed"
-                    >
-                        <option value="" disabled>Selecione uma organização</option>
-                        {visibleLegalOrgs.map(lo => <option key={lo.id} value={lo.id}>{lo.name}</option>)}
-                    </select>
-                </div>
-                <div>
-                    <label htmlFor="name" className="block text-sm font-medium text-slate-700">Nome da Empresa</label>
-                    <input 
-                        type="text" 
-                        id="name" 
-                        value={name} 
-                        onChange={e => setName(e.target.value)} 
-                        onBlur={handleCompanyNameBlur}
-                        required
-                        maxLength={FREE_TEXT_MAX}
-                        className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" 
-                    />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label htmlFor="cnpj" className="block text-sm font-medium text-slate-700">CNPJ *</label>
-                        <input
-                            ref={cnpjInputRef}
-                            type="text"
-                            id="cnpj"
-                            value={cnpj}
-                            required
-                            maxLength={CNPJ_MASK_MAX}
-                            onChange={handleCnpjChange}
-                            onBlur={handleCnpjBlur}
-                            className={`mt-1 block w-full px-3 py-2 bg-white border ${cnpjError ? 'border-red-500' : 'border-slate-300'} rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
-                        />
-                        {cnpjError && <p className="mt-1 text-xs text-red-600">{cnpjError}</p>}
-                    </div>
-                    <div>
-                        <label htmlFor="zipCode" className="block text-sm font-medium text-slate-700">CEP *</label>
-                        <input
-                            ref={cepInputRef}
-                            type="text"
-                            id="zipCode"
-                            value={zipCode}
-                            required
-                            maxLength={CEP_MASK_MAX}
-                            onChange={handleCepChange}
-                            onBlur={handleCepBlur}
-                            className={`mt-1 block w-full px-3 py-2 bg-white border ${cepError ? 'border-red-500' : 'border-slate-300'} rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
-                        />
-                        {cepError && <p className="mt-1 text-xs text-red-600">{cepError}</p>}
-                    </div>
-                </div>
-                
-                 <div>
-                    <label htmlFor="street" className="block text-sm font-medium text-slate-700">Rua *</label>
-                    <input type="text" id="street" value={street} required maxLength={FREE_TEXT_MAX} onChange={e => setStreet(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="md:col-span-1">
-                        <label htmlFor="number" className="block text-sm font-medium text-slate-700">Número *</label>
-                        <input type="text" id="number" value={number} required maxLength={FREE_TEXT_MAX} onChange={e => setNumber(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
-                    </div>
-                    <div className="md:col-span-2">
-                        <label htmlFor="complement" className="block text-sm font-medium text-slate-700">Complemento</label>
-                        <input type="text" id="complement" value={complement} maxLength={FREE_TEXT_MAX} onChange={e => setComplement(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="md:col-span-2">
-                        <label htmlFor="neighborhood" className="block text-sm font-medium text-slate-700">Bairro *</label>
-                        <input type="text" id="neighborhood" value={neighborhood} required maxLength={FREE_TEXT_MAX} onChange={e => setNeighborhood(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
-                    </div>
-                    <div className="md:col-span-1" />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="md:col-span-2">
-                        <label htmlFor="city" className="block text-sm font-medium text-slate-700">Cidade *</label>
-                        <input type="text" id="city" value={city} required maxLength={FREE_TEXT_MAX} onChange={e => setCity(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
-                    </div>
-                    <div className="md:col-span-1">
-                        <label htmlFor="state" className="block text-sm font-medium text-slate-700">Estado (UF) *</label>
-                        <input type="text" id="state" value={state} required maxLength={UF_MAX} onChange={e => setState(e.target.value.toUpperCase())} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm uppercase" />
-                    </div>
-                </div>
-
-                <div className="flex justify-end space-x-3 pt-4">
-                    <button type="button" onClick={onCancel} className="px-4 py-2 bg-slate-200 text-slate-800 rounded-md hover:bg-slate-300 transition">Cancelar</button>
-                    <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition">Salvar Empresa</button>
-                </div>
-            </form>
-            <ConfirmationModal
-                isOpen={isCopyDataConfirmOpen}
-                onClose={handleCloseCopyModal}
-                onConfirm={handleConfirmCopyData}
-                title="Usar Dados da Organização"
-                message="A organização matriz selecionada possui dados de endereço e CNPJ. Deseja usar os mesmos dados para esta empresa?"
-            />
-        </>
-    );
-};
 
 const DepartmentForm: React.FC<{ 
     department: Partial<Department>, 
@@ -384,10 +102,10 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
     const [orgToDelete, setOrgToDelete] = useState<Organization | null>(null);
     const [deptToDelete, setDeptToDelete] = useState<Department | null>(null);
 
-    const isOrgAdmin = currentUser.role === 'admin' && !!currentUser.organizationId;
+    const isOrgAdmin = isCompanyAdmin(currentUser);
     
     const visibleOrganizations = useMemo(() => {
-        const isAdminForLegalOrg = currentUser.role === 'admin' && !!currentUser.legalOrganizationId;
+        const isAdminForLegalOrg = isLegalOrgAdmin(currentUser);
         
         if (isAdminForLegalOrg) {
             return organizations.filter(o => String(o.legalOrganizationId) === String(currentUser.legalOrganizationId));
@@ -716,7 +434,7 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
                         <p>{apiError}</p>
                     </div>
                 )}
-                <OrganizationForm 
+                <OrganizationCompanyForm 
                     organization={editingOrganization || {}} 
                     onSave={handleSaveOrganization} 
                     onCancel={() => { setOrgModalOpen(false); setEditingOrganization(null); }} 

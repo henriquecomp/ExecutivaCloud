@@ -143,19 +143,19 @@ const UserManagementView: React.FC<UserManagementViewProps> = ({
 
   const canReassignCompany =
     currentUser.role === 'master' ||
-    (currentUser.role === 'admin_legal_organization' && !!currentUser.legalOrganizationId);
+    (currentUser.systemRole === 'admin_legal_organization' && !!currentUser.legalOrganizationId);
 
   const companyOptions = useMemo(() => {
     if (currentUser.role === 'master') {
       return [...organizations].sort((a, b) => a.name.localeCompare(b.name, 'pt'));
     }
-    if (currentUser.role === 'admin_legal_organization' && currentUser.legalOrganizationId) {
+    if (currentUser.systemRole === 'admin_legal_organization' && currentUser.legalOrganizationId) {
       return organizations
         .filter((o) => o.legalOrganizationId === currentUser.legalOrganizationId)
         .sort((a, b) => a.name.localeCompare(b.name, 'pt'));
     }
     return [];
-  }, [currentUser.role, currentUser.legalOrganizationId, organizations]);
+  }, [currentUser.role, currentUser.systemRole, currentUser.legalOrganizationId, organizations]);
 
   const openEdit = (u: ManagedUserRow) => {
     setEditRow(u);

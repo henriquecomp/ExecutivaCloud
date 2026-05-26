@@ -147,12 +147,22 @@ export interface Secretary {
 
 export type UserRole = 'master' | 'admin' | 'secretary' | 'executive';
 
+/** Papel retornado pela API (não colapsar com UserRole). */
+export type SystemRole =
+  | 'master'
+  | 'admin_legal_organization'
+  | 'admin_company'
+  | 'executive'
+  | 'secretary';
+
 export interface User {
   id: string;
   fullName: string;
   email?: string;
   phone?: string;
   role: UserRole;
+  /** Papel exato do backend; use para hierarquia tenant (matriz vs empresa). */
+  systemRole: SystemRole;
   organizationId?: string; // for admin of a specific company
   legalOrganizationId?: string; // for admin of a legal organization
   executiveId?: string;    // for executive

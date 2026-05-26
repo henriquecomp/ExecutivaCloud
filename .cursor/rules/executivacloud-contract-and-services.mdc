@@ -73,6 +73,22 @@ In the same delivery (or explicitly linked PR), update **all** layers:
 
 - When a helper already exists (e.g. `normalizeExecutivePayload` in `frontend/utils/executivePayload.ts`), reuse it instead of duplicating cleanup logic.
 - Trim text fields; send empty strings as `null` to the API when that matches existing behavior.
+- **Optional fields on PATCH/PUT** (e.g. `complement`): send JSON `null` to clear a value. Do not send `undefined` (omitted key) if the intent is to erase the stored value — see `frontend/utils/addressPayload.ts`.
+
+## Related rules
+
+- Tenant hierarchy: `executivacloud-tenant-hierarchy.mdc`
+- Address / complement: `executivacloud-address-and-complement.mdc`
+- Migrations: `executivacloud-alembic-migrations.mdc`
+- Skill checklist: `.cursor/skills/executivacloud-tenant-and-address/SKILL.md`
+
+## New field checklist
+
+When adding a column or form field:
+
+1. All layers in “When changing an endpoint” above.
+2. **Every** form that edits the entity (including nested modals in other views).
+3. Alembic migration if DB changes; never rewrite applied revisions in production.
 
 ## Forbidden anti-patterns
 

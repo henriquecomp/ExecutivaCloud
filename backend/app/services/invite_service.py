@@ -19,6 +19,7 @@ from app.schemas import auth_schema as auth_schemas
 from app.schemas.executive_schema import ExecutiveCreate
 from app.services.auth_service import _user_to_public
 from app.services.email_service import build_set_password_link, send_invite_email
+from app.core.tenant_scope import normalize_user_scope_fields, validate_user_tenant_scope
 from app.services.secretary_service import SecretaryService, validated_secretary_executive_ids_for_org
 
 
@@ -149,6 +150,16 @@ class InviteService:
                 self.db.add(ex)
                 self.db.flush()
 
+                ex_scope = normalize_user_scope_fields(
+                    role="executive",
+                    legal_organization_id=legal_lo_id,
+                    organization_id=org.id,
+                )
+                validate_user_tenant_scope(
+                    role="executive",
+                    legal_organization_id=ex_scope["legal_organization_id"],
+                    organization_id=ex_scope["organization_id"],
+                )
                 user_row = user_models.Usuario(
                     name=body.full_name.strip(),
                     email=str(body.email).lower().strip(),
@@ -157,8 +168,8 @@ class InviteService:
                     is_active=True,
                     needs_profile_completion=True,
                     role="executive",
-                    legal_organization_id=legal_lo_id,
-                    organization_id=org.id,
+                    legal_organization_id=ex_scope["legal_organization_id"],
+                    organization_id=ex_scope["organization_id"],
                     executive_id=ex.id,
                     secretary_external_id=None,
                 )
@@ -185,6 +196,11 @@ class InviteService:
                 SecretaryService(self.db)._set_executives(sec, exec_ids)
                 self.db.add(sec)
 
+                sec_scope = normalize_user_scope_fields(
+                    role="secretary",
+                    legal_organization_id=legal_lo_id,
+                    organization_id=org.id,
+                )
                 user_row = user_models.Usuario(
                     name=body.full_name.strip(),
                     email=str(body.email).lower().strip(),
@@ -193,8 +209,8 @@ class InviteService:
                     is_active=True,
                     needs_profile_completion=True,
                     role="secretary",
-                    legal_organization_id=legal_lo_id,
-                    organization_id=org.id,
+                    legal_organization_id=sec_scope["legal_organization_id"],
+                    organization_id=sec_scope["organization_id"],
                     executive_id=None,
                     secretary_external_id=str(sec.id),
                 )
@@ -203,6 +219,16 @@ class InviteService:
 
             else:
                 # admin_company
+                admin_scope = normalize_user_scope_fields(
+                    role="admin_company",
+                    legal_organization_id=legal_lo_id,
+                    organization_id=org.id,
+                )
+                validate_user_tenant_scope(
+                    role="admin_company",
+                    legal_organization_id=admin_scope["legal_organization_id"],
+                    organization_id=admin_scope["organization_id"],
+                )
                 user_row = user_models.Usuario(
                     name=body.full_name.strip(),
                     email=str(body.email).lower().strip(),
@@ -211,8 +237,8 @@ class InviteService:
                     is_active=True,
                     needs_profile_completion=False,
                     role="admin_company",
-                    legal_organization_id=legal_lo_id,
-                    organization_id=org.id,
+                    legal_organization_id=admin_scope["legal_organization_id"],
+                    organization_id=admin_scope["organization_id"],
                     executive_id=None,
                     secretary_external_id=None,
                 )

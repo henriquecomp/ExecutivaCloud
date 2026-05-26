@@ -1,4 +1,5 @@
 import { User, View } from '../../types';
+import { isCompanyAdmin, isLegalOrgAdmin } from '../../utils/tenantScope';
 import { SidebarNavItem } from './SidebarNavItem';
 
 /** Módulos permitidos para executivo e secretária (sem configurações administrativas). */
@@ -22,12 +23,12 @@ export function getVisibleNavItems(
     case 'secretary':
       return allNavItems.filter((item) => staffOnlyViews.includes(item.view));
     case 'admin': {
-      if (currentUser.organizationId) {
+      if (isLegalOrgAdmin(currentUser)) {
+        return allNavItems.filter((item) => item.view !== 'legalOrganizations');
+      }
+      if (isCompanyAdmin(currentUser)) {
         const hidden: View[] = ['legalOrganizations', 'organizations'];
         return allNavItems.filter((item) => !hidden.includes(item.view));
-      }
-      if (currentUser.legalOrganizationId) {
-        return allNavItems.filter((item) => item.view !== 'legalOrganizations');
       }
       return allNavItems;
     }

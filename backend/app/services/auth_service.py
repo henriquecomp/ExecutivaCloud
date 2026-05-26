@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.invite_token import hash_invite_token
+from app.core.tenant_scope import normalize_user_scope_fields, validate_user_tenant_scope
 from app.core.security import create_access_token, hash_password, verify_password
 from app.models.executive_model import Executive
 from app.models.secretary_model import Secretary
@@ -100,6 +101,16 @@ class AuthService:
         token_hash = hash_invite_token(raw_token)
         expires_at = datetime.now(timezone.utc) + timedelta(days=int(os.getenv("INVITE_TOKEN_DAYS", "7")))
 
+        lo_admin_scope = normalize_user_scope_fields(
+            role="admin_legal_organization",
+            legal_organization_id=lo.id,
+            organization_id=None,
+        )
+        validate_user_tenant_scope(
+            role="admin_legal_organization",
+            legal_organization_id=lo_admin_scope["legal_organization_id"],
+            organization_id=lo_admin_scope["organization_id"],
+        )
         try:
             db_user = self.users.create(
                 {
@@ -110,8 +121,8 @@ class AuthService:
                     "is_active": True,
                     "needs_profile_completion": False,
                     "role": "admin_legal_organization",
-                    "legal_organization_id": lo.id,
-                    "organization_id": None,
+                    "legal_organization_id": lo_admin_scope["legal_organization_id"],
+                    "organization_id": lo_admin_scope["organization_id"],
                     "executive_id": None,
                     "secretary_external_id": None,
                 }

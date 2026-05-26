@@ -8,6 +8,7 @@ import AppSelect from './ui/AppSelect';
 import ToolbarPanel from './ui/ToolbarPanel';
 import Pagination from './Pagination';
 import { DataTable, DataTableBody, DataTableEmptyRow, DataTableHead, DataTableRow, DataTableTd, DataTableTh } from './ui/DataTable';
+import { isCompanyAdmin, isLegalOrgAdmin } from '../utils/tenantScope';
 // --- Helper Functions ---
 /**
  * Validates a Brazilian CPF number.
@@ -185,8 +186,8 @@ export const SecretaryForm: React.FC<{
 
     const isSecretaryUser = currentUser.role === 'secretary';
     const canAssignExecutives = !isSecretaryUser;
-    const isAdminForLegalOrg = currentUser.role === 'admin' && !!currentUser.legalOrganizationId;
-    const isOrgAdmin = currentUser.role === 'admin' && !!currentUser.organizationId;
+    const isAdminForLegalOrg = isLegalOrgAdmin(currentUser);
+    const isOrgAdmin = isCompanyAdmin(currentUser);
 
     useEffect(() => {
         if (isOrgAdmin && currentUser.organizationId && organizationId !== currentUser.organizationId) {
@@ -569,8 +570,8 @@ const SecretariesView: React.FC<SecretariesViewProps> = ({
 }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const isSecretaryUser = currentUser.role === 'secretary';
-    const isAdminForLegalOrg = currentUser.role === 'admin' && !!currentUser.legalOrganizationId;
-    const isOrgAdmin = currentUser.role === 'admin' && !!currentUser.organizationId;
+    const isAdminForLegalOrg = isLegalOrgAdmin(currentUser);
+    const isOrgAdmin = isCompanyAdmin(currentUser);
 
     const adminScopedExecutiveIds = useMemo(() => {
         if (isAdminForLegalOrg) {

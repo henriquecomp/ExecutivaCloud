@@ -1,0 +1,26 @@
+---
+description: Safe Alembic migrations — one concern per revision, no rewrite of applied history.
+globs: "backend/alembic/**"
+alwaysApply: false
+---
+
+# Executiva Cloud — Alembic migrations
+
+## Rules
+
+1. **Never delete or rewrite** a revision already applied in production. Add a **new** `down_revision` chain entry instead.
+2. **One concern per migration** (e.g. add `complement` separate from unrelated `VARCHAR` shrinks on other tables).
+3. Generate revision IDs with `alembic revision -m "description"`; avoid hand-made hex IDs unless team standard requires it.
+4. **Header must match chain**: `Revises:` comment = `down_revision` in file.
+5. **Data before shrink**: if reducing column length, `UPDATE ... SET col = LEFT(col, N)` (or fix data) **before** `ALTER COLUMN`.
+6. **Do not mix domains** in one file (org address ≠ executive profile columns).
+
+## Production already has `m1n2o3p4q5r6`
+
+- Keep it in history.
+- Data fix for legal org admins: [`p7q8r9s0t1u2_fix_legal_org_admin_organization_id.py`](backend/alembic/versions/p7q8r9s0t1u2_fix_legal_org_admin_organization_id.py).
+
+## Before merge
+
+- `alembic upgrade head` on clean DB and on staging copy when possible.
+- Run `pytest` after schema changes.

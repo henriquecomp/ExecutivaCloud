@@ -290,13 +290,13 @@ const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout, on
       case 'master':
         return executives;
       case 'admin':
-        if (currentUser.legalOrganizationId) {
+        if (currentUser.systemRole === 'admin_legal_organization' && currentUser.legalOrganizationId) {
           const orgIdsForLegalOrg = organizations
             .filter((o) => o.legalOrganizationId === currentUser.legalOrganizationId)
             .map((o) => o.id);
           return executives.filter((e) => e.organizationId && orgIdsForLegalOrg.includes(e.organizationId));
         }
-        if (currentUser.organizationId) {
+        if (currentUser.systemRole === 'admin_company' && currentUser.organizationId) {
           return executives.filter((e) => e.organizationId === currentUser.organizationId);
         }
         return [];

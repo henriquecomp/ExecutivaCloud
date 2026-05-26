@@ -1,0 +1,37 @@
+---
+description: Address fields and complement must stay consistent across all org/company forms and API updates.
+globs: "{frontend,backend}/**/*.{ts,tsx,py}"
+alwaysApply: false
+---
+
+# Executiva Cloud — address and complement
+
+## Field `complement`
+
+Present on **legal_organizations** and **organizations**. Optional; must be clearable on update.
+
+## Screens (all must read/write complement)
+
+- [`RegisterOrganizationView.tsx`](frontend/components/RegisterOrganizationView.tsx) — `legalComplement`
+- [`LegalOrganizationsView.tsx`](frontend/components/LegalOrganizationsView.tsx) — `LegalOrganizationForm`
+- [`OrganizationCompanyForm.tsx`](frontend/components/OrganizationCompanyForm.tsx) — shared company form (used by Empresas and Org jurídicas modals)
+
+**Do not** duplicate a second company form without complement and full address validation.
+
+## Frontend payload rules
+
+- Use [`frontend/utils/addressPayload.ts`](frontend/utils/addressPayload.ts): `normalizeComplement`, `buildOrgAddressPayload`.
+- On **update**, send `complement: null` to clear — never `undefined` (axios omits key → backend `exclude_unset` skips → stale DB value).
+
+## Backend
+
+- Schemas: `OptionalComplement` in [`br_validators.py`](backend/app/core/br_validators.py) accepts `null`.
+- Services: `model_dump(exclude_unset=True)` must receive explicit `null` from client to clear.
+
+## Tests required for complement changes
+
+- `PUT /organizations/{id}` with complement → GET returns value.
+- `PUT` with `"complement": null` → cleared.
+- Same for `/legal-organizations/{id}`.
+
+See [`backend/tests/test_address_complement.py`](backend/tests/test_address_complement.py).

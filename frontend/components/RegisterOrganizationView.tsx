@@ -68,7 +68,7 @@ const RegisterOrganizationView: React.FC<RegisterOrganizationViewProps> = ({ onS
         legalCity: form.legalCity.trim(),
         legalState: form.legalState.trim().slice(0, 2).toUpperCase(),
         legalZipCode: form.legalZipCode.trim(),
-        legalComplement: form.legalComplement?.trim() || undefined,
+        legalComplement: form.legalComplement?.trim() ? form.legalComplement.trim() : undefined,
       };
       const data = await registerOrganization(payload);
       onSuccess(data.message);

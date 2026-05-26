@@ -19,6 +19,9 @@ import AppSelect from './ui/AppSelect';
 import Pagination from './Pagination';
 import { validateCNPJ, validateCEP, maskCNPJ, maskCEP } from '../utils/brValidators';
 import { FREE_TEXT_MAX, CNPJ_MASK_MAX, CEP_MASK_MAX, UF_MAX } from '../utils/fieldLimits';
+import { isCompanyAdmin, isLegalOrgAdmin } from '../utils/tenantScope';
+import { normalizeComplement } from '../utils/addressPayload';
+import OrganizationCompanyForm from './OrganizationCompanyForm';
 
 interface LegalOrgDeleteBlockerOrg {
     id: number;
@@ -191,7 +194,7 @@ const LegalOrganizationForm: React.FC<{
             city,
             state: state.trim().toUpperCase().slice(0, 2),
             zipCode,
-            complement: complement.trim() || undefined,
+            complement: normalizeComplement(complement),
         };
         if (legalOrganization.id) dataToSave.id = legalOrganization.id;
         onSave(dataToSave);
@@ -264,93 +267,6 @@ const LegalOrganizationForm: React.FC<{
     );
 };
 
-const OrganizationForm: React.FC<{
-    organization: Partial<Organization>, 
-    onSave: (organization: OrganizationUpdate | Organization) => void, 
-    onCancel: () => void, 
-    legalOrganizations: LegalOrganization[],
-    currentUser: User;
-}> = ({ organization, onSave, onCancel, legalOrganizations, currentUser }) => {
-    const [name, setName] = useState(organization.name || '');
-    const [cnpj, setCnpj] = useState(organization.cnpj || '');
-    const [street, setStreet] = useState(organization.street || '');
-    const [number, setNumber] = useState(organization.number || '');
-    const [neighborhood, setNeighborhood] = useState(organization.neighborhood || '');
-    const [city, setCity] = useState(organization.city || '');
-    const [state, setState] = useState(organization.state || '');
-    const [zipCode, setZipCode] = useState(organization.zipCode || '');
-    const [cnpjError, setCnpjError] = useState('');
-    const [cepError, setCepError] = useState('');
-    const [isCepLoading, setIsCepLoading] = useState(false);
-    
-    const isAdminForLegalOrg = currentUser.role === 'admin' && !!currentUser.legalOrganizationId;
-    const isOrgAdmin = currentUser.role === 'admin' && !!currentUser.organizationId;
-    const [legalOrganizationId, setLegalOrganizationId] = useState(isAdminForLegalOrg ? currentUser.legalOrganizationId : organization.legalOrganizationId || '');
-
-    const [isCopyDataConfirmOpen, setCopyDataConfirmOpen] = useState(false);
-    const [dataToCopy, setDataToCopy] = useState<Partial<LegalOrganization> | null>(null);
-
-    const visibleLegalOrgs = useMemo(() => {
-        if (isAdminForLegalOrg) return legalOrganizations.filter(lo => String(lo.id) === String(currentUser.legalOrganizationId));
-        return legalOrganizations;
-    }, [legalOrganizations, currentUser, isAdminForLegalOrg]);
-
-    const handleCnpjChange = (e: React.ChangeEvent<HTMLInputElement>) => { if (cnpjError) setCnpjError(''); setCnpj(maskCNPJ(e.target.value)); };
-    const handleCnpjBlur = () => { if (cnpj && !validateCNPJ(cnpj)) setCnpjError('CNPJ inválido.'); else setCnpjError(''); };
-    const handleCepChange = (e: React.ChangeEvent<HTMLInputElement>) => { if (cepError) setCepError(''); setZipCode(maskCEP(e.target.value)); };
-    
-    const handleCepBlur = async () => {
-        const cepClean = zipCode.replace(/\D/g, '');
-        if (cepClean.length !== 8) return;
-        setIsCepLoading(true);
-        try {
-            const response = await fetch(`https://viacep.com.br/ws/${cepClean}/json/`);
-            const data = await response.json();
-            if (!data.erro) {
-                setStreet(data.logradouro || ''); setNeighborhood(data.bairro || ''); setCity(data.localidade || ''); setState(data.uf || '');
-            }
-        } catch { setCepError('Erro ao buscar CEP.'); } finally { setIsCepLoading(false); }
-    };
-    
-    const handleCompanyNameBlur = () => {
-        if (!name || !legalOrganizationId || cnpj || zipCode) return;
-        const selectedLegalOrg = legalOrganizations.find(lo => String(lo.id) === String(legalOrganizationId));
-        if (selectedLegalOrg && (selectedLegalOrg.cnpj || selectedLegalOrg.zipCode)) {
-            setDataToCopy(selectedLegalOrg); setCopyDataConfirmOpen(true);
-        }
-    };
-    
-    const handleConfirmCopyData = () => {
-        if (dataToCopy) {
-            setCnpj(maskCNPJ(dataToCopy.cnpj || '')); setZipCode(maskCEP(dataToCopy.zipCode || ''));
-            setStreet(dataToCopy.street || ''); setNumber(dataToCopy.number || '');
-            setNeighborhood(dataToCopy.neighborhood || ''); setCity(dataToCopy.city || ''); setState(dataToCopy.state || '');
-        }
-        setCopyDataConfirmOpen(false);
-    };
-    
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!name || !legalOrganizationId) return;
-        const data: any = { name, legalOrganizationId, cnpj, street, number, neighborhood, city, state, zipCode };
-        if (organization.id) data.id = organization.id;
-        onSave(data);
-    };
-
-    return (
-        <>
-            {isCepLoading && <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]"><div className="bg-white p-6 rounded-lg shadow-xl text-center"><p>Buscando CEP...</p></div></div>}
-            <form onSubmit={handleSubmit} className="space-y-4">
-                <div><label className="block text-sm font-medium">Matriz</label><select value={legalOrganizationId} onChange={e => setLegalOrganizationId(e.target.value)} disabled={isAdminForLegalOrg || isOrgAdmin} className="mt-1 block w-full border rounded-md p-2"><option value="">Selecione</option>{visibleLegalOrgs.map(lo => <option key={lo.id} value={lo.id}>{lo.name}</option>)}</select></div>
-                <div><label className="block text-sm font-medium">Nome da Empresa</label><input type="text" value={name} onChange={e => setName(e.target.value)} onBlur={handleCompanyNameBlur} className="mt-1 block w-full border rounded-md p-2" /></div>
-                <div className="grid grid-cols-2 gap-4"><div><label className="block text-sm font-medium">CNPJ</label><input type="text" value={cnpj} onChange={handleCnpjChange} onBlur={handleCnpjBlur} className="mt-1 block w-full border rounded-md p-2" />{cnpjError && <p className="text-red-600 text-xs">{cnpjError}</p>}</div><div><label className="block text-sm font-medium">CEP</label><input type="text" value={zipCode} onChange={handleCepChange} onBlur={handleCepBlur} className="mt-1 block w-full border rounded-md p-2" /></div></div>
-                <div className="flex justify-end space-x-3 pt-4"><button type="button" onClick={onCancel} className="px-4 py-2 bg-slate-200 rounded-md">Cancelar</button><button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-md">Salvar</button></div>
-            </form>
-            <ConfirmationModal isOpen={isCopyDataConfirmOpen} onClose={() => setCopyDataConfirmOpen(false)} onConfirm={handleConfirmCopyData} title="Copiar Dados" message="Deseja copiar os dados de endereço da Matriz?" />
-        </>
-    );
-};
-
 const LegalOrganizationsView: React.FC<LegalOrganizationsViewProps> = ({
     currentUser, legalOrganizations, setLegalOrganizations, organizations, setOrganizations, onRefresh, layout
 }) => {
@@ -363,7 +279,7 @@ const LegalOrganizationsView: React.FC<LegalOrganizationsViewProps> = ({
     const [companyToDelete, setCompanyToDelete] = useState<Organization | null>(null);
     const [apiError, setApiError] = useState<string | null>(null);
     
-    const isAdminForLegalOrg = currentUser.role === 'admin' && !!currentUser.legalOrganizationId;
+    const isAdminForLegalOrg = isLegalOrgAdmin(currentUser);
 
     const visibleLegalOrgs = useMemo(() => {
         if (isAdminForLegalOrg) return legalOrganizations.filter(lo => String(lo.id) === String(currentUser.legalOrganizationId));
@@ -454,6 +370,9 @@ const LegalOrganizationsView: React.FC<LegalOrganizationsViewProps> = ({
             if ('id' in companyData && companyData.id) {
                 const updated = await organizationService.update(String(companyData.id), companyData as OrganizationUpdate);
                 setOrganizations(prev => prev.map(org => String(org.id) === String(companyData.id) ? updated : org));
+            } else {
+                const created = await organizationService.create(companyData as OrganizationCreate);
+                setOrganizations(prev => [...prev, created]);
             }
             if (onRefresh) onRefresh();
             setCompanyModalOpen(false);
@@ -687,7 +606,7 @@ const LegalOrganizationsView: React.FC<LegalOrganizationsViewProps> = ({
                             <p>{apiError}</p>
                         </div>
                     )}
-                    <OrganizationForm organization={editingCompany || {}} onSave={handleSaveCompany} onCancel={() => setCompanyModalOpen(false)} legalOrganizations={legalOrganizations} currentUser={currentUser} />
+                    <OrganizationCompanyForm organization={editingCompany || {}} onSave={handleSaveCompany} onCancel={() => setCompanyModalOpen(false)} legalOrganizations={legalOrganizations} currentUser={currentUser} />
                 </Modal>
             )}
 

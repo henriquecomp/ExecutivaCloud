@@ -187,6 +187,51 @@ def test_organization_create_rejects_invalid_cnpj(client, db_session):
     assert r.status_code == 422
 
 
+def test_register_organization_creates_legal_org_admin(client, db_session):
+    """Cadastro público de organização: admin da matriz, sem organization_id."""
+    email = "orgadmin@newtenant.com"
+    payload = {
+        "legalName": "Matriz Nova",
+        "legalCnpj": "11444777000161",
+        "legalStreet": "Rua Registro",
+        "legalNumber": "50",
+        "legalNeighborhood": "Centro",
+        "legalCity": "São Paulo",
+        "legalState": "SP",
+        "legalZipCode": VALID_CEP,
+        "legalComplement": "Sala 1",
+        "adminName": "Admin Matriz",
+        "adminEmail": email,
+    }
+    r = client.post(
+        "/auth/register-organization",
+        json=payload,
+        headers={"X-Frontend-Base-URL": "http://localhost:5173"},
+    )
+    assert r.status_code in (200, 201), r.text
+
+    user = db_session.query(user_models.Usuario).filter(user_models.Usuario.email == email).first()
+    assert user is not None
+    assert user.role == "admin_legal_organization"
+    assert user.legal_organization_id is not None
+    assert user.organization_id is None
+
+
+def test_legal_org_admin_cannot_have_organization_id(db_session):
+    import pytest
+    from fastapi import HTTPException
+    from app.core.tenant_scope import validate_user_tenant_scope
+
+    lo = _seed_legal_org(db_session, "06990590000123")
+    with pytest.raises(HTTPException) as exc:
+        validate_user_tenant_scope(
+            role="admin_legal_organization",
+            legal_organization_id=lo.id,
+            organization_id=99,
+        )
+    assert exc.value.status_code == 400
+
+
 def test_legal_organization_create_rejects_invalid_cep(client, db_session):
     payload = {
         "name": "Org Nova",
