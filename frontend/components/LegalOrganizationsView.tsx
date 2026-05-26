@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { useCepAutoLookup } from '../hooks/useCepAutoLookup';
 import { LegalOrganization, Organization, Department, Executive, Secretary, Event, Contact, Expense, Task, Document, User, LegalOrganizationCreate, LegalOrganizationUpdate, OrganizationUpdate, OrganizationCreate, LayoutView } from '../types';
 import Modal from './Modal';
 import ConfirmationModal from './ConfirmationModal';
@@ -118,9 +119,26 @@ const LegalOrganizationForm: React.FC<{
     const [complement, setComplement] = useState(legalOrganization.complement || '');
 
     const [cnpjError, setCnpjError] = useState('');
-    const [cepError, setCepError] = useState('');
-    const [isCepLoading, setIsCepLoading] = useState(false);
     const cnpjInputRef = useRef<HTMLInputElement>(null);
+
+    const applyCepAddress = useCallback((addr: { street: string; neighborhood: string; city: string; state: string }) => {
+        setStreet(addr.street);
+        setNeighborhood(addr.neighborhood);
+        setCity(addr.city);
+        setState(addr.state);
+    }, []);
+
+    const clearCepAddress = useCallback(() => {
+        setStreet('');
+        setNeighborhood('');
+        setCity('');
+        setState('');
+    }, []);
+
+    const { handleCepInputChange, isCepLoading, cepError, setCepError } = useCepAutoLookup({
+        onAddress: applyCepAddress,
+        onClearAddress: clearCepAddress,
+    });
 
     const handleCnpjChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (cnpjError) setCnpjError('');
@@ -138,34 +156,13 @@ const LegalOrganizationForm: React.FC<{
     };
 
     const handleCepChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (cepError) setCepError('');
-        setZipCode(maskCEP(e.target.value));
+        handleCepInputChange(e.target.value, setZipCode);
     };
 
-    const handleCepBlur = async () => {
-        const cepClean = zipCode.replace(/\D/g, '');
-        if (cepClean.length !== 8) {
-            if (cepClean.length > 0) setCepError('CEP incompleto ou inválido.');
-            return;
-        }
-
-        setIsCepLoading(true);
-        try {
-            const response = await fetch(`https://viacep.com.br/ws/${cepClean}/json/`);
-            if (!response.ok) throw new Error('Erro ao buscar CEP.');
-            const data = await response.json();
-            if (data.erro) throw new Error('CEP não encontrado ou inválido.');
-
-            setStreet(data.logradouro || '');
-            setNeighborhood(data.bairro || '');
-            setCity(data.localidade || '');
-            setState(data.uf || '');
-            setCepError('');
-        } catch (error) {
-            setCepError('CEP inválido. Verifique e tente novamente.');
-            setStreet(''); setNeighborhood(''); setCity(''); setState('');
-        } finally {
-            setIsCepLoading(false);
+    const handleCepBlur = () => {
+        const digits = zipCode.replace(/\D/g, '');
+        if (digits.length > 0 && digits.length !== 8) {
+            setCepError('CEP incompleto ou inválido.');
         }
     };
 

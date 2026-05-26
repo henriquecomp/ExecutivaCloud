@@ -22,6 +22,7 @@ Present on **legal_organizations** and **organizations**. Optional; must be clea
 
 - Use [`frontend/utils/addressPayload.ts`](frontend/utils/addressPayload.ts): `normalizeComplement`, `buildOrgAddressPayload`.
 - On **update**, send `complement: null` to clear — never `undefined` (axios omits key → backend `exclude_unset` skips → stale DB value).
+- **CEP lookup:** use [`useCepAutoLookup`](frontend/hooks/useCepAutoLookup.ts) on every CEP field — busca ViaCEP ao completar 8 dígitos no `onChange`, not only on blur.
 
 ## Backend
 

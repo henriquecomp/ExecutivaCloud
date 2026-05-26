@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
+import { useCepAutoLookup } from '../hooks/useCepAutoLookup';
 import { LogoIcon } from './Icons';
 import { registerOrganization, RegisterOrganizationPayload } from '../services/authService';
 import axios from 'axios';
@@ -27,6 +28,34 @@ const RegisterOrganizationView: React.FC<RegisterOrganizationViewProps> = ({ onS
   const [error, setError] = useState<string | null>(null);
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const applyCepAddress = useCallback(
+    (addr: { street: string; neighborhood: string; city: string; state: string }) => {
+      setForm((prev) => ({
+        ...prev,
+        legalStreet: addr.street,
+        legalNeighborhood: addr.neighborhood,
+        legalCity: addr.city,
+        legalState: addr.state,
+      }));
+    },
+    [],
+  );
+
+  const clearCepAddress = useCallback(() => {
+    setForm((prev) => ({
+      ...prev,
+      legalStreet: '',
+      legalNeighborhood: '',
+      legalCity: '',
+      legalState: '',
+    }));
+  }, []);
+
+  const { handleCepInputChange, isCepLoading, cepError } = useCepAutoLookup({
+    onAddress: applyCepAddress,
+    onClearAddress: clearCepAddress,
+  });
 
   const update = (field: keyof RegisterOrganizationPayload, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -139,9 +168,11 @@ const RegisterOrganizationView: React.FC<RegisterOrganizationViewProps> = ({ onS
                   required
                   maxLength={CEP_MASK_MAX}
                   value={form.legalZipCode || ''}
-                  onChange={(e) => update('legalZipCode', maskCEP(e.target.value))}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm"
+                  onChange={(e) => handleCepInputChange(e.target.value, (masked) => update('legalZipCode', masked))}
+                  className={`w-full px-3 py-2 border rounded-md text-sm ${cepError ? 'border-red-500' : 'border-slate-300'}`}
                 />
+                {cepError && <p className="mt-1 text-xs text-red-600">{cepError}</p>}
+                {isCepLoading && <p className="mt-1 text-xs text-slate-500">Buscando CEP…</p>}
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
