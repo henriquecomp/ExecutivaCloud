@@ -126,3 +126,7 @@ Foram removidos arquivos obsoletos/não utilizados em runtime:
 
 - O módulo principal em produção está centrado em agenda, contatos, tarefas, documentos, gestão de usuários e estrutura organizacional.
 - A base do frontend possui elementos de finanças, mas o eixo totalmente integrado e persistido hoje é o conjunto descrito na seção **Funcionalidades prontas e integradas**.
+
+## Comandos de inicialização
+
+uvicorn app.main:app --reload --port 8098

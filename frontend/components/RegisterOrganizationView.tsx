@@ -3,13 +3,22 @@ import { useCepAutoLookup } from '../hooks/useCepAutoLookup';
 import { LogoIcon } from './Icons';
 import { registerOrganization, RegisterOrganizationPayload } from '../services/authService';
 import axios from 'axios';
-import { validateCNPJ, validateCEP, maskCNPJ, maskCEP } from '../utils/brValidators';
-import { FREE_TEXT_MAX, CNPJ_MASK_MAX, CEP_MASK_MAX, UF_MAX, EMAIL_MAX } from '../utils/fieldLimits';
+import {
+  validateCNPJ,
+  validateCEP,
+  validateFullNameTwoWords,
+  maskCNPJ,
+  maskCEP,
+} from '../utils/brValidators';
+import { FREE_TEXT_MAX, CNPJ_MASK_MAX, CEP_MASK_MAX, EMAIL_MAX } from '../utils/fieldLimits';
 
 interface RegisterOrganizationViewProps {
   onSuccess: (message: string) => void;
   onBack: () => void;
 }
+
+const READONLY_ADDRESS_CLASS =
+  'w-full px-3 py-2 border border-slate-200 rounded-md text-sm bg-slate-50 text-slate-700 cursor-not-allowed';
 
 const RegisterOrganizationView: React.FC<RegisterOrganizationViewProps> = ({ onSuccess, onBack }) => {
   const [form, setForm] = useState<RegisterOrganizationPayload>({
@@ -24,6 +33,7 @@ const RegisterOrganizationView: React.FC<RegisterOrganizationViewProps> = ({ onS
     legalComplement: '',
     adminName: '',
     adminEmail: '',
+    adminEmailConfirm: '',
   });
   const [error, setError] = useState<string | null>(null);
   const [fieldError, setFieldError] = useState<string | null>(null);
@@ -52,7 +62,7 @@ const RegisterOrganizationView: React.FC<RegisterOrganizationViewProps> = ({ onS
     }));
   }, []);
 
-  const { handleCepInputChange, isCepLoading, cepError } = useCepAutoLookup({
+  const { handleCepInputChange, handleCepBlur, isCepLoading, cepError } = useCepAutoLookup({
     onAddress: applyCepAddress,
     onClearAddress: clearCepAddress,
   });
@@ -67,6 +77,10 @@ const RegisterOrganizationView: React.FC<RegisterOrganizationViewProps> = ({ onS
     setError(null);
     setFieldError(null);
 
+    if (!validateFullNameTwoWords(form.legalName)) {
+      setFieldError('A razão social deve conter pelo menos dois nomes.');
+      return;
+    }
     if (!form.legalCnpj?.trim() || !validateCNPJ(form.legalCnpj)) {
       setFieldError('Informe um CNPJ válido.');
       return;
@@ -85,6 +99,14 @@ const RegisterOrganizationView: React.FC<RegisterOrganizationViewProps> = ({ onS
       setFieldError('Preencha o endereço completo (logradouro, número, bairro, cidade e UF).');
       return;
     }
+    if (!validateFullNameTwoWords(form.adminName)) {
+      setFieldError('O nome completo deve conter pelo menos dois nomes.');
+      return;
+    }
+    if (form.adminEmail.trim().toLowerCase() !== form.adminEmailConfirm.trim().toLowerCase()) {
+      setFieldError('E-mail e confirmação não coincidem.');
+      return;
+    }
 
     setLoading(true);
     try {
@@ -98,6 +120,8 @@ const RegisterOrganizationView: React.FC<RegisterOrganizationViewProps> = ({ onS
         legalState: form.legalState.trim().slice(0, 2).toUpperCase(),
         legalZipCode: form.legalZipCode.trim(),
         legalComplement: form.legalComplement?.trim() ? form.legalComplement.trim() : undefined,
+        adminEmail: form.adminEmail.trim(),
+        adminEmailConfirm: form.adminEmailConfirm.trim(),
       };
       const data = await registerOrganization(payload);
       onSuccess(data.message);
@@ -148,6 +172,7 @@ const RegisterOrganizationView: React.FC<RegisterOrganizationViewProps> = ({ onS
                 maxLength={FREE_TEXT_MAX}
                 value={form.legalName}
                 onChange={(e) => update('legalName', e.target.value)}
+                placeholder="Ex.: STELLANTIS DO BRASIL"
                 className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm"
               />
             </div>
@@ -159,7 +184,7 @@ const RegisterOrganizationView: React.FC<RegisterOrganizationViewProps> = ({ onS
                   maxLength={CNPJ_MASK_MAX}
                   value={form.legalCnpj || ''}
                   onChange={(e) => update('legalCnpj', maskCNPJ(e.target.value))}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm uppercase"
                 />
               </div>
               <div>
@@ -169,6 +194,7 @@ const RegisterOrganizationView: React.FC<RegisterOrganizationViewProps> = ({ onS
                   maxLength={CEP_MASK_MAX}
                   value={form.legalZipCode || ''}
                   onChange={(e) => handleCepInputChange(e.target.value, (masked) => update('legalZipCode', masked))}
+                  onBlur={() => handleCepBlur(form.legalZipCode || '')}
                   className={`w-full px-3 py-2 border rounded-md text-sm ${cepError ? 'border-red-500' : 'border-slate-300'}`}
                 />
                 {cepError && <p className="mt-1 text-xs text-red-600">{cepError}</p>}
@@ -180,10 +206,11 @@ const RegisterOrganizationView: React.FC<RegisterOrganizationViewProps> = ({ onS
                 <label className="block text-xs font-medium text-slate-600 mb-1">Logradouro *</label>
                 <input
                   required
+                  readOnly
                   maxLength={FREE_TEXT_MAX}
                   value={form.legalStreet || ''}
-                  onChange={(e) => update('legalStreet', e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm"
+                  className={READONLY_ADDRESS_CLASS}
+                  tabIndex={-1}
                 />
               </div>
               <div>
@@ -210,10 +237,11 @@ const RegisterOrganizationView: React.FC<RegisterOrganizationViewProps> = ({ onS
               <label className="block text-xs font-medium text-slate-600 mb-1">Bairro *</label>
               <input
                 required
+                readOnly
                 maxLength={FREE_TEXT_MAX}
                 value={form.legalNeighborhood || ''}
-                onChange={(e) => update('legalNeighborhood', e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm"
+                className={READONLY_ADDRESS_CLASS}
+                tabIndex={-1}
               />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -221,20 +249,22 @@ const RegisterOrganizationView: React.FC<RegisterOrganizationViewProps> = ({ onS
                 <label className="block text-xs font-medium text-slate-600 mb-1">Cidade *</label>
                 <input
                   required
+                  readOnly
                   maxLength={FREE_TEXT_MAX}
                   value={form.legalCity || ''}
-                  onChange={(e) => update('legalCity', e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm"
+                  className={READONLY_ADDRESS_CLASS}
+                  tabIndex={-1}
                 />
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">UF *</label>
                 <input
                   required
-                  maxLength={UF_MAX}
+                  readOnly
+                  maxLength={2}
                   value={form.legalState || ''}
-                  onChange={(e) => update('legalState', e.target.value.toUpperCase())}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm uppercase"
+                  className={`${READONLY_ADDRESS_CLASS} uppercase`}
+                  tabIndex={-1}
                 />
               </div>
             </div>
@@ -250,6 +280,7 @@ const RegisterOrganizationView: React.FC<RegisterOrganizationViewProps> = ({ onS
                 maxLength={FREE_TEXT_MAX}
                 value={form.adminName}
                 onChange={(e) => update('adminName', e.target.value)}
+                placeholder="Ex.: Raythan Karabasappa"
                 className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm"
               />
             </div>
@@ -262,6 +293,18 @@ const RegisterOrganizationView: React.FC<RegisterOrganizationViewProps> = ({ onS
                 autoComplete="email"
                 value={form.adminEmail}
                 onChange={(e) => update('adminEmail', e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Confirmar e-mail *</label>
+              <input
+                type="email"
+                required
+                maxLength={EMAIL_MAX}
+                autoComplete="email"
+                value={form.adminEmailConfirm}
+                onChange={(e) => update('adminEmailConfirm', e.target.value)}
                 className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm"
               />
             </div>

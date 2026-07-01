@@ -1,6 +1,6 @@
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel, EmailStr, Field, ConfigDict
+from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator, model_validator
 
 from app.core.br_validators import (
     FREE_TEXT_MAX,
@@ -8,6 +8,7 @@ from app.core.br_validators import (
     RequiredCep,
     RequiredCnpj,
     RequiredUf,
+    validate_two_word_name,
 )
 
 
@@ -33,6 +34,23 @@ class RegisterOrganizationRequest(BaseModel):
 
     adminName: str = Field(..., min_length=2, max_length=100)
     adminEmail: EmailStr
+    adminEmailConfirm: EmailStr
+
+    @field_validator("legalName")
+    @classmethod
+    def validate_legal_name(cls, v: str) -> str:
+        return validate_two_word_name(v, "Razão social")
+
+    @field_validator("adminName")
+    @classmethod
+    def validate_admin_name(cls, v: str) -> str:
+        return validate_two_word_name(v, "Nome completo")
+
+    @model_validator(mode="after")
+    def validate_admin_email_confirm(self):
+        if str(self.adminEmail).lower() != str(self.adminEmailConfirm).lower():
+            raise ValueError("E-mail e confirmação não coincidem.")
+        return self
 
 
 class RegisterOrganizationResponse(BaseModel):

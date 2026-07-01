@@ -34,6 +34,7 @@ export interface RegisterOrganizationPayload {
   legalComplement?: string;
   adminName: string;
   adminEmail: string;
+  adminEmailConfirm: string;
 }
 
 export interface RegisterOrganizationResponse {

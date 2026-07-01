@@ -178,7 +178,7 @@ class AuthService:
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Usuário master já existe.",
+                detail="O superusuário já foi cadastrado.",
             )
         if self.users.get_by_email(body.email):
             raise HTTPException(

@@ -1,6 +1,7 @@
 """Testes de bootstrap master, bloqueio POST /users/, escopo de executivos e validadores."""
 
 import os
+from unittest.mock import patch
 
 from app.core.security import hash_password
 from app.models.executive_model import Executive
@@ -89,11 +90,39 @@ def test_bootstrap_master_requires_valid_token(client):
     )
     assert r.status_code == 201, r.text
     assert r.json()["user"]["role"] == "master"
-    assert client.post(
+    assert (
+        "Administrador da empresa deve estar vinculado a uma empresa."
+        not in r.text
+    )
+    r_dup = client.post(
         "/auth/bootstrap-master",
         json=body,
         headers={"X-Setup-Token": os.environ["EXECUTIVA_SETUP_TOKEN"]},
-    ).status_code == 400
+    )
+    assert r_dup.status_code == 400
+    assert r_dup.json()["detail"] == "O superusuário já foi cadastrado."
+
+
+def test_bootstrap_master_skips_company_admin_validation(client):
+    from app.core.tenant_scope import validate_user_tenant_scope
+
+    validate_user_tenant_scope(
+        role="master",
+        legal_organization_id=None,
+        organization_id=None,
+    )
+
+    body = {"email": "master2@test.com", "password": "secret123", "fullName": "Master Two"}
+    r = client.post(
+        "/auth/bootstrap-master",
+        json=body,
+        headers={"X-Setup-Token": os.environ["EXECUTIVA_SETUP_TOKEN"]},
+    )
+    assert r.status_code == 201, r.text
+    assert (
+        "Administrador da empresa deve estar vinculado a uma empresa."
+        not in r.text
+    )
 
 
 def test_post_users_blocks_master_role(client, db_session):
@@ -202,12 +231,14 @@ def test_register_organization_creates_legal_org_admin(client, db_session):
         "legalComplement": "Sala 1",
         "adminName": "Admin Matriz",
         "adminEmail": email,
+        "adminEmailConfirm": email,
     }
-    r = client.post(
-        "/auth/register-organization",
-        json=payload,
-        headers={"X-Frontend-Base-URL": "http://localhost:5173"},
-    )
+    with patch("app.services.auth_service.send_invite_email"):
+        r = client.post(
+            "/auth/register-organization",
+            json=payload,
+            headers={"X-Frontend-Base-URL": "http://localhost:5173"},
+        )
     assert r.status_code in (200, 201), r.text
 
     user = db_session.query(user_models.Usuario).filter(user_models.Usuario.email == email).first()

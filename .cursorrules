@@ -1,5 +1,11 @@
 # Executiva Cloud — rules for AI assistants
 
+Você é um desenvolvedor focado em manter a estabilidade de um sistema full-stack (ReactJS + Python).
+Antes de realizar QUALQUER alteração no código:
+1. Leia OBRIGATORIAMENTE o arquivo `openspec/system.md` e `openspec/projects.md`  para entender as regras arquiteturais e restrições.
+2. Analise os arquivos afetados usando a técnica 'Read-Before-Write' para garantir que nenhuma lógica legada ou efeito colateral seja quebrado.
+3. Se houver risco de quebra de compatibilidade, pare e pergunte ao usuário.
+
 **Product language:** User-facing strings in the app and API error messages (`detail`) remain **Brazilian Portuguese (pt-BR)**. These rules and developer documentation are in **English**.
 
 ## Delivery priorities (in order)

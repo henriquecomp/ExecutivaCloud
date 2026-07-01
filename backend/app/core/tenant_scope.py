@@ -6,6 +6,7 @@ from fastapi import HTTPException, status
 
 LEGAL_ORG_ADMIN = "admin_legal_organization"
 COMPANY_ADMIN = "admin_company"
+MASTER = "master"
 
 
 def validate_user_tenant_scope(
@@ -18,7 +19,11 @@ def validate_user_tenant_scope(
     Garante vínculos coerentes com o papel.
     - admin_legal_organization: legal_organization_id obrigatório; organization_id deve ser NULL.
     - admin_company: organization_id obrigatório.
+    - master: sem vínculo de tenant; não aplica validação de organização/empresa.
     """
+    if role == MASTER:
+        return
+
     if role == LEGAL_ORG_ADMIN:
         if legal_organization_id is None:
             raise HTTPException(

@@ -19,6 +19,17 @@ export function useCepAutoLookup({ onAddress, onClearAddress }: UseCepAutoLookup
   const lastFetchedDigitsRef = useRef('');
   const requestIdRef = useRef(0);
 
+  const clearAddressIfCepIncomplete = useCallback(
+    (digits: string) => {
+      if (digits.length === 8) return;
+      if (lastFetchedDigitsRef.current !== '') {
+        lastFetchedDigitsRef.current = '';
+        onClearAddress?.();
+      }
+    },
+    [onClearAddress],
+  );
+
   const handleCepInputChange = useCallback(
     (rawValue: string, setZipCode: (masked: string) => void) => {
       const masked = maskCEP(rawValue);
@@ -33,9 +44,7 @@ export function useCepAutoLookup({ onAddress, onClearAddress }: UseCepAutoLookup
       }
 
       if (digits.length !== 8) {
-        if (digits.length < 8) {
-          lastFetchedDigitsRef.current = '';
-        }
+        clearAddressIfCepIncomplete(digits);
         return;
       }
 
@@ -65,11 +74,20 @@ export function useCepAutoLookup({ onAddress, onClearAddress }: UseCepAutoLookup
         }
       })();
     },
-    [cepError, onAddress, onClearAddress],
+    [cepError, clearAddressIfCepIncomplete, onAddress, onClearAddress],
+  );
+
+  const handleCepBlur = useCallback(
+    (maskedZipCode: string) => {
+      const digits = normalizeDigits(maskedZipCode);
+      clearAddressIfCepIncomplete(digits);
+    },
+    [clearAddressIfCepIncomplete],
   );
 
   return {
     handleCepInputChange,
+    handleCepBlur,
     isCepLoading,
     cepError,
     setCepError,

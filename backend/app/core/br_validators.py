@@ -21,26 +21,52 @@ def normalize_digits(value: str | None) -> str:
     return re.sub(r"\D", "", str(value))
 
 
-def _cnpj_checksum(digits: str, weights: list[int]) -> int:
-    total = sum(int(d) * w for d, w in zip(digits, weights))
-    remainder = total % 11
-    return 0 if remainder < 2 else 11 - remainder
+def normalize_cnpj_raw(value: str | None) -> str:
+    if value is None:
+        return ""
+    return re.sub(r"[^A-Za-z0-9]", "", str(value)).upper()
+
+
+def _cnpj_char_value(char: str) -> int:
+    return ord(char) - 48
+
+
+def _cnpj_check_digits(base12: str) -> str:
+    w1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
+    s1 = sum(_cnpj_char_value(base12[i]) * w1[i] for i in range(12))
+    r1 = s1 % 11
+    d1 = 0 if r1 < 2 else 11 - r1
+    w2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
+    base13 = base12 + str(d1)
+    s2 = sum(_cnpj_char_value(base13[i]) * w2[i] for i in range(13))
+    r2 = s2 % 11
+    d2 = 0 if r2 < 2 else 11 - r2
+    return f"{d1}{d2}"
+
+
+def validate_two_word_name(value: str | None, field_label: str = "Nome") -> str:
+    if value is None or not str(value).strip():
+        raise ValueError(f"{field_label} é obrigatório.")
+    parts = [p for p in str(value).strip().split() if p]
+    if len(parts) < 2:
+        raise ValueError(f"{field_label} deve conter pelo menos dois nomes.")
+    return str(value).strip()
 
 
 def validate_cnpj(value: str | None) -> str:
     if value is None or not str(value).strip():
         raise ValueError("CNPJ é obrigatório.")
-    digits = normalize_digits(value)
-    if len(digits) != CNPJ_DIGITS:
-        raise ValueError("CNPJ deve conter 14 dígitos.")
-    if digits == digits[0] * CNPJ_DIGITS:
+    normalized = normalize_cnpj_raw(value)
+    if not re.match(r"^[A-Z0-9]{12}\d{2}$", normalized):
+        raise ValueError(
+            "CNPJ deve ter 14 caracteres (12 alfanuméricos e 2 dígitos verificadores)."
+        )
+    if len(set(normalized)) == 1:
         raise ValueError("CNPJ inválido.")
-    base = digits[:12]
-    d1 = _cnpj_checksum(base, [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2])
-    d2 = _cnpj_checksum(base + str(d1), [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2])
-    if digits[-2:] != f"{d1}{d2}":
+    base12, dv = normalized[:12], normalized[12:]
+    if _cnpj_check_digits(base12) != dv:
         raise ValueError("CNPJ inválido.")
-    return digits
+    return normalized
 
 
 def validate_cnpj_optional(value: str | None) -> str | None:
