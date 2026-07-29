@@ -14,8 +14,6 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build e Deploy dos Containers
-        # Aponta para a subpasta onde está o seu docker-compose.yml
-        working-directory: ./ExecutivaCloud
         run: |
           docker compose down
           docker compose up -d --build
