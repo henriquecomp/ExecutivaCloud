@@ -1,0 +1,21 @@
+name: Deploy to Home Server
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Build e Deploy dos Containers
+        # Aponta para a subpasta onde está o seu docker-compose.yml
+        working-directory: ./ExecutivaCloud
+        run: |
+          docker compose down
+          docker compose up -d --build
