@@ -16,8 +16,14 @@ jobs:
       - name: Criar arquivo .env
         run: |
           echo "${{ secrets.ENV_FILE }}" > .env
-          
+
       - name: Build e Deploy dos Containers
         run: |
           docker compose down
           docker compose up -d --build
+
+      - name: Executar Migrations do Alembic
+        run: |
+          # O parâmetro -T é necessário no GitHub Actions para não exigir um terminal interativo (TTY)
+          # Lembre-se de substituir "api" pelo nome real do serviço no seu docker-compose.yml
+          docker compose exec -T api alembic upgrade head
