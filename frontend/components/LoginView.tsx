@@ -55,7 +55,7 @@ const LoginView: React.FC<LoginViewProps> = ({
         <div className="inline-block bg-slate-800 p-4 rounded-full mb-4">
           <LogoIcon className="w-24 h-24 text-white" />
         </div>
-        <h1 className="text-4xl font-bold text-slate-800">Executiva Cloud Teste</h1>
+        <h1 className="text-4xl font-bold text-slate-800">Executiva Cloud</h1>
       </div>
 
       <div className="w-full max-w-md mx-auto mt-10 bg-white p-8 rounded-xl shadow-lg">
