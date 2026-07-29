@@ -13,10 +13,10 @@ jobs:
       - name: Checkout do código
         uses: actions/checkout@v4
 
-      # Copia o arquivo .env seguro do seu servidor para dentro do diretorio do build
-      - name: Copiar .env do servidor
-        run: cp /home/henrique/.env_executivacloud ./.env
-
+      - name: Criar arquivo .env
+        run: |
+          echo "${{ secrets.ENV_FILE }}" > .env
+          
       - name: Build e Deploy dos Containers
         run: |
           docker compose down
