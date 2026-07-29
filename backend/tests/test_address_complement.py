@@ -4,8 +4,11 @@ from app.models.legal_organization_model import LegalOrganization
 from app.models.organization_model import Organization
 
 VALID_CNPJ = "11222333000181"
+VALID_CNPJ_MASKED = "11.222.333/0001-81"
 VALID_CNPJ_B = "04252011000110"
+VALID_CNPJ_B_MASKED = "04.252.011/0001-10"
 VALID_CEP = "01310100"
+VALID_CEP_MASKED = "01310-100"
 
 
 def _seed_legal_org(db, cnpj: str = VALID_CNPJ) -> LegalOrganization:
@@ -105,3 +108,75 @@ def test_legal_organization_update_persists_and_clears_complement(client, db_ses
     r2 = client.put(f"/legal-organizations/{lo.id}", json=payload)
     assert r2.status_code == 200, r2.text
     assert r2.json().get("complement") is None
+
+
+def test_legal_organization_update_rejects_cnpj_change(client, db_session):
+    lo = _seed_legal_org(db_session)
+    db_session.commit()
+
+    payload = {
+        "name": "Org Atualizada",
+        "cnpj": VALID_CNPJ_B,
+        "street": "Av Paulista",
+        "number": "100",
+        "neighborhood": "Bela Vista",
+        "city": "São Paulo",
+        "state": "SP",
+        "zipCode": VALID_CEP,
+    }
+    r = client.put(f"/legal-organizations/{lo.id}", json=payload)
+    assert r.status_code == 400, r.text
+    assert r.json()["detail"] == "CNPJ não pode ser alterado."
+
+
+def test_organization_update_rejects_cnpj_change(client, db_session):
+    lo = _seed_legal_org(db_session)
+    org = _seed_company(db_session, lo)
+    db_session.commit()
+
+    r = client.put(
+        f"/organizations/{org.id}",
+        json=_full_org_payload(lo.id, cnpj=VALID_CNPJ),
+    )
+    assert r.status_code == 400, r.text
+    assert r.json()["detail"] == "CNPJ não pode ser alterado."
+
+
+def test_legal_organization_update_accepts_same_cnpj_masked(client, db_session):
+    lo = _seed_legal_org(db_session)
+    db_session.commit()
+
+    payload = {
+        "name": "Org Atualizada",
+        "cnpj": VALID_CNPJ_MASKED,
+        "street": "Av Paulista",
+        "number": "100",
+        "neighborhood": "Bela Vista",
+        "city": "São Paulo",
+        "state": "SP",
+        "zipCode": VALID_CEP_MASKED,
+        "complement": "Sala 9",
+    }
+    r = client.put(f"/legal-organizations/{lo.id}", json=payload)
+    assert r.status_code == 200, r.text
+    assert r.json().get("complement") == "Sala 9"
+    assert r.json().get("cnpj") == VALID_CNPJ
+
+
+def test_organization_update_accepts_same_cnpj_masked(client, db_session):
+    lo = _seed_legal_org(db_session)
+    org = _seed_company(db_session, lo)
+    db_session.commit()
+
+    r = client.put(
+        f"/organizations/{org.id}",
+        json=_full_org_payload(
+            lo.id,
+            cnpj=VALID_CNPJ_B_MASKED,
+            zipCode="01310-200",
+            complement="Mantém CNPJ",
+        ),
+    )
+    assert r.status_code == 200, r.text
+    assert r.json().get("complement") == "Mantém CNPJ"
+    assert r.json().get("cnpj") == VALID_CNPJ_B

@@ -31,7 +31,7 @@ export interface RegisterOrganizationPayload {
   legalCity: string;
   legalState: string;
   legalZipCode: string;
-  legalComplement?: string;
+  legalComplement?: string | null;
   adminName: string;
   adminEmail: string;
   adminEmailConfirm: string;

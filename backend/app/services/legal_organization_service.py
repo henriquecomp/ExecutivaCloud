@@ -8,6 +8,7 @@ from app.models.organization_model import Organization
 from app.models.secretary_model import Secretary
 from app.models.user_model import Usuario
 from app.core.database import get_db
+from app.core.br_validators import normalize_cnpj_raw
 from typing import List, Optional
 
 
@@ -45,12 +46,14 @@ class LegalOrganizationService:
             raise ValueError("Organização não encontrada.")
         
         update_dict = update_data.model_dump(exclude_unset=True)
-        
-        # Lógica de Negócio: Se o CNPJ for alterado, verifique a unicidade
-        if "cnpj" in update_dict and update_dict.get("cnpj") != db_org.cnpj:
-            if update_dict.get("cnpj") and self.repository.get_by_cnpj(update_dict["cnpj"]):
-                raise ValueError("Novo CNPJ já está em uso.")
-        
+
+        if "cnpj" in update_dict:
+            incoming = normalize_cnpj_raw(update_dict.get("cnpj") or "")
+            persisted = normalize_cnpj_raw(db_org.cnpj or "")
+            if incoming != persisted:
+                raise ValueError("CNPJ não pode ser alterado.")
+            update_dict["cnpj"] = persisted
+
         return self.repository.update(db_org, update_dict)
     
     def delete_legal_organization(self, org_id: int):

@@ -13,6 +13,9 @@ import { FREE_TEXT_MAX, CNPJ_MASK_MAX, CEP_MASK_MAX, UF_MAX } from '../utils/fie
 import { buildOrgAddressPayload } from '../utils/addressPayload';
 import { isCompanyAdmin, isLegalOrgAdmin } from '../utils/tenantScope';
 
+const READONLY_ADDRESS_CLASS =
+  'mt-1 block w-full px-3 py-2 border border-slate-200 rounded-md shadow-sm sm:text-sm bg-slate-50 text-slate-700 cursor-not-allowed';
+
 export interface OrganizationCompanyFormProps {
   organization: Partial<Organization>;
   onSave: (organization: OrganizationCreate | OrganizationUpdate) => void;
@@ -30,14 +33,15 @@ const OrganizationCompanyForm: React.FC<OrganizationCompanyFormProps> = ({
   currentUser,
   submitLabel = 'Salvar Empresa',
 }) => {
+  const isEditing = Boolean(organization.id);
   const [name, setName] = useState(organization.name || '');
-  const [cnpj, setCnpj] = useState(organization.cnpj || '');
+  const [cnpj, setCnpj] = useState(maskCNPJ(organization.cnpj || ''));
   const [street, setStreet] = useState(organization.street || '');
   const [number, setNumber] = useState(organization.number || '');
   const [neighborhood, setNeighborhood] = useState(organization.neighborhood || '');
   const [city, setCity] = useState(organization.city || '');
   const [state, setState] = useState(organization.state || '');
-  const [zipCode, setZipCode] = useState(organization.zipCode || '');
+  const [zipCode, setZipCode] = useState(maskCEP(organization.zipCode || ''));
   const [complement, setComplement] = useState(organization.complement || '');
 
   const [cnpjError, setCnpjError] = useState('');
@@ -122,7 +126,9 @@ const OrganizationCompanyForm: React.FC<OrganizationCompanyFormProps> = ({
 
   const handleConfirmCopyData = () => {
     if (dataToCopy) {
-      setCnpj(maskCNPJ(dataToCopy.cnpj || ''));
+      if (!isEditing) {
+        setCnpj(maskCNPJ(dataToCopy.cnpj || ''));
+      }
       setZipCode(maskCEP(dataToCopy.zipCode || ''));
       setStreet(dataToCopy.street || '');
       setNumber(dataToCopy.number || '');
@@ -244,9 +250,15 @@ const OrganizationCompanyForm: React.FC<OrganizationCompanyFormProps> = ({
               value={cnpj}
               required
               maxLength={CNPJ_MASK_MAX}
-              onChange={handleCnpjChange}
-              onBlur={handleCnpjBlur}
-              className={`mt-1 block w-full px-3 py-2 bg-white border ${cnpjError ? 'border-red-500' : 'border-slate-300'} rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
+              readOnly={isEditing}
+              tabIndex={isEditing ? -1 : undefined}
+              onChange={isEditing ? undefined : handleCnpjChange}
+              onBlur={isEditing ? undefined : handleCnpjBlur}
+              className={
+                isEditing
+                  ? `${READONLY_ADDRESS_CLASS} uppercase`
+                  : `mt-1 block w-full px-3 py-2 bg-white border ${cnpjError ? 'border-red-500' : 'border-slate-300'} rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm uppercase`
+              }
             />
             {cnpjError && <p className="mt-1 text-xs text-red-600">{cnpjError}</p>}
           </div>
@@ -278,9 +290,10 @@ const OrganizationCompanyForm: React.FC<OrganizationCompanyFormProps> = ({
             id="street"
             value={street}
             required
+            readOnly
+            tabIndex={-1}
             maxLength={FREE_TEXT_MAX}
-            onChange={(e) => setStreet(e.target.value)}
-            className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+            className={READONLY_ADDRESS_CLASS}
           />
         </div>
 
@@ -324,9 +337,10 @@ const OrganizationCompanyForm: React.FC<OrganizationCompanyFormProps> = ({
               id="neighborhood"
               value={neighborhood}
               required
+              readOnly
+              tabIndex={-1}
               maxLength={FREE_TEXT_MAX}
-              onChange={(e) => setNeighborhood(e.target.value)}
-              className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              className={READONLY_ADDRESS_CLASS}
             />
           </div>
           <div className="md:col-span-1" />
@@ -342,9 +356,10 @@ const OrganizationCompanyForm: React.FC<OrganizationCompanyFormProps> = ({
               id="city"
               value={city}
               required
+              readOnly
+              tabIndex={-1}
               maxLength={FREE_TEXT_MAX}
-              onChange={(e) => setCity(e.target.value)}
-              className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              className={READONLY_ADDRESS_CLASS}
             />
           </div>
           <div className="md:col-span-1">
@@ -356,9 +371,10 @@ const OrganizationCompanyForm: React.FC<OrganizationCompanyFormProps> = ({
               id="state"
               value={state}
               required
+              readOnly
+              tabIndex={-1}
               maxLength={UF_MAX}
-              onChange={(e) => setState(e.target.value.toUpperCase())}
-              className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm uppercase"
+              className={`${READONLY_ADDRESS_CLASS} uppercase`}
             />
           </div>
         </div>

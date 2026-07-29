@@ -3,7 +3,10 @@ from typing import Optional
 
 from app.core.br_validators import (
     FREE_TEXT_MAX,
+    OptionalCep,
+    OptionalCnpj,
     OptionalComplement,
+    OptionalUf,
     RequiredCep,
     RequiredCnpj,
     RequiredUf,
@@ -30,13 +33,13 @@ class OrganizationCreate(OrganizationBase):
 class OrganizationUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=2, max_length=FREE_TEXT_MAX)
     legalOrganizationId: Optional[int] = None
-    cnpj: Optional[str] = None
+    cnpj: OptionalCnpj = None
     street: Optional[str] = Field(None, max_length=FREE_TEXT_MAX)
     number: Optional[str] = Field(None, max_length=FREE_TEXT_MAX)
     neighborhood: Optional[str] = Field(None, max_length=FREE_TEXT_MAX)
     city: Optional[str] = Field(None, max_length=FREE_TEXT_MAX)
-    state: Optional[str] = Field(None, max_length=2)
-    zipCode: Optional[str] = None
+    state: OptionalUf = None
+    zipCode: OptionalCep = None
     complement: OptionalComplement = None
 
     @model_validator(mode="after")
@@ -56,11 +59,11 @@ class OrganizationUpdate(BaseModel):
         if not provided:
             return self
         if self.cnpj is not None:
-            validate_cnpj(self.cnpj)
+            self.cnpj = validate_cnpj(self.cnpj)
         if self.zipCode is not None:
-            validate_cep(self.zipCode)
+            self.zipCode = validate_cep(self.zipCode)
         if self.state is not None:
-            validate_uf(self.state)
+            self.state = validate_uf(self.state)
         required_on_update = ("cnpj", "street", "number", "neighborhood", "city", "state", "zipCode")
         missing = [k for k in required_on_update if getattr(self, k) is None]
         if missing:

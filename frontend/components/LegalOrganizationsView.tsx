@@ -24,6 +24,9 @@ import { isCompanyAdmin, isLegalOrgAdmin } from '../utils/tenantScope';
 import { normalizeComplement } from '../utils/addressPayload';
 import OrganizationCompanyForm from './OrganizationCompanyForm';
 
+const READONLY_ADDRESS_CLASS =
+  'mt-1 block w-full px-3 py-2 border border-slate-200 rounded-md shadow-sm sm:text-sm bg-slate-50 text-slate-700 cursor-not-allowed';
+
 interface LegalOrgDeleteBlockerOrg {
     id: number;
     name: string;
@@ -108,14 +111,15 @@ const LegalOrganizationForm: React.FC<{
     onSave: (legalOrganization: LegalOrganizationCreate | LegalOrganization) => void, 
     onCancel: () => void 
 }> = ({ legalOrganization, onSave, onCancel }) => {
+    const isEditing = Boolean(legalOrganization.id);
     const [name, setName] = useState(legalOrganization.name || '');
-    const [cnpj, setCnpj] = useState(legalOrganization.cnpj || '');
+    const [cnpj, setCnpj] = useState(maskCNPJ(legalOrganization.cnpj || ''));
     const [street, setStreet] = useState(legalOrganization.street || '');
     const [number, setNumber] = useState(legalOrganization.number || '');
     const [neighborhood, setNeighborhood] = useState(legalOrganization.neighborhood || '');
     const [city, setCity] = useState(legalOrganization.city || '');
     const [state, setState] = useState(legalOrganization.state || '');
-    const [zipCode, setZipCode] = useState(legalOrganization.zipCode || '');
+    const [zipCode, setZipCode] = useState(maskCEP(legalOrganization.zipCode || ''));
     const [complement, setComplement] = useState(legalOrganization.complement || '');
 
     const [cnpjError, setCnpjError] = useState('');
@@ -215,7 +219,23 @@ const LegalOrganizationForm: React.FC<{
                 <div className="flex items-start gap-4">
                     <div style={{ width: '190px' }}>
                         <label htmlFor="cnpj" className="block text-sm font-medium text-slate-700">CNPJ *</label>
-                        <input ref={cnpjInputRef} type="text" id="cnpj" value={cnpj} required maxLength={CNPJ_MASK_MAX} onChange={handleCnpjChange} onBlur={handleCnpjBlur} className={`mt-1 block w-full px-3 py-2 bg-white border ${cnpjError ? 'border-red-500' : 'border-slate-300'} rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`} />
+                        <input
+                            ref={cnpjInputRef}
+                            type="text"
+                            id="cnpj"
+                            value={cnpj}
+                            required
+                            maxLength={CNPJ_MASK_MAX}
+                            readOnly={isEditing}
+                            tabIndex={isEditing ? -1 : undefined}
+                            onChange={isEditing ? undefined : handleCnpjChange}
+                            onBlur={isEditing ? undefined : handleCnpjBlur}
+                            className={
+                                isEditing
+                                    ? `${READONLY_ADDRESS_CLASS} uppercase`
+                                    : `mt-1 block w-full px-3 py-2 bg-white border ${cnpjError ? 'border-red-500' : 'border-slate-300'} rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm uppercase`
+                            }
+                        />
                         {cnpjError && <p className="mt-1 text-xs text-red-600">{cnpjError}</p>}
                     </div>
                     <div style={{ width: '120px' }}>
@@ -226,7 +246,7 @@ const LegalOrganizationForm: React.FC<{
                 </div>
                 <div>
                     <label htmlFor="street" className="block text-sm font-medium text-slate-700">Rua *</label>
-                    <input type="text" id="street" value={street} required maxLength={FREE_TEXT_MAX} onChange={e => setStreet(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                    <input type="text" id="street" value={street} required readOnly tabIndex={-1} maxLength={FREE_TEXT_MAX} className={READONLY_ADDRESS_CLASS} />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="md:col-span-1">
@@ -241,18 +261,18 @@ const LegalOrganizationForm: React.FC<{
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="md:col-span-2">
                         <label htmlFor="neighborhood" className="block text-sm font-medium text-slate-700">Bairro *</label>
-                        <input type="text" id="neighborhood" value={neighborhood} required maxLength={FREE_TEXT_MAX} onChange={e => setNeighborhood(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                        <input type="text" id="neighborhood" value={neighborhood} required readOnly tabIndex={-1} maxLength={FREE_TEXT_MAX} className={READONLY_ADDRESS_CLASS} />
                     </div>
                     <div className="md:col-span-1" />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="md:col-span-2">
                         <label htmlFor="city" className="block text-sm font-medium text-slate-700">Cidade *</label>
-                        <input type="text" id="city" value={city} required maxLength={FREE_TEXT_MAX} onChange={e => setCity(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                        <input type="text" id="city" value={city} required readOnly tabIndex={-1} maxLength={FREE_TEXT_MAX} className={READONLY_ADDRESS_CLASS} />
                     </div>
                     <div className="md:col-span-1">
                         <label htmlFor="state" className="block text-sm font-medium text-slate-700">Estado (UF) *</label>
-                        <input type="text" id="state" value={state} required maxLength={UF_MAX} onChange={e => setState(e.target.value.toUpperCase())} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm uppercase" />
+                        <input type="text" id="state" value={state} required readOnly tabIndex={-1} maxLength={UF_MAX} className={`${READONLY_ADDRESS_CLASS} uppercase`} />
                     </div>
                 </div>
                 <div className="flex justify-end space-x-3 pt-4">

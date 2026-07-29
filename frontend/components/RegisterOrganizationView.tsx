@@ -11,6 +11,7 @@ import {
   maskCEP,
 } from '../utils/brValidators';
 import { FREE_TEXT_MAX, CNPJ_MASK_MAX, CEP_MASK_MAX, EMAIL_MAX } from '../utils/fieldLimits';
+import { normalizeComplement } from '../utils/addressPayload';
 
 interface RegisterOrganizationViewProps {
   onSuccess: (message: string) => void;
@@ -119,7 +120,7 @@ const RegisterOrganizationView: React.FC<RegisterOrganizationViewProps> = ({ onS
         legalCity: form.legalCity.trim(),
         legalState: form.legalState.trim().slice(0, 2).toUpperCase(),
         legalZipCode: form.legalZipCode.trim(),
-        legalComplement: form.legalComplement?.trim() ? form.legalComplement.trim() : undefined,
+        legalComplement: normalizeComplement(form.legalComplement),
         adminEmail: form.adminEmail.trim(),
         adminEmailConfirm: form.adminEmailConfirm.trim(),
       };
@@ -172,7 +173,6 @@ const RegisterOrganizationView: React.FC<RegisterOrganizationViewProps> = ({ onS
                 maxLength={FREE_TEXT_MAX}
                 value={form.legalName}
                 onChange={(e) => update('legalName', e.target.value)}
-                placeholder="Ex.: STELLANTIS DO BRASIL"
                 className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm"
               />
             </div>
@@ -280,7 +280,6 @@ const RegisterOrganizationView: React.FC<RegisterOrganizationViewProps> = ({ onS
                 maxLength={FREE_TEXT_MAX}
                 value={form.adminName}
                 onChange={(e) => update('adminName', e.target.value)}
-                placeholder="Ex.: Raythan Karabasappa"
                 className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm"
               />
             </div>
