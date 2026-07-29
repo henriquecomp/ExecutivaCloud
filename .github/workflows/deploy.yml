@@ -9,15 +9,15 @@ jobs:
   build-and-deploy:
     runs-on: self-hosted
 
-  steps:
-    - name: Checkout do código
-      uses: actions/checkout@v4
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
 
-    - name: Criar arquivo .env
-      run: |
-        echo "${{ secrets.ENV_FILE }}" > .env
+      # Copia o arquivo .env seguro do seu servidor para dentro do diretorio do build
+      - name: Copiar .env do servidor
+        run: cp /home/henrique/.env_executivacloud ./.env
 
-    - name: Build e Deploy dos Containers
-      run: |
-        docker compose down
-        docker compose up -d --build
+      - name: Build e Deploy dos Containers
+        run: |
+          docker compose down
+          docker compose up -d --build
