@@ -21,6 +21,8 @@ class ExecutiveService:
         skip: int = 0,
         limit: int = 100,
     ):
+        if actor.role == "executive":
+            return scoped_executives_query(db, actor).offset(skip).limit(limit).all()
         assert_executive_manager(actor)
         return scoped_executives_query(db, actor).offset(skip).limit(limit).all()
 
@@ -47,10 +49,12 @@ class ExecutiveService:
         return self.repository.create(db, executive_data)
 
     def get_executive(self, db: Session, actor: user_models.Usuario, executive_id: int):
-        assert_executive_manager(actor)
         executive = self.repository.get_by_id(db, executive_id)
         if not executive:
             raise HTTPException(status_code=404, detail="Executivo não encontrado")
+        if actor.role == "executive" and actor.executive_id == executive_id:
+            return executive
+        assert_executive_manager(actor)
         if not executive_in_manager_scope(db, actor, executive):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Executivo fora do seu escopo.")
         return executive

@@ -155,6 +155,7 @@ RequiredCep = Annotated[str, BeforeValidator(validate_cep)]
 OptionalCep = Annotated[Optional[str], BeforeValidator(validate_cep_optional)]
 RequiredUf = Annotated[str, BeforeValidator(validate_uf)]
 OptionalUf = Annotated[Optional[str], BeforeValidator(validate_uf_optional)]
+RequiredCpf = Annotated[str, BeforeValidator(validate_cpf)]
 OptionalCpf = Annotated[Optional[str], BeforeValidator(validate_cpf_optional)]
 
 FieldStr100 = Field(..., min_length=1, max_length=FREE_TEXT_MAX)

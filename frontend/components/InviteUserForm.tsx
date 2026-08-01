@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { inviteUser } from '../services/authService';
+import { validateFullNameTwoWords } from '../utils/brValidators';
 import type { Executive, LegalOrganization, Organization, User } from '../types';
 
 export interface InviteUserFormProps {
@@ -108,6 +109,10 @@ const InviteUserForm: React.FC<InviteUserFormProps> = ({
     setMessage(null);
     if (!fullName.trim()) {
       setError('Informe o nome completo.');
+      return;
+    }
+    if (!validateFullNameTwoWords(fullName)) {
+      setError('O nome completo deve conter pelo menos dois nomes.');
       return;
     }
     if (email.trim().toLowerCase() !== emailConfirm.trim().toLowerCase()) {

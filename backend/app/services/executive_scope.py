@@ -46,4 +46,8 @@ def scoped_executives_query(db: Session, actor: user_models.Usuario):
         if not org_ids:
             return q.filter(False)
         return q.filter(Executive.organization_id.in_(org_ids))
+    if actor.role == "executive":
+        if actor.organization_id is None:
+            return q.filter(False)
+        return q.filter(Executive.organization_id == actor.organization_id)
     return q.filter(False)

@@ -5,7 +5,7 @@ from fastapi import APIRouter, Body, Depends, Header, HTTPException, status
 from app.api.deps import get_current_user, get_invite_frontend_base
 from app.models import user_model as user_models
 from app.schemas import auth_schema as schemas
-from app.schemas.executive_schema import ExecutiveCreate
+from app.schemas.executive_schema import ExecutiveProfileComplete
 from app.services.auth_service import AuthService, _user_to_public
 from app.services.invite_service import InviteService
 
@@ -81,7 +81,7 @@ def complete_invite(body: schemas.CompleteInviteRequest, service: InviteService 
 
 @router.post("/complete-profile/executive", response_model=schemas.CurrentUserOut)
 def complete_profile_executive(
-    body: ExecutiveCreate,
+    body: ExecutiveProfileComplete,
     current: user_models.Usuario = Depends(get_current_user),
     service: InviteService = Depends(InviteService),
 ):

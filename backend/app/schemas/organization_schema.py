@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, model_validator, field_validator
 from typing import Optional
 
 from app.core.br_validators import (
@@ -10,6 +10,7 @@ from app.core.br_validators import (
     RequiredCep,
     RequiredCnpj,
     RequiredUf,
+    validate_two_word_name,
 )
 
 
@@ -24,6 +25,11 @@ class OrganizationBase(BaseModel):
     state: RequiredUf
     zipCode: RequiredCep
     complement: OptionalComplement = None
+
+    @field_validator("name")
+    @classmethod
+    def validate_company_name(cls, v: str) -> str:
+        return validate_two_word_name(v, "Nome da empresa")
 
 
 class OrganizationCreate(OrganizationBase):
@@ -41,6 +47,13 @@ class OrganizationUpdate(BaseModel):
     state: OptionalUf = None
     zipCode: OptionalCep = None
     complement: OptionalComplement = None
+
+    @field_validator("name")
+    @classmethod
+    def validate_company_name(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        return validate_two_word_name(v, "Nome da empresa")
 
     @model_validator(mode="after")
     def validate_address_when_partial(self):

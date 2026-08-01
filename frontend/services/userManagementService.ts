@@ -62,7 +62,6 @@ export async function patchManagedUser(
   body: {
     fullName?: string;
     email?: string;
-    phone?: string | null;
     isActive?: boolean;
     organizationId?: number;
     secretaryExecutiveIds?: number[];

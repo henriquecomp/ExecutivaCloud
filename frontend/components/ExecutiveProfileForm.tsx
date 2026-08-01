@@ -1,7 +1,14 @@
-import React from 'react';
-import { EMAIL_MAX, FREE_TEXT_MAX, PHONE_MAX, URL_MAX } from '../utils/fieldLimits';
+import React, { useCallback } from 'react';
+import { EMAIL_MAX, FREE_TEXT_MAX, CEP_MASK_MAX } from '../utils/fieldLimits';
 import { Executive, Organization, Department } from '../types';
 import { User, Briefcase, Phone, FileText, DollarSign, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { useCepAutoLookup } from '../hooks/useCepAutoLookup';
+import { maskCEP, maskCPF, maskPhone } from '../utils/brValidators';
+import { BRAZILIAN_BANKS } from '../utils/brazilianBanks';
+import type { ExecutiveProfileFieldErrors } from '../utils/executiveProfileValidation';
+
+const READONLY_ADDRESS_CLASS =
+  'mt-1 block w-full px-3 py-2 border border-slate-200 rounded-md shadow-sm sm:text-sm bg-slate-50 text-slate-700 cursor-not-allowed';
 
 // Subcomponente de Colapso
 const CollapseSection: React.FC<{
@@ -39,15 +46,24 @@ export interface ExecutiveProfileFormProps {
   organizations: Organization[];
   departments: Department[];
   executives: Executive[];
-  errors: { fullName?: string; workEmail?: string };
-  setErrors: React.Dispatch<React.SetStateAction<{ fullName?: string; workEmail?: string }>>;
+  errors?: { fullName?: string; workEmail?: string };
+  setErrors?: React.Dispatch<React.SetStateAction<{ fullName?: string; workEmail?: string }>>;
+  fieldErrors?: ExecutiveProfileFieldErrors;
+  setFieldErrors?: React.Dispatch<React.SetStateAction<ExecutiveProfileFieldErrors>>;
   apiError: string | null;
   setApiError: React.Dispatch<React.SetStateAction<string | null>>;
   openSections: Record<string, boolean>;
   toggleSection: (section: string) => void;
   workEmailReadOnly?: boolean;
-  /** Executivo alterando o próprio cadastro: não pode mudar empresa/depto/gestor. */
+  profileCompletion?: boolean;
+  loginEmail?: string;
   lockHrFields?: boolean;
+  bankCode?: string;
+  bankAgency?: string;
+  bankAccount?: string;
+  onBankCodeChange?: (v: string) => void;
+  onBankAgencyChange?: (v: string) => void;
+  onBankAccountChange?: (v: string) => void;
 }
 
 
@@ -57,17 +73,69 @@ export const ExecutiveProfileForm: React.FC<ExecutiveProfileFormProps> = ({
   organizations,
   departments,
   executives,
-  errors,
-  setErrors,
+  errors = {},
+  setErrors = () => {},
+  fieldErrors = {},
+  setFieldErrors = () => {},
   apiError,
   setApiError,
   openSections,
   toggleSection,
   workEmailReadOnly = false,
+  profileCompletion = false,
+  loginEmail,
   lockHrFields = false,
+  bankCode = '',
+  bankAgency = '',
+  bankAccount = '',
+  onBankCodeChange,
+  onBankAgencyChange,
+  onBankAccountChange,
 }) => {
+  const fullNameError = profileCompletion ? fieldErrors.fullName : errors.fullName;
+  const workEmailError = profileCompletion ? undefined : errors.workEmail;
+
+  const clearCepAddress = useCallback(() => {
+    setCurrentExecutive((prev) => ({
+      ...prev,
+      street: '',
+      neighborhood: '',
+      city: '',
+      state: '',
+    }));
+  }, [setCurrentExecutive]);
+
+  const applyCepAddress = useCallback(
+    (addr: { street: string; neighborhood: string; city: string; state: string }) => {
+      setCurrentExecutive((prev) => ({
+        ...prev,
+        street: addr.street,
+        neighborhood: addr.neighborhood,
+        city: addr.city,
+        state: addr.state,
+      }));
+    },
+    [setCurrentExecutive],
+  );
+
+  const { handleCepInputChange, handleCepBlur: lookupCepBlur, isCepLoading, cepError, setCepError } =
+    useCepAutoLookup({
+      onAddress: applyCepAddress,
+      onClearAddress: clearCepAddress,
+    });
+
+  const req = (label: string) => (profileCompletion ? `${label} *` : label);
+
   return (
     <div className="flex-1 overflow-y-auto pr-2 space-y-4 pb-4">
+      {isCepLoading && profileCompletion && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
+          <div className="bg-white p-6 rounded-lg shadow-xl text-center">
+            <div className="w-8 h-8 border-4 border-slate-200 border-t-indigo-600 rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-slate-700 font-semibold">Buscando CEP...</p>
+          </div>
+        </div>
+      )}
 
             {/* Alerta de Erro do Backend */}
             {apiError && (
@@ -89,36 +157,47 @@ export const ExecutiveProfileForm: React.FC<ExecutiveProfileFormProps> = ({
             >
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="col-span-2">
-                   <label className={`block text-sm font-medium ${errors.fullName ? 'text-red-600' : 'text-gray-700'}`}>
-                     Nome Completo *
+                   <label className={`block text-sm font-medium ${fullNameError ? 'text-red-600' : 'text-gray-700'}`}>
+                     {req('Nome Completo')}
                    </label>
                    <input
                      type="text"
                      className={`mt-1 w-full p-2 border rounded focus:outline-none focus:ring-2 ${
-                      errors.fullName ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
+                      fullNameError ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
                      }`}
                     value={currentExecutive.fullName || ''}
                      onChange={e => {
                       setCurrentExecutive({...currentExecutive, fullName: e.target.value});
-                      if (errors.fullName) setErrors({...errors, fullName: undefined});
+                      if (profileCompletion) setFieldErrors({...fieldErrors, fullName: undefined});
+                      else if (errors.fullName) setErrors({...errors, fullName: undefined});
                        if (apiError) setApiError(null);
                      }}
                    />
-                  {errors.fullName && (
-                    <p className="mt-1 text-sm text-red-600">{errors.fullName}</p>
+                  {fullNameError && (
+                    <p className="mt-1 text-sm text-red-600">{fullNameError}</p>
                    )}
                 </div>
                 <div>
-                   <label className="block text-sm font-medium text-gray-700">CPF</label>
+                   <label className={`block text-sm font-medium ${fieldErrors.cpf ? 'text-red-600' : 'text-gray-700'}`}>
+                     {req('CPF')}
+                   </label>
                    <input
                      type="text"
-                     className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                     className={`mt-1 w-full p-2 border rounded focus:ring-2 focus:outline-none ${
+                       fieldErrors.cpf ? 'border-red-500' : 'border-gray-300 focus:ring-blue-500'
+                     }`}
                      value={currentExecutive.cpf || ''}
-                     onChange={e => setCurrentExecutive({...currentExecutive, cpf: e.target.value})}
+                     onChange={e => {
+                       setCurrentExecutive({...currentExecutive, cpf: maskCPF(e.target.value)});
+                       if (fieldErrors.cpf) setFieldErrors({...fieldErrors, cpf: undefined});
+                     }}
                    />
+                   {fieldErrors.cpf && <p className="mt-1 text-sm text-red-600">{fieldErrors.cpf}</p>}
                 </div>
                 <div>
-                   <label className="block text-sm font-medium text-gray-700">RG</label>
+                   <label className={`block text-sm font-medium ${fieldErrors.rg ? 'text-red-600' : 'text-gray-700'}`}>
+                     {req('RG')}
+                   </label>
                    <input
                      type="text"
                      className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
@@ -214,8 +293,138 @@ export const ExecutiveProfileForm: React.FC<ExecutiveProfileFormProps> = ({
               onToggle={() => toggleSection('contact')}
             >
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {profileCompletion ? (
+                  <>
+                    <div className="col-span-2">
+                      <label className="block text-sm font-medium text-gray-700">E-mail de login (corporativo)</label>
+                      <input
+                        type="email"
+                        readOnly
+                        className="mt-1 w-full p-2 border border-gray-300 rounded bg-gray-100"
+                        value={loginEmail || currentExecutive.workEmail || ''}
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label className={`block text-sm font-medium ${fieldErrors.personalEmail ? 'text-red-600' : 'text-gray-700'}`}>
+                        E-mail adicional (opcional)
+                      </label>
+                      <input
+                        type="email"
+                        maxLength={EMAIL_MAX}
+                        className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        value={currentExecutive.personalEmail || ''}
+                        onChange={(e) => {
+                          setCurrentExecutive({ ...currentExecutive, personalEmail: e.target.value });
+                          if (fieldErrors.personalEmail) setFieldErrors({ ...fieldErrors, personalEmail: undefined });
+                        }}
+                      />
+                      {fieldErrors.personalEmail && (
+                        <p className="mt-1 text-sm text-red-600">{fieldErrors.personalEmail}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label className={`block text-sm font-medium ${fieldErrors.workPhone ? 'text-red-600' : 'text-gray-700'}`}>
+                        {req('Telefone corporativo')}
+                      </label>
+                      <input
+                        type="tel"
+                        className={`mt-1 w-full p-2 border rounded focus:ring-2 focus:outline-none ${
+                          fieldErrors.workPhone ? 'border-red-500' : 'border-gray-300 focus:ring-blue-500'
+                        }`}
+                        value={currentExecutive.workPhone || ''}
+                        onChange={(e) => {
+                          setCurrentExecutive({ ...currentExecutive, workPhone: maskPhone(e.target.value) });
+                          if (fieldErrors.workPhone) setFieldErrors({ ...fieldErrors, workPhone: undefined });
+                        }}
+                      />
+                      {fieldErrors.workPhone && <p className="mt-1 text-sm text-red-600">{fieldErrors.workPhone}</p>}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Telefone pessoal (opcional)</label>
+                      <input
+                        type="tel"
+                        className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        value={currentExecutive.personalPhone || ''}
+                        onChange={(e) =>
+                          setCurrentExecutive({ ...currentExecutive, personalPhone: maskPhone(e.target.value) })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label className={`block text-sm font-medium ${fieldErrors.zipCode || cepError ? 'text-red-600' : 'text-gray-700'}`}>
+                        {req('CEP')}
+                      </label>
+                      <input
+                        type="text"
+                        maxLength={CEP_MASK_MAX}
+                        className={`mt-1 w-full p-2 border rounded focus:ring-2 focus:outline-none ${
+                          fieldErrors.zipCode || cepError ? 'border-red-500' : 'border-gray-300 focus:ring-blue-500'
+                        }`}
+                        value={currentExecutive.zipCode || ''}
+                        onChange={(e) => {
+                          handleCepInputChange(e.target.value, (masked) =>
+                            setCurrentExecutive((prev) => ({ ...prev, zipCode: masked })),
+                          );
+                          if (fieldErrors.zipCode) setFieldErrors({ ...fieldErrors, zipCode: undefined });
+                          if (cepError) setCepError('');
+                        }}
+                        onBlur={() => {
+                          lookupCepBlur(currentExecutive.zipCode || '');
+                          const digits = (currentExecutive.zipCode || '').replace(/\D/g, '');
+                          if (digits.length > 0 && digits.length !== 8) setCepError('CEP incompleto ou inválido.');
+                        }}
+                      />
+                      {(fieldErrors.zipCode || cepError) && (
+                        <p className="mt-1 text-sm text-red-600">{fieldErrors.zipCode || cepError}</p>
+                      )}
+                    </div>
+                    <div className="col-span-2">
+                      <label className={`block text-sm font-medium ${fieldErrors.street ? 'text-red-600' : 'text-gray-700'}`}>
+                        {req('Logradouro')}
+                      </label>
+                      <input type="text" readOnly tabIndex={-1} className={READONLY_ADDRESS_CLASS} value={currentExecutive.street || ''} />
+                    </div>
+                    <div>
+                      <label className={`block text-sm font-medium ${fieldErrors.number ? 'text-red-600' : 'text-gray-700'}`}>
+                        {req('Número')}
+                      </label>
+                      <input
+                        type="text"
+                        className="mt-1 w-full p-2 border border-gray-300 rounded"
+                        value={currentExecutive.number || ''}
+                        onChange={(e) => {
+                          setCurrentExecutive({ ...currentExecutive, number: e.target.value });
+                          if (fieldErrors.number) setFieldErrors({ ...fieldErrors, number: undefined });
+                        }}
+                      />
+                      {fieldErrors.number && <p className="mt-1 text-sm text-red-600">{fieldErrors.number}</p>}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Complemento</label>
+                      <input
+                        type="text"
+                        className="mt-1 w-full p-2 border border-gray-300 rounded"
+                        value={currentExecutive.complement || ''}
+                        onChange={(e) => setCurrentExecutive({ ...currentExecutive, complement: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">{req('Bairro')}</label>
+                      <input type="text" readOnly tabIndex={-1} className={READONLY_ADDRESS_CLASS} value={currentExecutive.neighborhood || ''} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">{req('Cidade')}</label>
+                      <input type="text" readOnly tabIndex={-1} className={READONLY_ADDRESS_CLASS} value={currentExecutive.city || ''} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">{req('UF')}</label>
+                      <input type="text" readOnly tabIndex={-1} className={READONLY_ADDRESS_CLASS} value={currentExecutive.state || ''} />
+                    </div>
+                  </>
+                ) : (
+                  <>
                 <div className="col-span-2">
-                   <label className={`block text-sm font-medium ${errors.workEmail ? 'text-red-600' : 'text-gray-700'}`}>
+                   <label className={`block text-sm font-medium ${workEmailError ? 'text-red-600' : 'text-gray-700'}`}>
                      Email Corporativo *
                    </label>
                    <input
@@ -223,7 +432,7 @@ export const ExecutiveProfileForm: React.FC<ExecutiveProfileFormProps> = ({
                      maxLength={EMAIL_MAX}
                      readOnly={workEmailReadOnly}
                      className={`mt-1 w-full p-2 border rounded focus:outline-none focus:ring-2 ${
-                      errors.workEmail ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
+                      workEmailError ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
                      } ${workEmailReadOnly ? 'bg-gray-100' : ''}`}
                     value={currentExecutive.workEmail || ''}
                      onChange={e => {
@@ -233,8 +442,8 @@ export const ExecutiveProfileForm: React.FC<ExecutiveProfileFormProps> = ({
                        if (apiError) setApiError(null);
                      }}
                    />
-                  {errors.workEmail && (
-                    <p className="mt-1 text-sm text-red-600">{errors.workEmail}</p>
+                  {workEmailError && (
+                    <p className="mt-1 text-sm text-red-600">{workEmailError}</p>
                    )}
                 </div>
                 <div>
@@ -284,6 +493,8 @@ export const ExecutiveProfileForm: React.FC<ExecutiveProfileFormProps> = ({
                      onChange={e => setCurrentExecutive({...currentExecutive, street: e.target.value})}
                    />
                 </div>
+                  </>
+                )}
                  <div className="col-span-2">
                    <label className="block text-sm font-medium text-gray-700">LinkedIn URL</label>
                    <input
@@ -305,13 +516,21 @@ export const ExecutiveProfileForm: React.FC<ExecutiveProfileFormProps> = ({
             >
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                  <div>
-                   <label className="block text-sm font-medium text-gray-700">Cargo (Job Title)</label>
+                   <label className={`block text-sm font-medium ${fieldErrors.jobTitle ? 'text-red-600' : 'text-gray-700'}`}>
+                     {profileCompletion ? req('Cargo') : 'Cargo (Job Title)'}
+                   </label>
                    <input
                      type="text"
-                     className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                     className={`mt-1 w-full p-2 border rounded focus:ring-2 focus:outline-none ${
+                       fieldErrors.jobTitle ? 'border-red-500' : 'border-gray-300 focus:ring-blue-500'
+                     }`}
                      value={currentExecutive.jobTitle || ''}
-                     onChange={e => setCurrentExecutive({...currentExecutive, jobTitle: e.target.value})}
+                     onChange={e => {
+                       setCurrentExecutive({...currentExecutive, jobTitle: e.target.value});
+                       if (fieldErrors.jobTitle) setFieldErrors({...fieldErrors, jobTitle: undefined});
+                     }}
                    />
+                   {fieldErrors.jobTitle && <p className="mt-1 text-sm text-red-600">{fieldErrors.jobTitle}</p>}
                 </div>
                  <div>
                    <label className="block text-sm font-medium text-gray-700">Centro de Custo</label>
@@ -504,12 +723,68 @@ export const ExecutiveProfileForm: React.FC<ExecutiveProfileFormProps> = ({
 
             {/* --- Bloco 6: Financeiro --- */}
             <CollapseSection
-              title="Dados Financeiros e Remuneração"
+              title={profileCompletion ? 'Dados bancários' : 'Dados Financeiros e Remuneração'}
               icon={<DollarSign size={18} />}
               isOpen={openSections.finance}
               onToggle={() => toggleSection('finance')}
             >
                <div className="space-y-4">
+                 {profileCompletion ? (
+                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                     <div>
+                       <label className={`block text-sm font-medium ${fieldErrors.bankCode ? 'text-red-600' : 'text-gray-700'}`}>
+                         {req('Banco')}
+                       </label>
+                       <select
+                         className="mt-1 w-full p-2 border border-gray-300 rounded"
+                         value={bankCode}
+                         onChange={(e) => {
+                           onBankCodeChange?.(e.target.value);
+                           if (fieldErrors.bankCode) setFieldErrors({ ...fieldErrors, bankCode: undefined });
+                         }}
+                       >
+                         <option value="">Selecione…</option>
+                         {BRAZILIAN_BANKS.map((b) => (
+                           <option key={b.code} value={b.code}>
+                             {b.code} — {b.name}
+                           </option>
+                         ))}
+                       </select>
+                       {fieldErrors.bankCode && <p className="mt-1 text-sm text-red-600">{fieldErrors.bankCode}</p>}
+                     </div>
+                     <div>
+                       <label className={`block text-sm font-medium ${fieldErrors.bankAgency ? 'text-red-600' : 'text-gray-700'}`}>
+                         {req('Agência')}
+                       </label>
+                       <input
+                         type="text"
+                         className="mt-1 w-full p-2 border border-gray-300 rounded"
+                         value={bankAgency}
+                         onChange={(e) => {
+                           onBankAgencyChange?.(e.target.value);
+                           if (fieldErrors.bankAgency) setFieldErrors({ ...fieldErrors, bankAgency: undefined });
+                         }}
+                       />
+                       {fieldErrors.bankAgency && <p className="mt-1 text-sm text-red-600">{fieldErrors.bankAgency}</p>}
+                     </div>
+                     <div>
+                       <label className={`block text-sm font-medium ${fieldErrors.bankAccount ? 'text-red-600' : 'text-gray-700'}`}>
+                         {req('Conta')}
+                       </label>
+                       <input
+                         type="text"
+                         className="mt-1 w-full p-2 border border-gray-300 rounded"
+                         value={bankAccount}
+                         onChange={(e) => {
+                           onBankAccountChange?.(e.target.value);
+                           if (fieldErrors.bankAccount) setFieldErrors({ ...fieldErrors, bankAccount: undefined });
+                         }}
+                       />
+                       {fieldErrors.bankAccount && <p className="mt-1 text-sm text-red-600">{fieldErrors.bankAccount}</p>}
+                     </div>
+                   </div>
+                 ) : (
+                   <>
                  <div>
                    <label className="block text-sm font-medium text-gray-700">Dados Bancários</label>
                    <textarea
@@ -538,6 +813,8 @@ export const ExecutiveProfileForm: React.FC<ExecutiveProfileFormProps> = ({
                     onChange={e => setCurrentExecutive({...currentExecutive, systemAccessLevels: e.target.value})}
                   />
                </div>
+                   </>
+                 )}
                </div>
             </CollapseSection>
 

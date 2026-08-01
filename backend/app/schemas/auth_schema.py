@@ -1,6 +1,6 @@
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator, field_validator, model_validator
 
 from app.core.br_validators import (
     FREE_TEXT_MAX,
@@ -108,6 +108,11 @@ class InviteUserRequest(BaseModel):
     invited_role: InvitedRoleLiteral = Field(..., alias="invitedRole")
     organization_id: Optional[int] = Field(None, alias="organizationId")
     secretary_executive_ids: Optional[List[int]] = Field(None, alias="secretaryExecutiveIds")
+
+    @field_validator("full_name")
+    @classmethod
+    def validate_invitee_name(cls, v: str) -> str:
+        return validate_two_word_name(v, "Nome completo")
 
 
 class InviteUserResponse(BaseModel):

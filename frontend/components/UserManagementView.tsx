@@ -92,7 +92,6 @@ const UserManagementView: React.FC<UserManagementViewProps> = ({
 
   const [editName, setEditName] = useState('');
   const [editEmail, setEditEmail] = useState('');
-  const [editPhone, setEditPhone] = useState('');
   const [editOrgId, setEditOrgId] = useState('');
   const [editActive, setEditActive] = useState(true);
   const [editSecretaryExecutiveIds, setEditSecretaryExecutiveIds] = useState<number[]>([]);
@@ -161,7 +160,6 @@ const UserManagementView: React.FC<UserManagementViewProps> = ({
     setEditRow(u);
     setEditName(u.fullName);
     setEditEmail(u.email);
-    setEditPhone(u.phone ?? '');
     setEditOrgId(u.organizationId != null ? String(u.organizationId) : '');
     setEditActive(u.isActive);
     setEditSecretaryExecutiveIds(
@@ -197,7 +195,6 @@ const UserManagementView: React.FC<UserManagementViewProps> = ({
       const updated = await patchManagedUser(editRow.id, {
         fullName: editName.trim(),
         email: editEmail.trim(),
-        phone: editPhone.trim() === '' ? null : editPhone.trim(),
         isActive: editActive,
         ...(orgChanged && nextOrg != null && !Number.isNaN(nextOrg) ? { organizationId: nextOrg } : {}),
         ...(editRow.role === 'secretary' ? { secretaryExecutiveIds: editSecretaryExecutiveIds } : {}),
@@ -740,15 +737,6 @@ const UserManagementView: React.FC<UserManagementViewProps> = ({
                     type="email"
                     value={editEmail}
                     onChange={(e) => setEditEmail(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Telefone</label>
-                  <input
-                    type="text"
-                    value={editPhone}
-                    onChange={(e) => setEditPhone(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg"
                   />
                 </div>

@@ -76,7 +76,6 @@ class UserManagementPatch(BaseModel):
 
     full_name: Optional[str] = Field(None, alias="fullName", min_length=2, max_length=100)
     email: Optional[EmailStr] = None
-    phone: Optional[str] = None
     is_active: Optional[bool] = Field(None, alias="isActive")
     organization_id: Optional[int] = Field(None, alias="organizationId")
     secretary_executive_ids: Optional[List[int]] = Field(None, alias="secretaryExecutiveIds")

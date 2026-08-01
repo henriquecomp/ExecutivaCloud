@@ -5,6 +5,12 @@ const mapExecutive = (item: any): Executive => ({
   ...item,
   id: String(item.id),
   street: item.street ?? item.address,
+  zipCode: item.zipCode ?? item.zip_code,
+  number: item.number,
+  neighborhood: item.neighborhood,
+  city: item.city,
+  state: item.state,
+  complement: item.complement,
   organizationId: item.organizationId != null ? String(item.organizationId) : undefined,
   departmentId: item.departmentId != null ? String(item.departmentId) : undefined,
   reportsToExecutiveId:

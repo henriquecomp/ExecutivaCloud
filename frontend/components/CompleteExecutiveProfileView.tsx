@@ -4,7 +4,11 @@ import { departmentService } from '../services/departmentService';
 import { executiveService } from '../services/executiveService';
 import { organizationService } from '../services/organizationService';
 import { normalizeExecutivePayload } from '../utils/executivePayload';
-import { validateEmailFormat } from '../utils/brValidators';
+import {
+  composeBankInfo,
+  validateExecutiveProfileCompletion,
+  type ExecutiveProfileFieldErrors,
+} from '../utils/executiveProfileValidation';
 import { ExecutiveProfileForm } from './ExecutiveProfileForm';
 import type { Department, Executive, Organization, User } from '../types';
 
@@ -23,15 +27,18 @@ const CompleteExecutiveProfileView: React.FC<CompleteExecutiveProfileViewProps> 
   const [executives, setExecutives] = useState<Executive[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [errors, setErrors] = useState<{ fullName?: string; workEmail?: string }>({});
+  const [fieldErrors, setFieldErrors] = useState<ExecutiveProfileFieldErrors>({});
   const [apiError, setApiError] = useState<string | null>(null);
+  const [bankCode, setBankCode] = useState('');
+  const [bankAgency, setBankAgency] = useState('');
+  const [bankAccount, setBankAccount] = useState('');
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     personal: true,
     contact: true,
     professional: true,
     profile: false,
     emergency: false,
-    finance: false,
+    finance: true,
   });
 
   const toggleSection = useCallback((section: string) => {
@@ -45,16 +52,21 @@ const CompleteExecutiveProfileView: React.FC<CompleteExecutiveProfileViewProps> 
         setLoading(false);
         return;
       }
+      const orgId = currentUser.organizationId;
       try {
-        const [ex, orgs, depts, execs] = await Promise.all([
+        const [ex, orgList, depts, execs] = await Promise.all([
           executiveService.getById(currentUser.executiveId),
-          organizationService.getAll(),
-          departmentService.getAll(),
+          orgId ? organizationService.getOne(orgId).then((o) => [o]) : organizationService.getAll(),
+          orgId ? departmentService.getByOrg(orgId) : departmentService.getAll(),
           executiveService.getAll(0, 2000),
         ]);
         if (!cancelled) {
-          setCurrentExecutive(ex);
-          setOrganizations(orgs);
+          setCurrentExecutive({
+            ...ex,
+            workEmail: currentUser.email,
+            organizationId: ex.organizationId ?? orgId,
+          });
+          setOrganizations(orgList);
           setDepartments(depts);
           setExecutives(execs);
         }
@@ -68,31 +80,27 @@ const CompleteExecutiveProfileView: React.FC<CompleteExecutiveProfileViewProps> 
     return () => {
       cancelled = true;
     };
-  }, [currentUser.executiveId]);
+  }, [currentUser.executiveId, currentUser.email, currentUser.organizationId]);
 
   const handleSave = async () => {
     setApiError(null);
-    const newErrors: { fullName?: string; workEmail?: string } = {};
-    if (!currentExecutive.fullName?.trim()) newErrors.fullName = 'O nome completo é obrigatório.';
-    if (!currentExecutive.workEmail?.trim()) {
-      newErrors.workEmail = 'O e-mail corporativo é obrigatório.';
-    } else if (!validateEmailFormat(currentExecutive.workEmail)) {
-      newErrors.workEmail = 'Informe um e-mail corporativo válido (máx. 254 caracteres).';
-    }
-    if (
-      currentExecutive.personalEmail?.trim() &&
-      !validateEmailFormat(currentExecutive.personalEmail)
-    ) {
-      setApiError('Informe um e-mail pessoal válido (máx. 254 caracteres).');
-      return;
-    }
-    if (Object.keys(newErrors).length) {
-      setErrors(newErrors);
-      return;
-    }
+    const validation = validateExecutiveProfileCompletion(currentExecutive, {
+      code: bankCode,
+      agency: bankAgency,
+      account: bankAccount,
+    });
+    setFieldErrors(validation);
+    if (Object.keys(validation).length > 0) return;
+
     setSaving(true);
     try {
-      const payload = normalizeExecutivePayload(currentExecutive);
+      const payload = normalizeExecutivePayload({
+        ...currentExecutive,
+        workEmail: currentUser.email,
+        bankInfo: composeBankInfo(bankCode, bankAgency, bankAccount),
+        compensationInfo: undefined,
+        systemAccessLevels: undefined,
+      });
       const apiUser = await completeExecutiveProfile(payload);
       onDone(mapApiUserToAppUser(apiUser));
     } catch (err: unknown) {
@@ -124,8 +132,7 @@ const CompleteExecutiveProfileView: React.FC<CompleteExecutiveProfileViewProps> 
         <div className="p-6 border-b border-slate-200">
           <h1 className="text-2xl font-bold text-slate-800">Complete seu cadastro</h1>
           <p className="text-slate-500 text-sm mt-1">
-            Preencha os dados abaixo para concluir seu perfil de executivo. O e-mail corporativo deve ser o mesmo do
-            login.
+            Preencha os dados abaixo para concluir seu perfil. O e-mail de login é o seu e-mail corporativo.
           </p>
         </div>
         <div className="p-6 flex flex-col max-h-[85vh]">
@@ -135,14 +142,21 @@ const CompleteExecutiveProfileView: React.FC<CompleteExecutiveProfileViewProps> 
             organizations={organizations}
             departments={departments}
             executives={executives}
-            errors={errors}
-            setErrors={setErrors}
+            fieldErrors={fieldErrors}
+            setFieldErrors={setFieldErrors}
             apiError={apiError}
             setApiError={setApiError}
             openSections={openSections}
             toggleSection={toggleSection}
-            workEmailReadOnly
+            profileCompletion
+            loginEmail={currentUser.email}
             lockHrFields
+            bankCode={bankCode}
+            bankAgency={bankAgency}
+            bankAccount={bankAccount}
+            onBankCodeChange={setBankCode}
+            onBankAgencyChange={setBankAgency}
+            onBankAccountChange={setBankAccount}
           />
           <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-slate-200">
             <button

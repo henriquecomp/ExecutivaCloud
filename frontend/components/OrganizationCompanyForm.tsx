@@ -8,7 +8,7 @@ import {
   OrganizationUpdate,
   User,
 } from '../types';
-import { validateCNPJ, validateCEP, maskCNPJ, maskCEP } from '../utils/brValidators';
+import { validateCNPJ, validateCEP, maskCNPJ, maskCEP, validateFullNameTwoWords } from '../utils/brValidators';
 import { FREE_TEXT_MAX, CNPJ_MASK_MAX, CEP_MASK_MAX, UF_MAX } from '../utils/fieldLimits';
 import { buildOrgAddressPayload } from '../utils/addressPayload';
 import { isCompanyAdmin, isLegalOrgAdmin } from '../utils/tenantScope';
@@ -45,6 +45,7 @@ const OrganizationCompanyForm: React.FC<OrganizationCompanyFormProps> = ({
   const [complement, setComplement] = useState(organization.complement || '');
 
   const [cnpjError, setCnpjError] = useState('');
+  const [nameError, setNameError] = useState('');
   const cnpjInputRef = useRef<HTMLInputElement>(null);
   const cepInputRef = useRef<HTMLInputElement>(null);
 
@@ -62,7 +63,7 @@ const OrganizationCompanyForm: React.FC<OrganizationCompanyFormProps> = ({
     setState('');
   }, []);
 
-  const { handleCepInputChange, isCepLoading, cepError, setCepError } = useCepAutoLookup({
+  const { handleCepInputChange, handleCepBlur: lookupCepBlur, isCepLoading, cepError, setCepError } = useCepAutoLookup({
     onAddress: applyCepAddress,
     onClearAddress: clearCepAddress,
   });
@@ -105,6 +106,7 @@ const OrganizationCompanyForm: React.FC<OrganizationCompanyFormProps> = ({
   };
 
   const handleCepBlur = () => {
+    lookupCepBlur(zipCode);
     const digits = zipCode.replace(/\D/g, '');
     if (digits.length > 0 && digits.length !== 8) {
       setCepError('CEP incompleto ou inválido.');
@@ -112,6 +114,15 @@ const OrganizationCompanyForm: React.FC<OrganizationCompanyFormProps> = ({
   };
 
   const handleCompanyNameBlur = () => {
+    if (!name.trim()) {
+      setNameError('');
+      return;
+    }
+    if (!validateFullNameTwoWords(name)) {
+      setNameError('O nome da empresa deve conter pelo menos dois nomes.');
+    } else {
+      setNameError('');
+    }
     if (!name || !legalOrganizationId || cnpj || zipCode) {
       return;
     }
@@ -153,6 +164,10 @@ const OrganizationCompanyForm: React.FC<OrganizationCompanyFormProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !legalOrganizationId) return;
+    if (!validateFullNameTwoWords(name)) {
+      setNameError('O nome da empresa deve conter pelo menos dois nomes.');
+      return;
+    }
     if (!cnpj.trim() || !validateCNPJ(cnpj)) {
       handleCnpjBlur();
       cnpjInputRef.current?.focus();
@@ -231,12 +246,16 @@ const OrganizationCompanyForm: React.FC<OrganizationCompanyFormProps> = ({
             type="text"
             id="name"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => {
+              if (nameError) setNameError('');
+              setName(e.target.value);
+            }}
             onBlur={handleCompanyNameBlur}
             required
             maxLength={FREE_TEXT_MAX}
-            className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+            className={`mt-1 block w-full px-3 py-2 bg-white border ${nameError ? 'border-red-500' : 'border-slate-300'} rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
           />
+          {nameError && <p className="mt-1 text-xs text-red-600">{nameError}</p>}
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>

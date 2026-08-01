@@ -290,8 +290,6 @@ class UserManagementService:
                         detail="Este e-mail já está em uso.",
                     )
             updates["email"] = new_email
-        if "phone" in data:
-            updates["phone"] = data["phone"]
         if "is_active" in data and data["is_active"] is not None:
             if target.id == actor.id and data["is_active"] is False:
                 raise HTTPException(

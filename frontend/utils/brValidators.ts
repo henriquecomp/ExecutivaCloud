@@ -99,3 +99,23 @@ export function validateFullNameTwoWords(value: string): boolean {
   const parts = (value || '').trim().split(/\s+/).filter(Boolean);
   return parts.length >= 2;
 }
+
+/** Máscara telefone BR (+55 (XX) XXXXX-XXXX). */
+export function maskPhone(value: string): string {
+  if (!value) return '';
+  return value
+    .replace(/\D/g, '')
+    .replace(/^(\d{2})?(\d{2})?(\d{4,5})?(\d{4})?/, (_match, p1, p2, p3, p4) => {
+      let result = '';
+      if (p1) result = `+${p1}`;
+      if (p2) result += ` (${p2})`;
+      if (p3) result += ` ${p3}`;
+      if (p4) result += `-${p4}`;
+      return result;
+    })
+    .substring(0, 19);
+}
+
+export function phoneDigitsMin(value: string, min = 10): boolean {
+  return normalizeDigits(value).length >= min;
+}

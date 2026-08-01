@@ -56,7 +56,13 @@ export interface Executive {
   extension?: string;
   personalEmail?: string;
   personalPhone?: string;
-  street?: string; // Endereço
+  street?: string;
+  zipCode?: string;
+  number?: string;
+  neighborhood?: string;
+  city?: string;
+  state?: string;
+  complement?: string;
   linkedinProfileUrl?: string;
 
   // Bloco 3: Dados Profissionais

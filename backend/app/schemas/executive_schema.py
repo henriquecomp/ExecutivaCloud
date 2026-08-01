@@ -1,8 +1,8 @@
-from pydantic import BaseModel, EmailStr, Field, ConfigDict, AliasChoices
+from pydantic import BaseModel, EmailStr, Field, ConfigDict, AliasChoices, field_validator
 from typing import Optional
 from datetime import date
 
-from app.core.br_validators import FREE_TEXT_MAX, OptionalCpf
+from app.core.br_validators import FREE_TEXT_MAX, OptionalCpf, OptionalCep, OptionalUf, RequiredCep, RequiredCpf, RequiredUf, validate_two_word_name, PHONE_MAX
 
 
 class ExecutiveBase(BaseModel):
@@ -28,6 +28,12 @@ class ExecutiveBase(BaseModel):
         validation_alias=AliasChoices("street", "address"),
         max_length=FREE_TEXT_MAX,
     )
+    zip_code: Optional[str] = Field(None, alias="zipCode", max_length=9)
+    number: Optional[str] = Field(None, max_length=FREE_TEXT_MAX)
+    neighborhood: Optional[str] = Field(None, max_length=FREE_TEXT_MAX)
+    city: Optional[str] = Field(None, max_length=FREE_TEXT_MAX)
+    state: OptionalUf = None
+    complement: Optional[str] = Field(None, max_length=FREE_TEXT_MAX)
     linkedin_profile_url: Optional[str] = Field(None, alias="linkedinProfileUrl", max_length=255)
     job_title: Optional[str] = Field(None, alias="jobTitle", max_length=FREE_TEXT_MAX)
     organization_id: Optional[int] = Field(None, alias="organizationId")
@@ -65,3 +71,31 @@ class ExecutiveUpdate(ExecutiveBase):
 
 class Executive(ExecutiveBase):
     id: int
+
+
+class ExecutiveProfileComplete(ExecutiveBase):
+    """Payload da conclusão de perfil no primeiro acesso (executivo)."""
+
+    full_name: str = Field(..., alias="fullName", min_length=2, max_length=FREE_TEXT_MAX)
+    cpf: RequiredCpf
+    rg: str = Field(..., min_length=1, max_length=FREE_TEXT_MAX)
+    rg_issuer: str = Field(..., alias="rgIssuer", min_length=1, max_length=FREE_TEXT_MAX)
+    rg_issue_date: date = Field(..., alias="rgIssueDate")
+    birth_date: date = Field(..., alias="birthDate")
+    nationality: str = Field(..., min_length=1, max_length=FREE_TEXT_MAX)
+    civil_status: str = Field(..., alias="civilStatus", min_length=1, max_length=FREE_TEXT_MAX)
+    work_email: EmailStr = Field(..., alias="workEmail")
+    work_phone: str = Field(..., alias="workPhone", min_length=8, max_length=PHONE_MAX)
+    zip_code: RequiredCep = Field(..., alias="zipCode")
+    street: str = Field(..., min_length=1, max_length=FREE_TEXT_MAX)
+    number: str = Field(..., min_length=1, max_length=FREE_TEXT_MAX)
+    neighborhood: str = Field(..., min_length=1, max_length=FREE_TEXT_MAX)
+    city: str = Field(..., min_length=1, max_length=FREE_TEXT_MAX)
+    state: RequiredUf
+    job_title: str = Field(..., alias="jobTitle", min_length=1, max_length=FREE_TEXT_MAX)
+    bank_info: str = Field(..., alias="bankInfo", min_length=5, max_length=FREE_TEXT_MAX)
+
+    @field_validator("full_name")
+    @classmethod
+    def _two_names(cls, v: str) -> str:
+        return validate_two_word_name(v, "Nome completo")

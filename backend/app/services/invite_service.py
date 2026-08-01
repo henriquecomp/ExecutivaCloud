@@ -16,7 +16,7 @@ from app.models.user_invite_token_model import UserInviteToken
 from app.models import user_model as user_models
 from app.repositories.user_repository import UserRepository
 from app.schemas import auth_schema as auth_schemas
-from app.schemas.executive_schema import ExecutiveCreate
+from app.schemas.executive_schema import ExecutiveProfileComplete
 from app.services.auth_service import _user_to_public
 from app.services.email_service import build_set_password_link, send_invite_email
 from app.core.tenant_scope import normalize_user_scope_fields, validate_user_tenant_scope
@@ -341,7 +341,7 @@ class InviteService:
     def complete_executive_profile(
         self,
         user_row: user_models.Usuario,
-        body: ExecutiveCreate,
+        body: ExecutiveProfileComplete,
     ) -> auth_schemas.CurrentUserOut:
         if user_row.role != "executive" or user_row.executive_id is None:
             raise HTTPException(
