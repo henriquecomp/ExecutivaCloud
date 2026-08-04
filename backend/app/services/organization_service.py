@@ -10,6 +10,7 @@ from app.core.br_validators import normalize_cnpj_raw
 from app.services.organization_scope import (
     assert_organization_in_scope,
     assert_organization_manager,
+    assert_organization_readable,
     scoped_organizations_query,
 )
 from typing import List, Optional
@@ -27,7 +28,7 @@ class OrganizationService:
         db_org = self.repository.get_by_id(org_id)
         if db_org is None:
             return None
-        assert_organization_in_scope(actor, db_org)
+        assert_organization_readable(actor, db_org)
         return db_org
 
     def get_all_organizations(

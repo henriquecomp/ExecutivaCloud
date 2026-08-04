@@ -27,12 +27,16 @@ const CompleteSecretaryProfileView: React.FC<CompleteSecretaryProfileViewProps> 
     (async () => {
       if (!currentUser.secretaryId) return;
       try {
-        const [sec, orgs, depts, execs] = await Promise.all([
+        const [sec, orgs, execs] = await Promise.all([
           secretaryService.getOne(currentUser.secretaryId),
           organizationService.getAll(),
-          departmentService.getAll(),
           executiveService.getAll(0, 2000),
         ]);
+        if (cancelled) return;
+        const orgId = currentUser.organizationId ?? sec.organizationId;
+        const depts = orgId
+          ? await departmentService.getByOrg(String(orgId))
+          : await departmentService.getAll();
         if (!cancelled) {
           setSecretary(sec);
           setOrganizations(orgs);
@@ -47,7 +51,7 @@ const CompleteSecretaryProfileView: React.FC<CompleteSecretaryProfileViewProps> 
     return () => {
       cancelled = true;
     };
-  }, [currentUser.secretaryId]);
+  }, [currentUser.secretaryId, currentUser.organizationId]);
 
   if (error) {
     return (

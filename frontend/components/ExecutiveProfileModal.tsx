@@ -60,18 +60,25 @@ const ExecutiveProfileModal: React.FC<ExecutiveProfileModalProps> = ({
     setAccOk(null);
     void (async () => {
       try {
-        const [me, ex, orgs, depts, execs] = await Promise.all([
+        const [me, ex, orgs, execs] = await Promise.all([
           fetchMe(),
           executiveService.getById(currentUser.executiveId),
           organizationService.getAll(),
-          departmentService.getAll(),
           executiveService.getAll(0, 2000),
         ]);
+        if (cancelled) return;
+        const orgId = currentUser.organizationId ?? ex.organizationId ?? me.organizationId;
+        const depts = orgId
+          ? await departmentService.getByOrg(String(orgId))
+          : await departmentService.getAll();
         if (cancelled) return;
         setAccFullName(me.fullName);
         setAccEmail(me.email);
         setAccPhone(me.phone != null ? String(me.phone) : '');
-        setCurrentExecutive(ex);
+        setCurrentExecutive({
+          ...ex,
+          organizationId: ex.organizationId ?? (orgId != null ? String(orgId) : undefined),
+        });
         setOrganizations(orgs);
         setDepartments(depts);
         setExecutives(execs);
@@ -84,7 +91,7 @@ const ExecutiveProfileModal: React.FC<ExecutiveProfileModalProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, currentUser.role, currentUser.executiveId]);
+  }, [isOpen, currentUser.role, currentUser.executiveId, currentUser.organizationId]);
 
   const handleSaveAccount = async () => {
     setAccError(null);

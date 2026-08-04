@@ -44,13 +44,17 @@ const SecretaryProfileModal: React.FC<SecretaryProfileModalProps> = ({
     setAccOk(null);
     void (async () => {
       try {
-        const [me, sec, orgs, depts, execs] = await Promise.all([
+        const [me, sec, orgs, execs] = await Promise.all([
           fetchMe(),
           secretaryService.getOne(currentUser.secretaryId),
           organizationService.getAll(),
-          departmentService.getAll(),
           executiveService.getAll(0, 2000),
         ]);
+        if (cancelled) return;
+        const orgId = currentUser.organizationId ?? sec.organizationId ?? me.organizationId;
+        const depts = orgId
+          ? await departmentService.getByOrg(String(orgId))
+          : await departmentService.getAll();
         if (cancelled) return;
         setAccFullName(me.fullName);
         setAccEmail(me.email);
@@ -66,7 +70,7 @@ const SecretaryProfileModal: React.FC<SecretaryProfileModalProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, currentUser.role, currentUser.secretaryId]);
+  }, [isOpen, currentUser.role, currentUser.secretaryId, currentUser.organizationId]);
 
   const handleSaveAccount = async () => {
     setAccError(null);

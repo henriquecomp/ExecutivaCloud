@@ -200,46 +200,84 @@ export const ExecutiveProfileForm: React.FC<ExecutiveProfileFormProps> = ({
                    </label>
                    <input
                      type="text"
-                     className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                     className={`mt-1 w-full p-2 border rounded focus:ring-2 focus:outline-none ${
+                       fieldErrors.rg ? 'border-red-500' : 'border-gray-300 focus:ring-blue-500'
+                     }`}
                      value={currentExecutive.rg || ''}
-                     onChange={e => setCurrentExecutive({...currentExecutive, rg: e.target.value})}
+                     onChange={e => {
+                       setCurrentExecutive({...currentExecutive, rg: e.target.value});
+                       if (fieldErrors.rg) setFieldErrors({...fieldErrors, rg: undefined});
+                     }}
                    />
+                   {fieldErrors.rg && <p className="mt-1 text-sm text-red-600">{fieldErrors.rg}</p>}
                 </div>
                 <div>
-                   <label className="block text-sm font-medium text-gray-700">Órgão Emissor do RG</label>
+                   <label className={`block text-sm font-medium ${fieldErrors.rgIssuer ? 'text-red-600' : 'text-gray-700'}`}>
+                     {req('Órgão Emissor do RG')}
+                   </label>
                    <input
                      type="text"
-                     className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                     className={`mt-1 w-full p-2 border rounded focus:ring-2 focus:outline-none ${
+                       fieldErrors.rgIssuer ? 'border-red-500' : 'border-gray-300 focus:ring-blue-500'
+                     }`}
                      value={currentExecutive.rgIssuer || ''}
-                     onChange={e => setCurrentExecutive({...currentExecutive, rgIssuer: e.target.value})}
+                     onChange={e => {
+                       setCurrentExecutive({...currentExecutive, rgIssuer: e.target.value});
+                       if (fieldErrors.rgIssuer) setFieldErrors({...fieldErrors, rgIssuer: undefined});
+                     }}
                    />
+                   {fieldErrors.rgIssuer && <p className="mt-1 text-sm text-red-600">{fieldErrors.rgIssuer}</p>}
                 </div>
                 <div>
-                   <label className="block text-sm font-medium text-gray-700">Data de Expedição do RG</label>
+                   <label className={`block text-sm font-medium ${fieldErrors.rgIssueDate ? 'text-red-600' : 'text-gray-700'}`}>
+                     {req('Data de Expedição do RG')}
+                   </label>
                    <input
                      type="date"
-                     className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                     className={`mt-1 w-full p-2 border rounded focus:ring-2 focus:outline-none ${
+                       fieldErrors.rgIssueDate ? 'border-red-500' : 'border-gray-300 focus:ring-blue-500'
+                     }`}
                      value={currentExecutive.rgIssueDate || ''}
-                     onChange={e => setCurrentExecutive({...currentExecutive, rgIssueDate: e.target.value})}
+                     onChange={e => {
+                       setCurrentExecutive({...currentExecutive, rgIssueDate: e.target.value});
+                       if (fieldErrors.rgIssueDate) setFieldErrors({...fieldErrors, rgIssueDate: undefined});
+                     }}
                    />
+                   {fieldErrors.rgIssueDate && <p className="mt-1 text-sm text-red-600">{fieldErrors.rgIssueDate}</p>}
                 </div>
                 <div>
-                   <label className="block text-sm font-medium text-gray-700">Data de Nascimento</label>
+                   <label className={`block text-sm font-medium ${fieldErrors.birthDate ? 'text-red-600' : 'text-gray-700'}`}>
+                     {req('Data de Nascimento')}
+                   </label>
                    <input
                      type="date"
-                     className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                     className={`mt-1 w-full p-2 border rounded focus:ring-2 focus:outline-none ${
+                       fieldErrors.birthDate ? 'border-red-500' : 'border-gray-300 focus:ring-blue-500'
+                     }`}
                      value={currentExecutive.birthDate || ''}
-                     onChange={e => setCurrentExecutive({...currentExecutive, birthDate: e.target.value})}
+                     onChange={e => {
+                       setCurrentExecutive({...currentExecutive, birthDate: e.target.value});
+                       if (fieldErrors.birthDate) setFieldErrors({...fieldErrors, birthDate: undefined});
+                     }}
                    />
+                   {fieldErrors.birthDate && <p className="mt-1 text-sm text-red-600">{fieldErrors.birthDate}</p>}
                 </div>
                 <div>
-                   <label className="block text-sm font-medium text-gray-700">Nacionalidade</label>
+                   <label className={`block text-sm font-medium ${fieldErrors.nationality ? 'text-red-600' : 'text-gray-700'}`}>
+                     {req('Nacionalidade')}
+                   </label>
                    <input
                      type="text"
-                     className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                     className={`mt-1 w-full p-2 border rounded focus:ring-2 focus:outline-none ${
+                       fieldErrors.nationality ? 'border-red-500' : 'border-gray-300 focus:ring-blue-500'
+                     }`}
                      value={currentExecutive.nationality || ''}
-                     onChange={e => setCurrentExecutive({...currentExecutive, nationality: e.target.value})}
+                     onChange={e => {
+                       setCurrentExecutive({...currentExecutive, nationality: e.target.value});
+                       if (fieldErrors.nationality) setFieldErrors({...fieldErrors, nationality: undefined});
+                     }}
                    />
+                   {fieldErrors.nationality && <p className="mt-1 text-sm text-red-600">{fieldErrors.nationality}</p>}
                 </div>
                 <div>
                    <label className="block text-sm font-medium text-gray-700">Naturalidade</label>
@@ -251,11 +289,18 @@ export const ExecutiveProfileForm: React.FC<ExecutiveProfileFormProps> = ({
                    />
                 </div>
                 <div className="col-span-2 md:col-span-1">
-                   <label className="block text-sm font-medium text-gray-700">Estado Civil</label>
+                   <label className={`block text-sm font-medium ${fieldErrors.civilStatus ? 'text-red-600' : 'text-gray-700'}`}>
+                     {req('Estado Civil')}
+                   </label>
                    <select 
-                      className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      className={`mt-1 w-full p-2 border rounded focus:ring-2 focus:outline-none ${
+                        fieldErrors.civilStatus ? 'border-red-500' : 'border-gray-300 focus:ring-blue-500'
+                      }`}
                       value={currentExecutive.civilStatus || ''}
-                      onChange={e => setCurrentExecutive({...currentExecutive, civilStatus: e.target.value})}
+                      onChange={e => {
+                        setCurrentExecutive({...currentExecutive, civilStatus: e.target.value});
+                        if (fieldErrors.civilStatus) setFieldErrors({...fieldErrors, civilStatus: undefined});
+                      }}
                    >
                      <option value="">Selecione</option>
                      <option value="Solteiro(a)">Solteiro(a)</option>
@@ -263,6 +308,7 @@ export const ExecutiveProfileForm: React.FC<ExecutiveProfileFormProps> = ({
                      <option value="Divorciado(a)">Divorciado(a)</option>
                      <option value="Viúvo(a)">Viúvo(a)</option>
                    </select>
+                   {fieldErrors.civilStatus && <p className="mt-1 text-sm text-red-600">{fieldErrors.civilStatus}</p>}
                 </div>
                 <div>
                    <label className="block text-sm font-medium text-gray-700">Nome da Mãe</label>

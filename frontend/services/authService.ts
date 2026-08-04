@@ -90,6 +90,8 @@ export function mapApiUserToAppUser(apiUser: ApiCurrentUser): User {
         ...base,
         role: 'executive',
         executiveId: apiUser.executiveId != null ? String(apiUser.executiveId) : undefined,
+        organizationId:
+          apiUser.organizationId != null ? String(apiUser.organizationId) : undefined,
       };
     case 'secretary':
       return {

@@ -52,19 +52,22 @@ const CompleteExecutiveProfileView: React.FC<CompleteExecutiveProfileViewProps> 
         setLoading(false);
         return;
       }
-      const orgId = currentUser.organizationId;
       try {
-        const [ex, orgList, depts, execs] = await Promise.all([
-          executiveService.getById(currentUser.executiveId),
-          orgId ? organizationService.getOne(orgId).then((o) => [o]) : organizationService.getAll(),
-          orgId ? departmentService.getByOrg(orgId) : departmentService.getAll(),
+        const ex = await executiveService.getById(currentUser.executiveId);
+        if (cancelled) return;
+        const resolvedOrgId = currentUser.organizationId ?? ex.organizationId;
+        const [orgList, depts, execs] = await Promise.all([
+          resolvedOrgId
+            ? organizationService.getOne(resolvedOrgId).then((o) => [o])
+            : organizationService.getAll(),
+          resolvedOrgId ? departmentService.getByOrg(resolvedOrgId) : departmentService.getAll(),
           executiveService.getAll(0, 2000),
         ]);
         if (!cancelled) {
           setCurrentExecutive({
             ...ex,
             workEmail: currentUser.email,
-            organizationId: ex.organizationId ?? orgId,
+            organizationId: ex.organizationId ?? resolvedOrgId,
           });
           setOrganizations(orgList);
           setDepartments(depts);

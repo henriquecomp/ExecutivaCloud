@@ -321,6 +321,78 @@ def test_organization_tenant_visibility_and_create_scope(client, db_session):
     assert r_unauth.status_code == 401
 
 
+def test_executive_can_read_own_organization_only(client, db_session):
+    """Onboarding: executive lê só a própria empresa; não muta; não vê outra."""
+    lo_a = _seed_legal_org(db_session, "11444777000161")
+    lo_b = _seed_legal_org(db_session, "06990590000123")
+    org_a = _seed_company(db_session, lo_a, "04252011000110")
+    org_b = Organization(
+        name="Empresa Outra",
+        legalOrganizationId=lo_b.id,
+        cnpj="23145757000179",
+        street="Rua B",
+        number="20",
+        neighborhood="Centro",
+        city="Rio",
+        state="RJ",
+        zipCode="20040020",
+        complement=None,
+    )
+    db_session.add(org_b)
+    db_session.flush()
+
+    ex = Executive(
+        full_name="Executivo Onboard",
+        work_email="exec-onboard@test.com",
+        organization_id=org_a.id,
+    )
+    db_session.add(ex)
+    db_session.flush()
+    db_session.commit()
+
+    user = _create_user(
+        db_session,
+        email="exec-onboard@test.com",
+        role="executive",
+        org_id=org_a.id,
+        legal_id=lo_a.id,
+    )
+    user.executive_id = ex.id
+    db_session.commit()
+
+    token = _login(client, "exec-onboard@test.com")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    r_list = client.get("/organizations/", headers=headers)
+    assert r_list.status_code == 200, r_list.text
+    ids = {o["id"] for o in r_list.json()}
+    assert ids == {org_a.id}
+
+    r_own = client.get(f"/organizations/{org_a.id}", headers=headers)
+    assert r_own.status_code == 200, r_own.text
+    assert r_own.json()["id"] == org_a.id
+
+    r_other = client.get(f"/organizations/{org_b.id}", headers=headers)
+    assert r_other.status_code == 403, r_other.text
+
+    r_create = client.post(
+        "/organizations/",
+        json={
+            "name": "Hack Empresa",
+            "legalOrganizationId": lo_a.id,
+            "cnpj": "58929179000146",
+            "street": "Rua X",
+            "number": "1",
+            "neighborhood": "Centro",
+            "city": "SP",
+            "state": "SP",
+            "zipCode": VALID_CEP,
+        },
+        headers=headers,
+    )
+    assert r_create.status_code == 403, r_create.text
+
+
 def test_register_organization_creates_legal_org_admin(client, db_session):
     """Cadastro público de organização: admin da matriz, sem organization_id."""
     email = "orgadmin@newtenant.com"
