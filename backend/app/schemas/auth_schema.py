@@ -10,6 +10,7 @@ from app.core.br_validators import (
     RequiredUf,
     validate_two_word_name,
 )
+from app.core.password_policy import MAX_LENGTH, MIN_LENGTH, validate_password
 
 
 class LoginRequest(BaseModel):
@@ -124,8 +125,16 @@ class CompleteInviteRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     token: str = Field(..., min_length=10)
-    password: str = Field(..., min_length=6)
-    password_confirm: str = Field(..., alias="passwordConfirm", min_length=6)
+    password: str = Field(..., min_length=MIN_LENGTH, max_length=MAX_LENGTH)
+    password_confirm: str = Field(
+        ..., alias="passwordConfirm", min_length=MIN_LENGTH, max_length=MAX_LENGTH
+    )
+
+    @field_validator("password")
+    @classmethod
+    def validate_password_policy(cls, v: str) -> str:
+        validate_password(v)
+        return v
 
 
 class InviteTokenStatusResponse(BaseModel):

@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.invite_token import hash_invite_token
+from app.core.password_policy import validate_password
 from app.core.security import create_access_token, hash_password
 from app.models.executive_model import Executive
 from app.models.organization_model import Organization
@@ -285,6 +286,13 @@ class InviteService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="As senhas não coincidem.",
             )
+        try:
+            validate_password(body.password)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(exc),
+            ) from exc
         th = hash_invite_token(body.token.strip())
         row = (
             self.db.query(UserInviteToken)
