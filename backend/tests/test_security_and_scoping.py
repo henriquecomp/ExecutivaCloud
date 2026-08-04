@@ -232,8 +232,11 @@ def test_register_organization_creates_legal_org_admin(client, db_session):
         "adminName": "Admin Matriz",
         "adminEmail": email,
         "adminEmailConfirm": email,
+        "captchaToken": "test-captcha-token",
     }
-    with patch("app.services.auth_service.send_invite_email"):
+    with patch("app.services.auth_service.send_invite_email"), patch(
+        "app.services.auth_service.verify_turnstile_token"
+    ):
         r = client.post(
             "/auth/register-organization",
             json=payload,

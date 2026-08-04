@@ -6,8 +6,9 @@
 #
 # Acesse o front em http://localhost:8080 e a API em http://localhost:8098/docs
 #
-# Em servidor público, antes do build defina a URL da API para o navegador:
+# Em servidor público, antes do build defina as variáveis do front:
 #   export VITE_API_URL=http://SEU_IP_OU_DOMINIO:8098/
+#   export VITE_TURNSTILE_SITE_KEY=sua-site-key-turnstile
 #   docker compose build --no-cache web
 # E ajuste CORS_ORIGINS abaixo para a origem do front (ex.: https://app.seudominio.com).
 
@@ -34,6 +35,7 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_API_URL: ${VITE_API_URL:-https://apiexecutiva.smarth.space/}
+        VITE_TURNSTILE_SITE_KEY: ${VITE_TURNSTILE_SITE_KEY:-}
     container_name: executivacloud-web
     ports:
       - "8080:80"

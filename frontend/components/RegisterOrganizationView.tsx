@@ -1,4 +1,5 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
+import { Turnstile, type TurnstileInstance } from '@marsidev/react-turnstile';
 import { useCepAutoLookup } from '../hooks/useCepAutoLookup';
 import { LogoIcon } from './Icons';
 import { registerOrganization, RegisterOrganizationPayload } from '../services/authService';
@@ -18,11 +19,15 @@ interface RegisterOrganizationViewProps {
   onBack: () => void;
 }
 
+type RegisterOrganizationFormState = Omit<RegisterOrganizationPayload, 'captchaToken'>;
+
 const READONLY_ADDRESS_CLASS =
   'w-full px-3 py-2 border border-slate-200 rounded-md text-sm bg-slate-50 text-slate-700 cursor-not-allowed';
 
+const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY ?? '';
+
 const RegisterOrganizationView: React.FC<RegisterOrganizationViewProps> = ({ onSuccess, onBack }) => {
-  const [form, setForm] = useState<RegisterOrganizationPayload>({
+  const [form, setForm] = useState<RegisterOrganizationFormState>({
     legalName: '',
     legalCnpj: '',
     legalStreet: '',
@@ -39,6 +44,13 @@ const RegisterOrganizationView: React.FC<RegisterOrganizationViewProps> = ({ onS
   const [error, setError] = useState<string | null>(null);
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const turnstileRef = useRef<TurnstileInstance>(null);
+
+  const resetCaptcha = () => {
+    setCaptchaToken(null);
+    turnstileRef.current?.reset();
+  };
 
   const applyCepAddress = useCallback(
     (addr: { street: string; neighborhood: string; city: string; state: string }) => {
@@ -68,7 +80,7 @@ const RegisterOrganizationView: React.FC<RegisterOrganizationViewProps> = ({ onS
     onClearAddress: clearCepAddress,
   });
 
-  const update = (field: keyof RegisterOrganizationPayload, value: string) => {
+  const update = (field: keyof RegisterOrganizationFormState, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
     if (fieldError) setFieldError(null);
   };
@@ -108,6 +120,10 @@ const RegisterOrganizationView: React.FC<RegisterOrganizationViewProps> = ({ onS
       setFieldError('E-mail e confirmação não coincidem.');
       return;
     }
+    if (!captchaToken) {
+      setFieldError('Conclua a verificação de segurança antes de continuar.');
+      return;
+    }
 
     setLoading(true);
     try {
@@ -123,8 +139,10 @@ const RegisterOrganizationView: React.FC<RegisterOrganizationViewProps> = ({ onS
         legalComplement: normalizeComplement(form.legalComplement),
         adminEmail: form.adminEmail.trim(),
         adminEmailConfirm: form.adminEmailConfirm.trim(),
+        captchaToken,
       };
       const data = await registerOrganization(payload);
+      resetCaptcha();
       onSuccess(data.message);
     } catch (err) {
       if (axios.isAxiosError(err) && err.response?.data?.detail != null) {
@@ -138,6 +156,7 @@ const RegisterOrganizationView: React.FC<RegisterOrganizationViewProps> = ({ onS
       } else {
         setError('Não foi possível concluir o cadastro. Tente novamente.');
       }
+      resetCaptcha();
     } finally {
       setLoading(false);
     }
@@ -309,6 +328,22 @@ const RegisterOrganizationView: React.FC<RegisterOrganizationViewProps> = ({ onS
             </div>
           </fieldset>
 
+          <div className="pt-2 flex justify-center">
+            {TURNSTILE_SITE_KEY ? (
+              <Turnstile
+                ref={turnstileRef}
+                siteKey={TURNSTILE_SITE_KEY}
+                onSuccess={setCaptchaToken}
+                onExpire={() => setCaptchaToken(null)}
+                onError={() => setCaptchaToken(null)}
+              />
+            ) : (
+              <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+                Verificação de segurança indisponível. Configure VITE_TURNSTILE_SITE_KEY.
+              </p>
+            )}
+          </div>
+
           <div className="flex flex-col sm:flex-row gap-3 pt-2">
             <button
               type="button"
@@ -319,7 +354,7 @@ const RegisterOrganizationView: React.FC<RegisterOrganizationViewProps> = ({ onS
             </button>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !captchaToken || !TURNSTILE_SITE_KEY}
               className="flex-1 py-2.5 px-4 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-400"
             >
               {loading ? 'Cadastrando…' : 'Criar organização'}

@@ -35,6 +35,7 @@ export interface RegisterOrganizationPayload {
   adminName: string;
   adminEmail: string;
   adminEmailConfirm: string;
+  captchaToken: string;
 }
 
 export interface RegisterOrganizationResponse {

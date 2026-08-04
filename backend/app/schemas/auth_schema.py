@@ -36,6 +36,7 @@ class RegisterOrganizationRequest(BaseModel):
     adminName: str = Field(..., min_length=2, max_length=100)
     adminEmail: EmailStr
     adminEmailConfirm: EmailStr
+    captcha_token: str = Field(..., alias="captchaToken", min_length=1)
 
     @field_validator("legalName")
     @classmethod

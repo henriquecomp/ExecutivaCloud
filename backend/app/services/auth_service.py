@@ -1,3 +1,4 @@
+import logging
 import os
 from typing import Optional
 
@@ -5,6 +6,7 @@ from fastapi import Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.captcha_service import CaptchaVerificationError, verify_turnstile_token
 from app.core.database import get_db
 from app.core.invite_token import hash_invite_token
 from app.core.tenant_scope import normalize_user_scope_fields, validate_user_tenant_scope
@@ -19,6 +21,17 @@ from app.schemas import auth_schema as auth_schemas
 from app.services.email_service import build_set_password_link, send_invite_email
 import secrets
 from datetime import datetime, timedelta, timezone
+
+logger = logging.getLogger(__name__)
+
+REGISTER_ORGANIZATION_SUCCESS_MESSAGE = (
+    "Se o cadastro for elegível, enviaremos um e-mail com instruções para definir sua senha "
+    "e concluir o primeiro acesso."
+)
+
+
+def _register_organization_success_response() -> auth_schemas.RegisterOrganizationResponse:
+    return auth_schemas.RegisterOrganizationResponse(message=REGISTER_ORGANIZATION_SUCCESS_MESSAGE)
 
 
 def _user_to_public(u: user_models.Usuario) -> auth_schemas.CurrentUserOut:
@@ -66,16 +79,26 @@ class AuthService:
         body: auth_schemas.RegisterOrganizationRequest,
         frontend_base: str,
     ) -> auth_schemas.RegisterOrganizationResponse:
-        if self.users.get_by_email(body.adminEmail):
+        try:
+            verify_turnstile_token(body.captcha_token)
+        except CaptchaVerificationError as exc:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Este e-mail já está cadastrado.",
+                detail=str(exc),
+            ) from exc
+
+        if self.users.get_by_email(body.adminEmail):
+            logger.info(
+                "register_organization blocked: duplicate admin email",
+                extra={"admin_email": str(body.adminEmail).lower()},
             )
+            return _register_organization_success_response()
         if self.legal_orgs.get_by_cnpj(body.legalCnpj):
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Este CNPJ já está cadastrado.",
+            logger.info(
+                "register_organization blocked: duplicate legal cnpj",
+                extra={"legal_cnpj": body.legalCnpj},
             )
+            return _register_organization_success_response()
         lo_data = {
             "name": body.legalName,
             "cnpj": body.legalCnpj,
@@ -91,10 +114,11 @@ class AuthService:
             lo = self.legal_orgs.create(lo_data)
         except IntegrityError:
             self.db.rollback()
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Este CNPJ já está cadastrado.",
-            ) from None
+            logger.info(
+                "register_organization blocked: integrity error (likely duplicate cnpj)",
+                extra={"legal_cnpj": body.legalCnpj},
+            )
+            return _register_organization_success_response()
         placeholder_pw = secrets.token_urlsafe(48)
         hashed = hash_password(placeholder_pw)
         raw_token = secrets.token_urlsafe(32)
@@ -154,12 +178,7 @@ class AuthService:
                 detail=f"Falha ao enviar e-mail de primeiro acesso: {e!s}",
             ) from e
 
-        return auth_schemas.RegisterOrganizationResponse(
-            message=(
-                "Cadastro criado com sucesso. Enviamos um e-mail para definir sua senha e "
-                "validar o primeiro acesso."
-            )
-        )
+        return _register_organization_success_response()
 
     def bootstrap_master(
         self,
