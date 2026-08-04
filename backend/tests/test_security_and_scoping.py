@@ -201,6 +201,14 @@ def test_executive_list_scoped_by_role(client, db_session):
 
 def test_organization_create_rejects_invalid_cnpj(client, db_session):
     lo = _seed_legal_org(db_session, VALID_CNPJ_B)
+    db_session.commit()
+    _create_user(
+        db_session,
+        email="lo-cnpj@test.com",
+        role="admin_legal_organization",
+        legal_id=lo.id,
+    )
+    token = _login(client, "lo-cnpj@test.com")
     payload = {
         "name": "Nova Empresa",
         "legalOrganizationId": lo.id,
@@ -212,8 +220,105 @@ def test_organization_create_rejects_invalid_cnpj(client, db_session):
         "state": "SP",
         "zipCode": VALID_CEP,
     }
-    r = client.post("/organizations/", json=payload)
+    r = client.post(
+        "/organizations/",
+        json=payload,
+        headers={"Authorization": f"Bearer {token}"},
+    )
     assert r.status_code == 422
+
+
+def test_organization_tenant_visibility_and_create_scope(client, db_session):
+    """Matriz vê/cria só suas empresas; master vê todas; cross-tenant bloqueado."""
+    lo_a = _seed_legal_org(db_session, "11444777000161")
+    lo_b = _seed_legal_org(db_session, "06990590000123")
+    org_a = _seed_company(db_session, lo_a, "04252011000110")
+    org_b = Organization(
+        name="Empresa Outra Matriz",
+        legalOrganizationId=lo_b.id,
+        cnpj="23145757000179",
+        street="Rua B",
+        number="20",
+        neighborhood="Centro",
+        city="Rio",
+        state="RJ",
+        zipCode="20040020",
+        complement=None,
+    )
+    db_session.add(org_b)
+    db_session.flush()
+    db_session.commit()
+
+    _create_user(
+        db_session,
+        email="admin-a@test.com",
+        role="admin_legal_organization",
+        legal_id=lo_a.id,
+    )
+    _create_user(
+        db_session,
+        email="admin-b@test.com",
+        role="admin_legal_organization",
+        legal_id=lo_b.id,
+    )
+    _create_user(db_session, email="master-org@test.com", role="master")
+
+    token_a = _login(client, "admin-a@test.com")
+    token_b = _login(client, "admin-b@test.com")
+    token_master = _login(client, "master-org@test.com")
+    headers_a = {"Authorization": f"Bearer {token_a}"}
+    headers_b = {"Authorization": f"Bearer {token_b}"}
+    headers_master = {"Authorization": f"Bearer {token_master}"}
+
+    r_a = client.get("/organizations/", headers=headers_a)
+    assert r_a.status_code == 200, r_a.text
+    ids_a = {o["id"] for o in r_a.json()}
+    assert org_a.id in ids_a
+    assert org_b.id not in ids_a
+
+    r_b = client.get("/organizations/", headers=headers_b)
+    ids_b = {o["id"] for o in r_b.json()}
+    assert org_b.id in ids_b
+    assert org_a.id not in ids_b
+
+    r_master = client.get("/organizations/", headers=headers_master)
+    ids_master = {o["id"] for o in r_master.json()}
+    assert org_a.id in ids_master and org_b.id in ids_master
+
+    create_payload = {
+        "name": "Filial Nova A",
+        "legalOrganizationId": lo_b.id,  # tentativa de vincular à outra matriz
+        "cnpj": "58929179000146",
+        "street": "Rua Nova",
+        "number": "1",
+        "neighborhood": "Centro",
+        "city": "São Paulo",
+        "state": "SP",
+        "zipCode": VALID_CEP,
+    }
+    r_create = client.post("/organizations/", json=create_payload, headers=headers_a)
+    assert r_create.status_code == 201, r_create.text
+    assert r_create.json()["legalOrganizationId"] == lo_a.id
+
+    r_cross = client.put(
+        f"/organizations/{org_b.id}",
+        json={
+            "name": "Hack Tentativa",
+            "legalOrganizationId": lo_b.id,
+            "cnpj": org_b.cnpj,
+            "street": "Rua B",
+            "number": "20",
+            "neighborhood": "Centro",
+            "city": "Rio",
+            "state": "RJ",
+            "zipCode": "20040020",
+        },
+        headers=headers_a,
+    )
+    assert r_cross.status_code == 403, r_cross.text
+
+    r_unauth = client.get("/organizations/")
+    assert r_unauth.status_code == 401
 
 
 def test_register_organization_creates_legal_org_admin(client, db_session):

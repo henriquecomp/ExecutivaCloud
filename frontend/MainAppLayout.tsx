@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import {
   Executive,
   Organization,
@@ -85,9 +85,11 @@ const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout, on
   const [documentCategories, setDocumentCategories] = useState<DocumentCategory[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [notifiedEventIds, setNotifiedEventIds] = useState<Set<string>>(new Set());
+  const coreLoadGenRef = useRef(0);
 
   const loadCoreData = useCallback(async (isStale?: () => boolean) => {
-    const stale = () => isStale?.() ?? false;
+    const gen = ++coreLoadGenRef.current;
+    const stale = () => (isStale?.() ?? false) || gen !== coreLoadGenRef.current;
     try {
       const legalOrgsRes = await legalOrganizationService.getAll();
       if (stale()) return;

@@ -1,30 +1,4 @@
-# Gestão de organizações (empresas)
-
-## Purpose
-
-Fluxo autenticado de criação e atualização de entidades `Organization` (empresa/filial) vinculadas a uma `LegalOrganization`. Visibilidade restrita à organização matriz responsável e ao usuário `master` (acesso global).
-
-## Requirements
-
-### Requirement: Gestão de Organization
-O sistema DEVE permitir que usuários autenticados com permissão adequada gerenciem entidades `Organization` dentro da sua `LegalOrganization`, e que o `master` gerencie empresas de qualquer matriz. Endpoints de empresa MUST exigir autenticação.
-
-#### Scenario: Criar nova organização
-- **WHEN** um `admin_legal_organization` envia dados válidos para uma nova `Organization`
-- **THEN** o sistema cria a `Organization` vinculada à `LegalOrganization` do usuário
-
-#### Scenario: Master cria empresa em qualquer matriz
-- **WHEN** um `master` envia dados válidos incluindo `legalOrganizationId` de uma matriz existente
-- **THEN** o sistema cria a `Organization` vinculada a essa matriz
-
-#### Scenario: Atualizar endereço da organização
-- **WHEN** um administrador autorizado atualiza o endereço de uma `Organization` no seu escopo
-- **THEN** o sistema DEVE validar que todos os campos obrigatórios de endereço (CNPJ, logradouro, número, bairro, cidade, UF, CEP) são enviados em conjunto
-
-#### Scenario: Limpar complemento opcional
-- **WHEN** um administrador autorizado atualiza uma `Organization` e limpa o campo complemento
-- **THEN** o frontend envia `null` para o complemento
-- **THEN** o backend atualiza o registro no banco para `null`
+## ADDED Requirements
 
 ### Requirement: Visibilidade de empresas por tenant
 O sistema MUST restringir a listagem e a gestão de entidades `Organization` (empresas) ao usuário `master` (acesso global) e ao `admin_legal_organization` cuja `LegalOrganization` está vinculada à empresa. Demais papéis MUST receber acesso negado.
@@ -59,3 +33,25 @@ O sistema MUST vincular novas empresas à matriz do `admin_legal_organization` a
 #### Scenario: Bloquear mutação cross-tenant
 - **WHEN** um `admin_legal_organization` tenta atualizar ou excluir empresa de outra matriz
 - **THEN** o sistema responde com HTTP 403 ou 404 e não altera o registro
+
+## MODIFIED Requirements
+
+### Requirement: Gestão de Organization
+O sistema DEVE permitir que usuários autenticados com permissão adequada gerenciem entidades `Organization` dentro da sua `LegalOrganization`, e que o `master` gerencie empresas de qualquer matriz. Endpoints de empresa MUST exigir autenticação.
+
+#### Scenario: Criar nova organização
+- **WHEN** um `admin_legal_organization` envia dados válidos para uma nova `Organization`
+- **THEN** o sistema cria a `Organization` vinculada à `LegalOrganization` do usuário
+
+#### Scenario: Master cria empresa em qualquer matriz
+- **WHEN** um `master` envia dados válidos incluindo `legalOrganizationId` de uma matriz existente
+- **THEN** o sistema cria a `Organization` vinculada a essa matriz
+
+#### Scenario: Atualizar endereço da organização
+- **WHEN** um administrador autorizado atualiza o endereço de uma `Organization` no seu escopo
+- **THEN** o sistema DEVE validar que todos os campos obrigatórios de endereço (CNPJ, logradouro, número, bairro, cidade, UF, CEP) são enviados em conjunto
+
+#### Scenario: Limpar complemento opcional
+- **WHEN** um administrador autorizado atualiza uma `Organization` e limpa o campo complemento
+- **THEN** o frontend envia `null` para o complemento
+- **THEN** o backend atualiza o registro no banco para `null`
