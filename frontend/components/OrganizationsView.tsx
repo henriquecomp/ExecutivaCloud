@@ -20,6 +20,7 @@ import AppSelect from './ui/AppSelect';
 import ToolbarPanel from './ui/ToolbarPanel';
 import Pagination from './Pagination';
 import { isCompanyAdmin, isLegalOrgAdmin } from '../utils/tenantScope';
+import { FREE_TEXT_MAX } from '../utils/fieldLimits';
 import OrganizationCompanyForm from './OrganizationCompanyForm';
 
 interface OrganizationsViewProps {
@@ -184,9 +185,16 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({
         try {
             setApiError(null);
             if ('id' in orgData && orgData.id) {
-                await organizationService.update(String(orgData.id), orgData);
+                const updated = await organizationService.update(String(orgData.id), orgData);
+                setOrganizations((prev) =>
+                    prev.map((o) => (String(o.id) === String(updated.id) ? updated : o)),
+                );
             } else {
-                await organizationService.create(orgData as OrganizationCreate);
+                const created = await organizationService.create(orgData as OrganizationCreate);
+                setOrganizations((prev) => {
+                    if (prev.some((o) => String(o.id) === String(created.id))) return prev;
+                    return [...prev, created];
+                });
             }
             if (onRefresh) {
                 await onRefresh();
