@@ -14,4 +14,4 @@
 
 - [x] 3.1 Adicionar pytest: matriz vê/cria só suas empresas; cross-tenant bloqueado; master vê todas
 - [x] 3.2 Ajustar testes existentes de `/organizations/` para autenticar
-- [ ] 3.3 Rodar pytest afetados, commit e push seguro em `origin/main` (sem force)
+- [x] 3.3 Rodar pytest afetados, commit e push seguro em `origin/main` (sem force)
