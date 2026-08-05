@@ -11,10 +11,24 @@ const mapExecutive = (item: any): Executive => ({
   city: item.city,
   state: item.state,
   complement: item.complement,
-  organizationId: item.organizationId != null ? String(item.organizationId) : undefined,
-  departmentId: item.departmentId != null ? String(item.departmentId) : undefined,
+  organizationId:
+    item.organizationId != null
+      ? String(item.organizationId)
+      : item.organization_id != null
+        ? String(item.organization_id)
+        : undefined,
+  departmentId:
+    item.departmentId != null
+      ? String(item.departmentId)
+      : item.department_id != null
+        ? String(item.department_id)
+        : undefined,
   reportsToExecutiveId:
-    item.reportsToExecutiveId != null ? String(item.reportsToExecutiveId) : undefined,
+    item.reportsToExecutiveId != null
+      ? String(item.reportsToExecutiveId)
+      : item.reports_to_executive_id != null
+        ? String(item.reports_to_executive_id)
+        : undefined,
 });
 
 export const executiveService = {

@@ -199,6 +199,45 @@ def test_executive_list_scoped_by_role(client, db_session):
     assert len(r_master.json()) >= 2
 
 
+def test_executive_lists_peers_in_same_company(client, db_session):
+    """Gestor direto: lista executivos da mesma empresa (não da org jurídica)."""
+    lo = _seed_legal_org(db_session)
+    org_a = _seed_company(db_session, lo, VALID_CNPJ_B)
+    org_b = _seed_company(db_session, lo, "11444777000161")
+
+    peer = Executive(full_name="Peer Same Org", work_email="peer@corp.com", organization_id=org_a.id)
+    self_ex = Executive(full_name="Self Exec", work_email="self@corp.com", organization_id=org_a.id)
+    # Mesma org jurídica, outra empresa — não deve aparecer
+    other = Executive(full_name="Other Company", work_email="other@corp.com", organization_id=org_b.id)
+    db_session.add_all([peer, self_ex, other])
+    db_session.commit()
+
+    # organization_id só no cadastro Executive (fallback do escopo pela empresa)
+    u = user_models.Usuario(
+        name="Self Exec",
+        email="self@corp.com",
+        hashed_password=hash_password("secret123"),
+        is_active=True,
+        role="executive",
+        legal_organization_id=lo.id,
+        organization_id=None,
+        executive_id=self_ex.id,
+        needs_profile_completion=True,
+    )
+    db_session.add(u)
+    db_session.commit()
+
+    token = _login(client, "self@corp.com")
+    r = client.get("/executives/?limit=2000", headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 200, r.text
+    ids = {e["id"] for e in r.json()}
+    assert peer.id in ids
+    assert self_ex.id in ids
+    assert other.id not in ids
+    for row in r.json():
+        assert row.get("organizationId") == org_a.id
+
+
 def test_organization_create_rejects_invalid_cnpj(client, db_session):
     lo = _seed_legal_org(db_session, VALID_CNPJ_B)
     db_session.commit()

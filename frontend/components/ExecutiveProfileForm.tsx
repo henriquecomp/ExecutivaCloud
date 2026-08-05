@@ -57,7 +57,8 @@ export interface ExecutiveProfileFormProps {
   workEmailReadOnly?: boolean;
   profileCompletion?: boolean;
   loginEmail?: string;
-  lockHrFields?: boolean;
+  /** Trava só a empresa (organização). Departamento e gestor direto permanecem editáveis. */
+  lockOrganization?: boolean;
   bankCode?: string;
   bankAgency?: string;
   bankAccount?: string;
@@ -84,7 +85,7 @@ export const ExecutiveProfileForm: React.FC<ExecutiveProfileFormProps> = ({
   workEmailReadOnly = false,
   profileCompletion = false,
   loginEmail,
-  lockHrFields = false,
+  lockOrganization = false,
   bankCode = '',
   bankAgency = '',
   bankAccount = '',
@@ -599,8 +600,8 @@ export const ExecutiveProfileForm: React.FC<ExecutiveProfileFormProps> = ({
                 <div>
                    <label className="block text-sm font-medium text-gray-700">Empresa (organização)</label>
                    <select 
-                      disabled={lockHrFields}
-                      className={`mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none ${lockHrFields ? 'cursor-not-allowed bg-gray-100' : ''}`}
+                      disabled={lockOrganization}
+                      className={`mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none ${lockOrganization ? 'cursor-not-allowed bg-gray-100' : ''}`}
                       value={currentExecutive.organizationId || ''}
                       onChange={e => setCurrentExecutive({
                         ...currentExecutive,
@@ -614,15 +615,14 @@ export const ExecutiveProfileForm: React.FC<ExecutiveProfileFormProps> = ({
                        <option key={org.id} value={org.id}>{org.name}</option>
                      ))}
                    </select>
-                   {lockHrFields && (
+                   {lockOrganization && (
                      <p className="mt-1 text-xs text-gray-500">Definido pela empresa; não pode ser alterado aqui.</p>
                    )}
                 </div>
                 <div>
                    <label className="block text-sm font-medium text-gray-700">Departamento</label>
-                   <select 
-                      disabled={lockHrFields}
-                      className={`mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none ${lockHrFields ? 'cursor-not-allowed bg-gray-100' : ''}`}
+                   <select
+                      className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
                       value={currentExecutive.departmentId || ''}
                       onChange={e => setCurrentExecutive({...currentExecutive, departmentId: e.target.value || undefined})}
                    >
@@ -636,17 +636,24 @@ export const ExecutiveProfileForm: React.FC<ExecutiveProfileFormProps> = ({
                 </div>
                 <div>
                    <label className="block text-sm font-medium text-gray-700">Gestor direto</label>
-                   <select 
-                      disabled={lockHrFields}
-                      className={`mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none ${lockHrFields ? 'cursor-not-allowed bg-gray-100' : ''}`}
+                   <select
+                      className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
                       value={currentExecutive.reportsToExecutiveId || ''}
                       onChange={e => setCurrentExecutive({...currentExecutive, reportsToExecutiveId: e.target.value || undefined})}
                    >
                      <option value="">Selecione</option>
                      {executives
-                        .filter(e => e.id !== currentExecutive.id)
-                        .filter(e => !currentExecutive.organizationId || e.organizationId === currentExecutive.organizationId)
-                        .map(exec => (
+                        .filter((e) => String(e.id) !== String(currentExecutive.id ?? ''))
+                        .filter((e) => {
+                          const orgId = currentExecutive.organizationId;
+                          if (!orgId) return false;
+                          return String(e.organizationId ?? '') === String(orgId);
+                        })
+                        .slice()
+                        .sort((a, b) =>
+                          (a.fullName || '').localeCompare(b.fullName || '', 'pt-BR'),
+                        )
+                        .map((exec) => (
                        <option key={exec.id} value={exec.id}>{exec.fullName}</option>
                      ))}
                    </select>

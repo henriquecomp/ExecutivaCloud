@@ -64,14 +64,25 @@ const CompleteExecutiveProfileView: React.FC<CompleteExecutiveProfileViewProps> 
           executiveService.getAll(0, 2000),
         ]);
         if (!cancelled) {
+          const orgId =
+            ex.organizationId != null
+              ? String(ex.organizationId)
+              : resolvedOrgId != null
+                ? String(resolvedOrgId)
+                : undefined;
           setCurrentExecutive({
             ...ex,
             workEmail: currentUser.email,
-            organizationId: ex.organizationId ?? resolvedOrgId,
+            organizationId: orgId,
           });
           setOrganizations(orgList);
           setDepartments(depts);
-          setExecutives(execs);
+          // Gestor direto: todos os executivos da mesma empresa (organizations.id), não da org jurídica
+          setExecutives(
+            orgId
+              ? execs.filter((e) => String(e.organizationId ?? '') === orgId)
+              : [],
+          );
         }
       } catch (e) {
         console.error(e);
@@ -153,7 +164,7 @@ const CompleteExecutiveProfileView: React.FC<CompleteExecutiveProfileViewProps> 
             toggleSection={toggleSection}
             profileCompletion
             loginEmail={currentUser.email}
-            lockHrFields
+            lockOrganization
             bankCode={bankCode}
             bankAgency={bankAgency}
             bankAccount={bankAccount}

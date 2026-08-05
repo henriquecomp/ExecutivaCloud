@@ -1,3 +1,5 @@
+from typing import Optional
+
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -12,6 +14,19 @@ def assert_executive_manager(actor: user_models.Usuario) -> None:
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Sem permissão para acessar executivos.",
         )
+
+
+def resolve_actor_organization_id(
+    db: Session, actor: user_models.Usuario
+) -> Optional[int]:
+    """Empresa (organizations.id) do ator — não a organização jurídica."""
+    if actor.organization_id is not None:
+        return actor.organization_id
+    if actor.role == "executive" and actor.executive_id is not None:
+        ex = db.query(Executive).filter(Executive.id == actor.executive_id).first()
+        if ex is not None and ex.organization_id is not None:
+            return ex.organization_id
+    return None
 
 
 def executive_in_manager_scope(
@@ -47,7 +62,8 @@ def scoped_executives_query(db: Session, actor: user_models.Usuario):
             return q.filter(False)
         return q.filter(Executive.organization_id.in_(org_ids))
     if actor.role == "executive":
-        if actor.organization_id is None:
+        org_id = resolve_actor_organization_id(db, actor)
+        if org_id is None:
             return q.filter(False)
-        return q.filter(Executive.organization_id == actor.organization_id)
+        return q.filter(Executive.organization_id == org_id)
     return q.filter(False)

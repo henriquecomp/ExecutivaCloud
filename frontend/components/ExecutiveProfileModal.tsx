@@ -81,7 +81,12 @@ const ExecutiveProfileModal: React.FC<ExecutiveProfileModalProps> = ({
         });
         setOrganizations(orgs);
         setDepartments(depts);
-        setExecutives(execs);
+        const orgIdStr = orgId != null ? String(orgId) : undefined;
+        setExecutives(
+          orgIdStr
+            ? execs.filter((e) => String(e.organizationId ?? '') === orgIdStr)
+            : execs,
+        );
       } catch {
         if (!cancelled) setApiError('Não foi possível carregar seus dados.');
       } finally {
@@ -231,7 +236,7 @@ const ExecutiveProfileModal: React.FC<ExecutiveProfileModalProps> = ({
                 openSections={openSections}
                 toggleSection={toggleSection}
                 workEmailReadOnly={!!currentUser.needsProfileCompletion}
-                lockHrFields
+                lockOrganization
               />
             </section>
           </div>
