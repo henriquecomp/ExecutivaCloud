@@ -59,6 +59,19 @@ class ExecutiveBase(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True, from_attributes=True)
 
+    @field_validator(
+        "organization_id",
+        "department_id",
+        "reports_to_executive_id",
+        mode="before",
+    )
+    @classmethod
+    def _optional_fk_empty_to_none(cls, v):
+        """Gestor direto / depto / empresa: string vazia ou ausente → NULL (não obrigatório)."""
+        if v is None or v == "":
+            return None
+        return v
+
 
 class ExecutiveCreate(ExecutiveBase):
     pass

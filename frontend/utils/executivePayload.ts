@@ -9,6 +9,14 @@ export function normalizeExecutivePayload(executive: Partial<Executive>): Record
     const trimmed = value.trim();
     return trimmed === '' ? null : trimmed;
   };
+  /** FKs opcionais (empresa, depto, gestor): vazio → null; valor → number. */
+  const cleanOptionalId = (value?: string | number | null) => {
+    if (value == null) return null;
+    const trimmed = String(value).trim();
+    if (trimmed === '') return null;
+    const n = Number(trimmed);
+    return Number.isFinite(n) ? n : null;
+  };
 
   return {
     ...rest,
@@ -52,8 +60,8 @@ export function normalizeExecutivePayload(executive: Partial<Executive>): Record
     bankInfo: cleanText(rest.bankInfo),
     compensationInfo: cleanText(rest.compensationInfo),
     systemAccessLevels: cleanText(rest.systemAccessLevels),
-    organizationId: cleanText(rest.organizationId),
-    departmentId: cleanText(rest.departmentId),
-    reportsToExecutiveId: cleanText(rest.reportsToExecutiveId),
+    organizationId: cleanOptionalId(rest.organizationId),
+    departmentId: cleanOptionalId(rest.departmentId),
+    reportsToExecutiveId: cleanOptionalId(rest.reportsToExecutiveId),
   };
 }

@@ -635,13 +635,15 @@ export const ExecutiveProfileForm: React.FC<ExecutiveProfileFormProps> = ({
                    </select>
                 </div>
                 <div>
-                   <label className="block text-sm font-medium text-gray-700">Gestor direto</label>
+                   <label className="block text-sm font-medium text-gray-700">
+                     Gestor direto <span className="font-normal text-gray-400">(opcional)</span>
+                   </label>
                    <select
                       className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
                       value={currentExecutive.reportsToExecutiveId || ''}
                       onChange={e => setCurrentExecutive({...currentExecutive, reportsToExecutiveId: e.target.value || undefined})}
                    >
-                     <option value="">Selecione</option>
+                     <option value="">Nenhum</option>
                      {executives
                         .filter((e) => String(e.id) !== String(currentExecutive.id ?? ''))
                         .filter((e) => {
