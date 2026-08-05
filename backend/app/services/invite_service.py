@@ -414,8 +414,38 @@ class InviteService:
         if sec is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Secretária não encontrada.")
 
-        merged = {**secretary_to_dict(sec), **body}
+        # Depto/gestor não fazem parte do 1º acesso — preservar o que já existir no perfil
+        body_clean = {
+            k: v
+            for k, v in body.items()
+            if k not in ("departmentId", "reportsToExecutiveId", "department_id", "reports_to_executive_id")
+        }
+        merged = {**secretary_to_dict(sec), **body_clean}
         full_name, org_id, work_email, job_title, profile, exec_ids = _body_to_parts(merged)
+
+        login_email = user_row.email.lower().strip()
+        if work_email is None or str(work_email).lower().strip() != login_email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="O e-mail corporativo deve ser o mesmo do login.",
+            )
+        work_email = user_row.email.strip()
+
+        if org_id is None and user_row.organization_id is not None:
+            org_id = user_row.organization_id
+        elif (
+            org_id is not None
+            and user_row.organization_id is not None
+            and org_id != user_row.organization_id
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Organização inválida para este usuário.",
+            )
+
+        # Vínculos do convite: se o body não trouxe executivos, manter os atuais
+        if not exec_ids:
+            exec_ids = [ex.id for ex in (sec.executives or [])]
 
         sec.full_name = full_name
         sec.organization_id = org_id

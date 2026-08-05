@@ -186,6 +186,7 @@ export const SecretaryForm: React.FC<{
     const canAssignExecutives = !isSecretaryUser;
     const isAdminForLegalOrg = isLegalOrgAdmin(currentUser);
     const isOrgAdmin = isCompanyAdmin(currentUser);
+    const emailLocked = profileCompletion || workEmailReadOnly;
 
     useEffect(() => {
         if (isOrgAdmin && currentUser.organizationId && organizationId !== currentUser.organizationId) {
@@ -312,6 +313,9 @@ export const SecretaryForm: React.FC<{
         const validExecutiveIds = selectedExecutiveIds.filter((id, idx, arr) =>
             id && arr.indexOf(id) === idx && assignableExecutives.some((exec) => exec.id === id),
         );
+        const lockedWorkEmail = profileCompletion
+            ? (currentUser.email || workEmail)
+            : workEmail;
         await onSave({
             ...(secretary.id && /^\d+$/.test(String(secretary.id)) ? { id: secretary.id } : {}),
             executiveIds: validExecutiveIds,
@@ -328,7 +332,7 @@ export const SecretaryForm: React.FC<{
             motherName: normalize(motherName),
             fatherName: normalize(fatherName),
             civilStatus: normalize(civilStatus),
-            workEmail: normalize(workEmail),
+            workEmail: normalize(lockedWorkEmail),
             workPhone: normalize(workPhone),
             extension: normalize(extension),
             personalEmail: normalize(personalEmail),
@@ -336,10 +340,14 @@ export const SecretaryForm: React.FC<{
             address: normalize(address),
             linkedinProfileUrl: normalize(linkedinProfileUrl),
             organizationId: normalize(selectedOrganizationId),
-            departmentId: normalize(departmentId),
+            ...(profileCompletion
+                ? {}
+                : {
+                    departmentId: normalize(departmentId),
+                    reportsToExecutiveId: normalize(reportsToExecutiveId),
+                  }),
             costCenter: normalize(costCenter),
             employeeId: normalize(employeeId),
-            reportsToExecutiveId: normalize(reportsToExecutiveId),
             hireDate: normalize(hireDate),
             workLocation: normalize(workLocation),
             systemAccessLevels: normalize(systemAccessLevels),
@@ -425,6 +433,7 @@ export const SecretaryForm: React.FC<{
                             {visibleOrganizations.map(org => <option key={org.id} value={org.id}>{org.name}</option>)}
                         </select>
                     </div>
+                    {!profileCompletion && (
                      <div>
                         <label htmlFor="departmentId" className="block text-sm font-medium text-slate-700">Departamento</label>
                         <select id="departmentId" value={departmentId} onChange={e => setDepartmentId(e.target.value)} disabled={isSecretaryUser || !organizationId || filteredDepartments.length === 0} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm disabled:bg-slate-50 disabled:cursor-not-allowed">
@@ -432,8 +441,10 @@ export const SecretaryForm: React.FC<{
                             {filteredDepartments.map(dept => <option key={dept.id} value={dept.id}>{dept.name}</option>)}
                         </select>
                     </div>
+                    )}
                 </div>
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {!profileCompletion && (
                     <div>
                         <label htmlFor="reportsToExecutiveId" className="block text-sm font-medium text-slate-700">Gestor Direto</label>
                         <select id="reportsToExecutiveId" value={reportsToExecutiveId} onChange={e => setReportsToExecutiveId(e.target.value)} disabled={isSecretaryUser || !organizationId} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm disabled:bg-slate-50 disabled:cursor-not-allowed">
@@ -441,6 +452,7 @@ export const SecretaryForm: React.FC<{
                             {availableManagers.map(e => (<option key={e.id} value={e.id}>{e.fullName}</option>))}
                         </select>
                     </div>
+                    )}
                     <div>
                         <label htmlFor="hireDate" className="block text-sm font-medium text-slate-700">Data de Admissão</label>
                         <AppDateInput
@@ -499,13 +511,20 @@ export const SecretaryForm: React.FC<{
                                 <input
                                     type="email"
                                     id="workEmail"
-                                    readOnly={workEmailReadOnly}
-                                    value={workEmail}
-                                    onChange={e => setWorkEmail(e.target.value)}
-                                    className={`mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm ${workEmailReadOnly ? 'cursor-not-allowed bg-slate-100' : ''}`}
+                                    readOnly={emailLocked}
+                                    value={profileCompletion ? (currentUser.email || workEmail) : workEmail}
+                                    onChange={e => {
+                                      if (emailLocked) return;
+                                      setWorkEmail(e.target.value);
+                                    }}
+                                    className={`mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm ${emailLocked ? 'cursor-not-allowed bg-slate-100' : ''}`}
                                 />
-                                {workEmailReadOnly && (
-                                    <p className="mt-1 text-xs text-slate-500">Alterável após concluir o primeiro acesso.</p>
+                                {emailLocked && (
+                                    <p className="mt-1 text-xs text-slate-500">
+                                      {profileCompletion
+                                        ? 'E-mail de login; não pode ser alterado neste cadastro.'
+                                        : 'Alterável após concluir o primeiro acesso.'}
+                                    </p>
                                 )}
                             </div>
                             <div>

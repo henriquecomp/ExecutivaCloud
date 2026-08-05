@@ -1,11 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { completeSecretaryProfile, mapApiUserToAppUser } from '../services/authService';
-import { departmentService } from '../services/departmentService';
 import { executiveService } from '../services/executiveService';
 import { organizationService } from '../services/organizationService';
 import { secretaryService } from '../services/secretaryService';
 import { SecretaryForm } from './SecretariesView';
-import type { Department, Executive, Organization, Secretary, User } from '../types';
+import type { Executive, Organization, Secretary, User } from '../types';
 
 interface CompleteSecretaryProfileViewProps {
   currentUser: User;
@@ -18,7 +17,6 @@ const CompleteSecretaryProfileView: React.FC<CompleteSecretaryProfileViewProps> 
 }) => {
   const [secretary, setSecretary] = useState<Partial<Secretary> | null>(null);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
   const [executives, setExecutives] = useState<Executive[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -30,13 +28,10 @@ const CompleteSecretaryProfileView: React.FC<CompleteSecretaryProfileViewProps> 
         const sec = await secretaryService.getOne(currentUser.secretaryId);
         if (cancelled) return;
         const resolvedOrgId = currentUser.organizationId ?? sec.organizationId;
-        const [orgList, depts, execs] = await Promise.all([
+        const [orgList, execs] = await Promise.all([
           resolvedOrgId
             ? organizationService.getOne(String(resolvedOrgId)).then((o) => [o])
             : organizationService.getAll(),
-          resolvedOrgId
-            ? departmentService.getByOrg(String(resolvedOrgId))
-            : departmentService.getAll(),
           executiveService.getAll(0, 2000),
         ]);
         if (cancelled) return;
@@ -52,7 +47,6 @@ const CompleteSecretaryProfileView: React.FC<CompleteSecretaryProfileViewProps> 
           organizationId: orgId ?? sec.organizationId,
         });
         setOrganizations(orgList);
-        setDepartments(depts);
         setExecutives(
           orgId
             ? execs.filter((e) => String(e.organizationId ?? '') === orgId)
@@ -94,11 +88,11 @@ const CompleteSecretaryProfileView: React.FC<CompleteSecretaryProfileViewProps> 
         <SecretaryForm
           secretary={secretary}
           organizations={organizations}
-          departments={departments}
+          departments={[]}
           executives={executives}
           currentUser={currentUser}
           profileCompletion
-          workEmailReadOnly={!!currentUser.needsProfileCompletion}
+          workEmailReadOnly
           onCancel={() => {}}
           onSave={async (payload) => {
             const apiUser = await completeSecretaryProfile(payload as unknown as Record<string, unknown>);
