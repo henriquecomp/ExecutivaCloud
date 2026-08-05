@@ -80,7 +80,9 @@ In the same delivery (or explicitly linked PR), update **all** layers:
 - Tenant hierarchy: `executivacloud-tenant-hierarchy.mdc`
 - Address / complement: `executivacloud-address-and-complement.mdc`
 - Migrations: `executivacloud-alembic-migrations.mdc`
-- Skill checklist: `.cursor/skills/executivacloud-tenant-and-address/SKILL.md`
+- Form field chain (UI → DB): `executivacloud-form-field-chain.mdc`
+- Skill checklist (tenant/address): `.cursor/skills/executivacloud-tenant-and-address/SKILL.md`
+- Skill checklist (form fields): `.cursor/skills/executivacloud-form-field-chain/SKILL.md`
 
 ## New field checklist
 
@@ -89,7 +91,7 @@ When adding a column or form field:
 1. All layers in “When changing an endpoint” above.
 2. **Every** form that edits the entity (including nested modals in other views).
 3. Alembic migration if DB changes; never rewrite applied revisions in production.
-
+4. Run the **form field chain** skill: required/optional on screen must match FE validation, payload (`""`→`null` for optional FKs), Pydantic, and DB `nullable`/FK.
 ## Forbidden anti-patterns
 
 - Importing `api` (axios) directly in a view/component (except centralized auth concerns via `authService`).

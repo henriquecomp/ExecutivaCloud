@@ -69,7 +69,9 @@ Only add a new component if nothing fits **or** the extraction is clearly reusab
 
 - Type/category colors: `.cursor/rules/executivacloud-ui-colors-types.mdc`
 - Icons, actions, tables: `.cursor/rules/executivacloud-ui-icons-actions-tables.mdc`
+- Form field chain (UI → validation → payload → Pydantic → DB FK/null): `.cursor/rules/executivacloud-form-field-chain.mdc`
 - Visual standardization skill: `.cursor/skills/executivacloud-visual-standardization/SKILL.md`
+- Form field chain skill: `.cursor/skills/executivacloud-form-field-chain/SKILL.md`
 
 ## Error handling
 
@@ -86,6 +88,7 @@ Before considering work complete:
 - [ ] If endpoints were added: router registered in `backend/app/main.py`.
 - [ ] TS service `map*` updated for all new fields.
 - [ ] `types.ts` interfaces match the current Pydantic schema.
+- [ ] If a form field required/optional changed: full UI→DB chain checked (form-field-chain skill).
 - [ ] Existing UI components reused where applicable.
 - [ ] `VITE_API_URL` / `CORS_ORIGINS` updated if host/port changed.
 - [ ] New icons added via `createIcon` in `Icons.tsx`; no duplicated SVGs.

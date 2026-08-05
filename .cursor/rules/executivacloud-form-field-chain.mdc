@@ -1,0 +1,34 @@
+---
+description: >-
+  Full-stack form field chain: UI required/optional must match FE validation,
+  payload, types, Pydantic, and DB nullability/FKs. Apply when editing form
+  fields, profile completion, or optional/required input behavior.
+globs: "{frontend/components/**/*.{tsx,ts},frontend/utils/**/*.ts,frontend/types.ts,frontend/services/**/*.ts,backend/app/schemas/**/*.py,backend/app/models/**/*.py,backend/alembic/versions/**/*.py}"
+alwaysApply: false
+---
+
+# Executiva Cloud — form field chain (UI → DB)
+
+When you **add, change, or relax/require** a field filled on screen, the on-screen contract (required vs optional, empty value, ID vs text) MUST match every layer below. Do not stop at the component.
+
+## Chain (verify all in the same change)
+
+1. **UI** — label (`*` / `(opcional)`), `required`/`disabled`/`readOnly`, empty option text, no false “Selecione” that feels mandatory for optional fields.
+2. **FE validation** — `*Validation.ts` / inline checks: only required fields fail submit; optional never block on empty.
+3. **Payload** — helpers like `normalizeExecutivePayload`: empty optional text/`""` → `null`; optional FKs/IDs → `null` or `Number(id)`, never `""`.
+4. **types.ts** — `field?` if optional; IDs as `string` in domain types.
+5. **TS `map*`** — accept camelCase and snake_case; normalize IDs with `String(...)`.
+6. **Pydantic** — `Optional[...] = None` vs `Field(...)`; coerce `""` → `None` for optional int FKs (`mode="before"`).
+7. **SQLAlchemy + Alembic** — `nullable=True/False` and `ForeignKey` match UI; changing nullability needs a migration.
+8. **Tests** — at least one path that submits as on screen (e.g. optional FK omitted/`""`/`null` persists `NULL`).
+
+## Hard rules
+
+- **Optional on screen ⇒** optional in FE validation **and** Pydantic **and** `nullable=True` (or no NOT NULL) in DB.
+- **Required on screen ⇒** FE blocks empty **and** Pydantic required **and** DB NOT NULL (unless product explicitly allows incomplete rows — document why).
+- **FK pickers** (gestor, departamento, empresa): empty = `null`, never invalid `""` that 422s and looks “required”.
+- Never ship UI-only or schema-only half-fixes.
+
+## Skill checklist
+
+Use `.cursor/skills/executivacloud-form-field-chain/SKILL.md` when changing form fields or required/optional behavior.
