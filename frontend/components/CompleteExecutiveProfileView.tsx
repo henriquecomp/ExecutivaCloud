@@ -77,7 +77,7 @@ const CompleteExecutiveProfileView: React.FC<CompleteExecutiveProfileViewProps> 
           });
           setOrganizations(orgList);
           setDepartments(depts);
-          // Gestor direto: todos os executivos da mesma empresa (organizations.id), não da org jurídica
+          // Gestor direto: executivos da mesma empresa com conta ativa (filtro no backend)
           setExecutives(
             orgId
               ? execs.filter((e) => String(e.organizationId ?? '') === orgId)

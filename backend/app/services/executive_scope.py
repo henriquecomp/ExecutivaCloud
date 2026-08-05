@@ -65,5 +65,14 @@ def scoped_executives_query(db: Session, actor: user_models.Usuario):
         org_id = resolve_actor_organization_id(db, actor)
         if org_id is None:
             return q.filter(False)
-        return q.filter(Executive.organization_id == org_id)
+        # Gestores / pares: só executivos com conta de usuário ativa na mesma empresa
+        return (
+            q.filter(Executive.organization_id == org_id)
+            .join(
+                user_models.Usuario,
+                user_models.Usuario.executive_id == Executive.id,
+            )
+            .filter(user_models.Usuario.is_active.is_(True))
+            .distinct()
+        )
     return q.filter(False)
