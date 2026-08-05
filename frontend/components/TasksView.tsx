@@ -18,6 +18,7 @@ import {
 } from './ui/DataTable';
 import AppButton from './ui/AppButton';
 import AppInput from './ui/AppInput';
+import AppDateInput from './ui/AppDateInput';
 import AppLabel from './ui/AppLabel';
 import AppSelect from './ui/AppSelect';
 import AppTextarea from './ui/AppTextarea';
@@ -113,7 +114,13 @@ const TaskForm: React.FC<{ task: Partial<Task>, onSave: (task: Partial<Task>, re
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
                   <AppLabel htmlFor="dueDate">Data de Vencimento da 1ª Tarefa</AppLabel>
-                  <AppInput type="date" id="dueDate" value={dueDate} onChange={e => setDueDate(e.target.value)} required className="mt-1" />
+                  <AppDateInput
+                    id="dueDate"
+                    value={dueDate}
+                    onChange={setDueDate}
+                    required
+                    className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
               </div>
               <div>
                   <AppLabel htmlFor="priority">Prioridade</AppLabel>
@@ -192,7 +199,12 @@ const TaskForm: React.FC<{ task: Partial<Task>, onSave: (task: Partial<Task>, re
                                     <input type="radio" id="task-end-on" name="taskEndType" value="on" checked={endType === 'on'} onChange={e => setEndType(e.target.value)} className={radioClass}/>
                                     <label htmlFor="task-end-on" className="ml-3 flex flex-wrap items-center gap-2 text-sm text-slate-600">
                                         <span>Em</span>
-                                        <AppInput type="date" disabled={endType !== 'on'} value={recurrence.endDate || ''} onChange={e => handleRecurrenceChange('endDate', e.target.value)} className="px-2 py-1"/>
+                                        <AppDateInput
+                                          disabled={endType !== 'on'}
+                                          value={recurrence.endDate || ''}
+                                          onChange={(iso) => handleRecurrenceChange('endDate', iso)}
+                                          className="w-36 rounded-md border border-slate-300 bg-white px-2 py-1 text-sm disabled:cursor-not-allowed disabled:bg-slate-100"
+                                        />
                                     </label>
                                 </div>
                              </div>

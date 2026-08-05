@@ -9,6 +9,7 @@ import ToolbarPanel from './ui/ToolbarPanel';
 import Pagination from './Pagination';
 import { DataTable, DataTableBody, DataTableEmptyRow, DataTableHead, DataTableRow, DataTableTd, DataTableTh } from './ui/DataTable';
 import { isCompanyAdmin, isLegalOrgAdmin } from '../utils/tenantScope';
+import AppDateInput from './ui/AppDateInput';
 // --- Helper Functions ---
 /**
  * Validates a Brazilian CPF number.
@@ -177,9 +178,6 @@ export const SecretaryForm: React.FC<{
     
     // Errors and Refs
     const cpfInputRef = useRef<HTMLInputElement>(null);
-    const birthDateRef = useRef<HTMLInputElement>(null);
-    const rgIssueDateRef = useRef<HTMLInputElement>(null);
-    const hireDateRef = useRef<HTMLInputElement>(null);
     const [birthDateError, setBirthDateError] = useState('');
     const [rgIssueDateError, setRgIssueDateError] = useState('');
     const [hireDateError, setHireDateError] = useState('');
@@ -285,16 +283,13 @@ export const SecretaryForm: React.FC<{
         }
     };
     
-    const handleDateBlur = (e: React.FocusEvent<HTMLInputElement>, setter: React.Dispatch<React.SetStateAction<string>>, errorSetter: React.Dispatch<React.SetStateAction<string>>) => {
-        const { value, validity } = e.target;
-        if (value && !validity.valid) {
-            errorSetter('Data inválida. Verifique o dia, mês e ano.');
-            setter('');
-            e.target.value = '';
-            e.target.focus();
-        } else {
-            errorSetter('');
-        }
+    const handleDateCommit = (
+        iso: string,
+        setter: React.Dispatch<React.SetStateAction<string>>,
+        errorSetter: React.Dispatch<React.SetStateAction<string>>,
+    ) => {
+        errorSetter('');
+        setter(iso);
     };
 
 
@@ -384,7 +379,12 @@ export const SecretaryForm: React.FC<{
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label htmlFor="birthDate" className="block text-sm font-medium text-slate-700">Data de Nascimento</label>
-                        <input ref={birthDateRef} type="date" id="birthDate" value={birthDate} onChange={e => setBirthDate(e.target.value)} onBlur={e => handleDateBlur(e, setBirthDate, setBirthDateError)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                        <AppDateInput
+                          id="birthDate"
+                          value={birthDate}
+                          onChange={(iso) => handleDateCommit(iso, setBirthDate, setBirthDateError)}
+                          className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                        />
                         {birthDateError && <p className="mt-1 text-xs text-red-600">{birthDateError}</p>}
                     </div>
                     <div>
@@ -443,7 +443,13 @@ export const SecretaryForm: React.FC<{
                     </div>
                     <div>
                         <label htmlFor="hireDate" className="block text-sm font-medium text-slate-700">Data de Admissão</label>
-                        <input ref={hireDateRef} type="date" id="hireDate" value={hireDate} onChange={e => setHireDate(e.target.value)} onBlur={e => handleDateBlur(e, setHireDate, setHireDateError)} disabled={isSecretaryUser} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm disabled:bg-slate-100 disabled:cursor-not-allowed" />
+                        <AppDateInput
+                          id="hireDate"
+                          value={hireDate}
+                          onChange={(iso) => handleDateCommit(iso, setHireDate, setHireDateError)}
+                          disabled={isSecretaryUser}
+                          className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm disabled:bg-slate-100 disabled:cursor-not-allowed"
+                        />
                         {hireDateError && <p className="mt-1 text-xs text-red-600">{hireDateError}</p>}
                     </div>
                 </div>

@@ -16,6 +16,8 @@ import {
 import { FormDangerAlert } from './ui/FormDangerAlert';
 import AppButton from './ui/AppButton';
 import AppInput from './ui/AppInput';
+import AppDateInput from './ui/AppDateInput';
+import AppDateTimeInput from './ui/AppDateTimeInput';
 import AppSearchInput from './ui/AppSearchInput';
 import AppLabel from './ui/AppLabel';
 import TypeColorFormField from './ui/TypeColorFormField';
@@ -372,12 +374,11 @@ const EventForm: React.FC<{
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
                   <AppLabel htmlFor="start-time">Início do 1º Evento</AppLabel>
-                  <AppInput
-                    type="datetime-local"
+                  <AppDateTimeInput
                     id="start-time"
                     value={startTime}
                     min={minDatetimeLocal}
-                    onChange={e => handleStartTimeChange(e.target.value)}
+                    onChange={(v) => handleStartTimeChange(v)}
                     onFocus={() => setFormError(null)}
                     required
                     className="mt-1"
@@ -385,13 +386,12 @@ const EventForm: React.FC<{
               </div>
               <div>
                   <AppLabel htmlFor="end-time">Fim do 1º Evento</AppLabel>
-                  <AppInput
-                    type="datetime-local"
+                  <AppDateTimeInput
                     id="end-time"
                     value={endTime}
                     min={startTime || minDatetimeLocal}
-                    onChange={e => {
-                      setEndTime(e.target.value);
+                    onChange={(v) => {
+                      setEndTime(v);
                       setFormError(null);
                     }}
                     required
@@ -475,7 +475,13 @@ const EventForm: React.FC<{
                                     <input type="radio" id="end-on" name="endType" value="on" checked={endType === 'on'} onChange={e => setEndType(e.target.value)} className={radioClass}/>
                                     <label htmlFor="end-on" className="ml-3 flex flex-wrap items-center gap-2 text-sm text-slate-600">
                                         <span>Em</span>
-                                        <AppInput type="date" disabled={endType !== 'on'} min={minEndDateOnly} value={recurrence.endDate || ''} onChange={e => handleRecurrenceChange('endDate', e.target.value)} className="px-2 py-1"/>
+                                        <AppDateInput
+                                          disabled={endType !== 'on'}
+                                          min={minEndDateOnly}
+                                          value={recurrence.endDate || ''}
+                                          onChange={(iso) => handleRecurrenceChange('endDate', iso)}
+                                          className="w-36 rounded-md border border-slate-300 bg-white px-2 py-1 text-sm disabled:cursor-not-allowed disabled:bg-slate-100"
+                                        />
                                     </label>
                                 </div>
                              </div>

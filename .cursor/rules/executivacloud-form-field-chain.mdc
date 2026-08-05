@@ -27,6 +27,7 @@ When you **add, change, or relax/require** a field filled on screen, the on-scre
 - **Optional on screen ⇒** optional in FE validation **and** Pydantic **and** `nullable=True` (or no NOT NULL) in DB.
 - **Required on screen ⇒** FE blocks empty **and** Pydantic required **and** DB NOT NULL (unless product explicitly allows incomplete rows — document why).
 - **FK pickers** (gestor, departamento, empresa): empty = `null`, never invalid `""` that 422s and looks “required”.
+- **Dates:** never use native `type="date"` / `datetime-local` for user entry (browser locale shows mm/dd/yyyy). Use `AppDateInput` / `AppDateTimeInput` (mask **dd/mm/aaaa**, value still ISO for API).
 - Never ship UI-only or schema-only half-fixes.
 
 ## Skill checklist

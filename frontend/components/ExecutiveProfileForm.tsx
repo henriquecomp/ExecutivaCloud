@@ -6,6 +6,7 @@ import { useCepAutoLookup } from '../hooks/useCepAutoLookup';
 import { maskCEP, maskCPF, maskPhone } from '../utils/brValidators';
 import { BRAZILIAN_BANKS } from '../utils/brazilianBanks';
 import type { ExecutiveProfileFieldErrors } from '../utils/executiveProfileValidation';
+import AppDateInput from './ui/AppDateInput';
 
 const READONLY_ADDRESS_CLASS =
   'mt-1 block w-full px-3 py-2 border border-slate-200 rounded-md shadow-sm sm:text-sm bg-slate-50 text-slate-700 cursor-not-allowed';
@@ -233,14 +234,13 @@ export const ExecutiveProfileForm: React.FC<ExecutiveProfileFormProps> = ({
                    <label className={`block text-sm font-medium ${fieldErrors.rgIssueDate ? 'text-red-600' : 'text-gray-700'}`}>
                      {req('Data de Expedição do RG')}
                    </label>
-                   <input
-                     type="date"
+                   <AppDateInput
                      className={`mt-1 w-full p-2 border rounded focus:ring-2 focus:outline-none ${
                        fieldErrors.rgIssueDate ? 'border-red-500' : 'border-gray-300 focus:ring-blue-500'
                      }`}
                      value={currentExecutive.rgIssueDate || ''}
-                     onChange={e => {
-                       setCurrentExecutive({...currentExecutive, rgIssueDate: e.target.value});
+                     onChange={(iso) => {
+                       setCurrentExecutive({...currentExecutive, rgIssueDate: iso || undefined});
                        if (fieldErrors.rgIssueDate) setFieldErrors({...fieldErrors, rgIssueDate: undefined});
                      }}
                    />
@@ -250,14 +250,13 @@ export const ExecutiveProfileForm: React.FC<ExecutiveProfileFormProps> = ({
                    <label className={`block text-sm font-medium ${fieldErrors.birthDate ? 'text-red-600' : 'text-gray-700'}`}>
                      {req('Data de Nascimento')}
                    </label>
-                   <input
-                     type="date"
+                   <AppDateInput
                      className={`mt-1 w-full p-2 border rounded focus:ring-2 focus:outline-none ${
                        fieldErrors.birthDate ? 'border-red-500' : 'border-gray-300 focus:ring-blue-500'
                      }`}
                      value={currentExecutive.birthDate || ''}
-                     onChange={e => {
-                       setCurrentExecutive({...currentExecutive, birthDate: e.target.value});
+                     onChange={(iso) => {
+                       setCurrentExecutive({...currentExecutive, birthDate: iso || undefined});
                        if (fieldErrors.birthDate) setFieldErrors({...fieldErrors, birthDate: undefined});
                      }}
                    />
@@ -662,11 +661,10 @@ export const ExecutiveProfileForm: React.FC<ExecutiveProfileFormProps> = ({
                 </div>
                 <div>
                    <label className="block text-sm font-medium text-gray-700">Data de Contratação</label>
-                   <input
-                     type="date"
+                   <AppDateInput
                      className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
                      value={currentExecutive.hireDate || ''}
-                     onChange={e => setCurrentExecutive({...currentExecutive, hireDate: e.target.value})}
+                     onChange={(iso) => setCurrentExecutive({...currentExecutive, hireDate: iso || undefined})}
                    />
                 </div>
                  <div>
