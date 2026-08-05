@@ -44,25 +44,38 @@ const SecretaryProfileModal: React.FC<SecretaryProfileModalProps> = ({
     setAccOk(null);
     void (async () => {
       try {
-        const [me, sec, orgs, execs] = await Promise.all([
+        const [me, sec] = await Promise.all([
           fetchMe(),
           secretaryService.getOne(currentUser.secretaryId),
-          organizationService.getAll(),
+        ]);
+        if (cancelled) return;
+        const orgId =
+          currentUser.organizationId ?? sec.organizationId ?? me.organizationId;
+        const [orgs, depts, execs] = await Promise.all([
+          orgId
+            ? organizationService.getOne(String(orgId)).then((o) => [o])
+            : organizationService.getAll(),
+          orgId
+            ? departmentService.getByOrg(String(orgId))
+            : departmentService.getAll(),
           executiveService.getAll(0, 2000),
         ]);
         if (cancelled) return;
-        const orgId = currentUser.organizationId ?? sec.organizationId ?? me.organizationId;
-        const depts = orgId
-          ? await departmentService.getByOrg(String(orgId))
-          : await departmentService.getAll();
-        if (cancelled) return;
+        const orgIdStr = orgId != null ? String(orgId) : undefined;
         setAccFullName(me.fullName);
         setAccEmail(me.email);
         setAccPhone(me.phone != null ? String(me.phone) : '');
-        setSecretary(sec);
+        setSecretary({
+          ...sec,
+          organizationId: sec.organizationId ?? orgIdStr,
+        });
         setOrganizations(orgs);
         setDepartments(depts);
-        setExecutives(execs);
+        setExecutives(
+          orgIdStr
+            ? execs.filter((e) => String(e.organizationId ?? '') === orgIdStr)
+            : execs,
+        );
       } catch {
         if (!cancelled) setError('Não foi possível carregar seus dados.');
       }

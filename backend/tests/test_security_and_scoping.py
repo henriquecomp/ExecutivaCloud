@@ -269,6 +269,51 @@ def test_executive_lists_peers_in_same_company(client, db_session):
         assert row.get("organizationId") == org_a.id
 
 
+def test_secretary_lists_executives_in_same_company(client, db_session):
+    """1º acesso da secretária: GET /executives/ não pode 403; só a própria empresa."""
+    from app.models.secretary_model import Secretary
+
+    lo = _seed_legal_org(db_session)
+    org_a = _seed_company(db_session, lo, VALID_CNPJ_B)
+    org_b = _seed_company(db_session, lo, "11444777000161")
+
+    peer = Executive(full_name="Exec Linked", work_email="linked@corp.com", organization_id=org_a.id)
+    other = Executive(full_name="Exec Other", work_email="otherco@corp.com", organization_id=org_b.id)
+    db_session.add_all([peer, other])
+    db_session.flush()
+
+    sec = Secretary(
+        full_name="Sec User",
+        organization_id=org_a.id,
+        work_email="sec@corp.com",
+    )
+    db_session.add(sec)
+    db_session.flush()
+    sec.executives.append(peer)
+
+    db_session.add(
+        user_models.Usuario(
+            name="Sec User",
+            email="sec@corp.com",
+            hashed_password=hash_password("secret123"),
+            is_active=True,
+            role="secretary",
+            legal_organization_id=lo.id,
+            organization_id=org_a.id,
+            secretary_external_id=str(sec.id),
+            needs_profile_completion=True,
+        )
+    )
+    db_session.commit()
+
+    token = _login(client, "sec@corp.com")
+    r = client.get("/executives/?limit=2000", headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 200, r.text
+    ids = {e["id"] for e in r.json()}
+    assert peer.id in ids
+    assert other.id not in ids
+
+
 def test_organization_create_rejects_invalid_cnpj(client, db_session):
     lo = _seed_legal_org(db_session, VALID_CNPJ_B)
     db_session.commit()

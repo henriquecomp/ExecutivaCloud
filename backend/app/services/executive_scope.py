@@ -26,6 +26,16 @@ def resolve_actor_organization_id(
         ex = db.query(Executive).filter(Executive.id == actor.executive_id).first()
         if ex is not None and ex.organization_id is not None:
             return ex.organization_id
+    if actor.role == "secretary" and actor.secretary_external_id:
+        try:
+            sid = int(actor.secretary_external_id)
+        except (TypeError, ValueError):
+            return None
+        from app.models.secretary_model import Secretary
+
+        sec = db.query(Secretary).filter(Secretary.id == sid).first()
+        if sec is not None and sec.organization_id is not None:
+            return sec.organization_id
     return None
 
 
@@ -75,4 +85,10 @@ def scoped_executives_query(db: Session, actor: user_models.Usuario):
             .filter(user_models.Usuario.is_active.is_(True))
             .distinct()
         )
+    if actor.role == "secretary":
+        # 1º acesso / perfil: precisa ler executivos da própria empresa (vínculos do admin)
+        org_id = resolve_actor_organization_id(db, actor)
+        if org_id is None:
+            return q.filter(False)
+        return q.filter(Executive.organization_id == org_id)
     return q.filter(False)

@@ -21,7 +21,7 @@ class ExecutiveService:
         skip: int = 0,
         limit: int = 100,
     ):
-        if actor.role == "executive":
+        if actor.role in ("executive", "secretary"):
             return scoped_executives_query(db, actor).offset(skip).limit(limit).all()
         assert_executive_manager(actor)
         return scoped_executives_query(db, actor).offset(skip).limit(limit).all()
