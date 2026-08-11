@@ -9,6 +9,7 @@ import { FormDangerAlert } from './ui/FormDangerAlert';
 import { contactTypeService } from '../services/contactTypeService';
 import { contactService } from '../services/contactService';
 import { getApiErrorMessage } from '../utils/apiError';
+import { maskPhone } from '../utils/brValidators';
 import {
   DataTable,
   DataTableBody,
@@ -234,7 +235,7 @@ const ContactForm: React.FC<{ contact: Partial<Contact>, onSave: (contact: Parti
                 </div>
                 <div>
                     <AppLabel htmlFor="phone">Telefone</AppLabel>
-                    <AppInput type="tel" id="phone" value={phone} onChange={e => setPhone(e.target.value)} className="mt-1" />
+                    <AppInput type="tel" id="phone" value={phone} onChange={e => setPhone(maskPhone(e.target.value))} placeholder="+55 (XX) XXXXX-XXXX" className="mt-1" />
                 </div>
             </div>
              <div>

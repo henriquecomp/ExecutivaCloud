@@ -5,6 +5,7 @@ import { executiveService } from '../services/executiveService';
 import { organizationService } from '../services/organizationService';
 import { secretaryService } from '../services/secretaryService';
 import { fetchMe, mapApiUserToAppUser, updateMeProfile } from '../services/authService';
+import { maskPhone } from '../utils/brValidators';
 import type { Executive, Organization, Secretary, User } from '../types';
 
 const MENU_LABEL = 'Meus dados Cadastrais';
@@ -150,11 +151,11 @@ const SecretaryProfileModal: React.FC<SecretaryProfileModalProps> = ({
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1">Telefone</label>
                 <input
-                  type="text"
+                  type="tel"
                   value={accPhone}
-                  onChange={(e) => setAccPhone(e.target.value)}
+                  onChange={(e) => setAccPhone(maskPhone(e.target.value))}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
-                  placeholder="Opcional"
+                  placeholder="+55 (XX) XXXXX-XXXX"
                 />
               </div>
             </div>

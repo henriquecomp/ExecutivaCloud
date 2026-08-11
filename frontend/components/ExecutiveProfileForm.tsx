@@ -375,6 +375,7 @@ export const ExecutiveProfileForm: React.FC<ExecutiveProfileFormProps> = ({
                       </label>
                       <input
                         type="tel"
+                        placeholder="+55 (XX) XXXXX-XXXX"
                         className={`mt-1 w-full p-2 border rounded focus:ring-2 focus:outline-none ${
                           fieldErrors.workPhone ? 'border-red-500' : 'border-gray-300 focus:ring-blue-500'
                         }`}
@@ -390,6 +391,7 @@ export const ExecutiveProfileForm: React.FC<ExecutiveProfileFormProps> = ({
                       <label className="block text-sm font-medium text-gray-700">Telefone pessoal (opcional)</label>
                       <input
                         type="tel"
+                        placeholder="+55 (XX) XXXXX-XXXX"
                         className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
                         value={currentExecutive.personalPhone || ''}
                         onChange={(e) =>
@@ -496,10 +498,11 @@ export const ExecutiveProfileForm: React.FC<ExecutiveProfileFormProps> = ({
                 <div>
                    <label className="block text-sm font-medium text-gray-700">Telefone Corporativo</label>
                    <input
-                     type="text"
+                     type="tel"
+                     placeholder="+55 (XX) XXXXX-XXXX"
                      className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
                      value={currentExecutive.workPhone || ''}
-                     onChange={e => setCurrentExecutive({...currentExecutive, workPhone: e.target.value})}
+                     onChange={e => setCurrentExecutive({...currentExecutive, workPhone: maskPhone(e.target.value)})}
                    />
                 </div>
                 <div>
@@ -524,10 +527,11 @@ export const ExecutiveProfileForm: React.FC<ExecutiveProfileFormProps> = ({
                 <div>
                    <label className="block text-sm font-medium text-gray-700">Telefone Pessoal</label>
                    <input
-                     type="text"
+                     type="tel"
+                     placeholder="+55 (XX) XXXXX-XXXX"
                      className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
                      value={currentExecutive.personalPhone || ''}
-                     onChange={e => setCurrentExecutive({...currentExecutive, personalPhone: e.target.value})}
+                     onChange={e => setCurrentExecutive({...currentExecutive, personalPhone: maskPhone(e.target.value)})}
                    />
                 </div>
                 <div className="col-span-2">
@@ -748,10 +752,11 @@ export const ExecutiveProfileForm: React.FC<ExecutiveProfileFormProps> = ({
                 <div>
                    <label className="block text-sm font-medium text-gray-700">Telefone Emergência</label>
                    <input
-                     type="text"
+                     type="tel"
+                     placeholder="+55 (XX) XXXXX-XXXX"
                      className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
                      value={currentExecutive.emergencyContactPhone || ''}
-                     onChange={e => setCurrentExecutive({...currentExecutive, emergencyContactPhone: e.target.value})}
+                     onChange={e => setCurrentExecutive({...currentExecutive, emergencyContactPhone: maskPhone(e.target.value)})}
                    />
                 </div>
                 <div className="col-span-2 md:col-span-1">
