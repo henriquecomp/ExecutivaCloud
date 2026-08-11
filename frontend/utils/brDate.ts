@@ -89,6 +89,14 @@ export function isDatetimeLocalValue(value: string): boolean {
 }
 
 /**
+ * ISO datetime naive (sem Z/offset), com ou sem segundos.
+ * Ex.: 2026-08-12T18:40:00 — horário de parede, não UTC.
+ */
+export function isNaiveIsoDatetime(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test((value || '').trim());
+}
+
+/**
  * Interpreta `YYYY-MM-DDTHH:mm` como horário de parede no fuso local do browser.
  * Evita ambiguidade de `new Date("YYYY-MM-DDTHH:mm")` entre ambientes.
  */
@@ -101,6 +109,7 @@ export function datetimeLocalToDate(local: string): Date | null {
   return Number.isNaN(dt.getTime()) ? null : dt;
 }
 
+/** @deprecated Preferir datetimeLocalToApi (naive, sem UTC). Mantido só se algum caller ainda usar. */
 export function datetimeLocalToUtcIso(local: string): string | null {
   const dt = datetimeLocalToDate(local);
   return dt ? dt.toISOString() : null;
@@ -114,15 +123,15 @@ export function formatDateBr(isoDate: string): string {
 
 /**
  * Apresentação de hora 24h HH:mm.
- * Aceita `HH:mm`, `YYYY-MM-DDTHH:mm` (parede local) ou ISO com fuso (converte para local).
+ * Naive / datetime-local = parede; ISO com Z/offset = converte para local.
  */
 export function formatTimeBr(isoOrTime: string): string {
   const trimmed = (isoOrTime || '').trim();
   if (!trimmed) return '';
   if (isValidTimeHHMM(trimmed)) return trimmed;
-  if (isDatetimeLocalValue(trimmed)) {
-    const fromLocal = splitDatetimeLocal(trimmed).time;
-    return isValidTimeHHMM(fromLocal) ? fromLocal : '';
+  if (isDatetimeLocalValue(trimmed) || isNaiveIsoDatetime(trimmed)) {
+    const time = trimmed.split('T')[1]?.slice(0, 5) ?? '';
+    return isValidTimeHHMM(time) ? time : '';
   }
   const dt = new Date(trimmed);
   if (Number.isNaN(dt.getTime())) return '';
@@ -135,11 +144,12 @@ export function formatTimeBr(isoOrTime: string): string {
 export function formatDateTimeBr(isoTimestamp: string): string {
   const trimmed = (isoTimestamp || '').trim();
   if (!trimmed) return '';
-  if (isDatetimeLocalValue(trimmed)) {
-    const local = splitDatetimeLocal(trimmed);
-    const d = formatDateBr(local.dateIso);
-    const t = isValidTimeHHMM(local.time) ? local.time : '00:00';
-    return d ? `${d} ${t}` : '';
+  if (isDatetimeLocalValue(trimmed) || isNaiveIsoDatetime(trimmed)) {
+    const [datePart, timePart = ''] = trimmed.split('T');
+    const d = formatDateBr(datePart.slice(0, 10));
+    const t = timePart.slice(0, 5);
+    const time = isValidTimeHHMM(t) ? t : '00:00';
+    return d ? `${d} ${time}` : '';
   }
   const dt = new Date(trimmed);
   if (Number.isNaN(dt.getTime())) return '';

@@ -28,11 +28,17 @@ import AppTextarea from './ui/AppTextarea';
 import FormActions from './ui/FormActions';
 import ToolbarPanel from './ui/ToolbarPanel';
 import { checkboxClass, radioClass } from './ui/controlTokens';
-import { datetimeLocalToDate, datetimeLocalToUtcIso, formatDateTimeBr, formatTimeBr } from '../utils/brDate';
+import { datetimeLocalToDate, formatDateTimeBr, formatTimeBr } from '../utils/brDate';
 import { eventService } from '../services/eventService';
 import { eventTypeService } from '../services/eventTypeService';
 import { getApiErrorMessage } from '../utils/apiError';
-import { toDatetimeLocalInputValue, todayDateInputValue } from '../utils/datetimeLocal';
+import {
+  apiDateTimeToDatetimeLocal,
+  dateToApiNaive,
+  datetimeLocalToApi,
+  toDatetimeLocalInputValue,
+  todayDateInputValue,
+} from '../utils/datetimeLocal';
 
 interface AgendaViewProps {
   events: Event[];
@@ -210,10 +216,10 @@ const EventForm: React.FC<{
 
     const [formError, setFormError] = useState<string | null>(null);
 
-    // Handle datetime-local input which requires YYYY-MM-DDTHH:mm format
+    // Formato canônico do form: YYYY-MM-DDTHH:mm (horário de parede, sem UTC).
     const formatDateTimeForInput = (isoString?: string) => {
         if (!isoString) return '';
-        return toDatetimeLocalInputValue(new Date(isoString));
+        return apiDateTimeToDatetimeLocal(isoString);
     };
 
     const minDatetimeLocal = useMemo(() => toDatetimeLocalInputValue(new Date()), []);
@@ -226,8 +232,9 @@ const EventForm: React.FC<{
     const [endTime, setEndTime] = useState(() => {
         if (event.endTime) return formatDateTimeForInput(event.endTime);
         if (event.startTime) {
-            const s = new Date(event.startTime);
-            return formatDateTimeForInput(new Date(s.getTime() + 3600000).toISOString());
+            const s = datetimeLocalToDate(formatDateTimeForInput(event.startTime))
+              ?? new Date(event.startTime);
+            return toDatetimeLocalInputValue(new Date(s.getTime() + 3600000));
         }
         return toDatetimeLocalInputValue(new Date(Date.now() + 3600000));
     });
@@ -292,11 +299,11 @@ const EventForm: React.FC<{
             }
         }
 
-        const startUtc = datetimeLocalToUtcIso(startTime);
-        const endUtc = datetimeLocalToUtcIso(endTime);
+        const startApi = datetimeLocalToApi(startTime);
+        const endApi = datetimeLocalToApi(endTime);
         const startDt = datetimeLocalToDate(startTime);
         const endDt = datetimeLocalToDate(endTime);
-        if (!startUtc || !endUtc || !startDt || !endDt) {
+        if (!startApi || !endApi || !startDt || !endDt) {
             setFormError('Informe data e hora de início e fim válidas.');
             return;
         }
@@ -345,8 +352,8 @@ const EventForm: React.FC<{
                         title,
                         description,
                         location,
-                        startTime: startUtc,
-                        endTime: endUtc,
+                        startTime: startApi,
+                        endTime: endApi,
                         eventTypeId,
                         reminderMinutes: totalMinutes,
                     },
@@ -533,8 +540,8 @@ const generateRecurringEvents = (baseEvent: Partial<Event>, rule: RecurrenceRule
         newEvents.push({
             ...baseEvent,
             id: `evt_${recurrenceId}_${occurrences}`,
-            startTime: newEventStartTime.toISOString(),
-            endTime: newEventEndTime.toISOString(),
+            startTime: dateToApiNaive(newEventStartTime),
+            endTime: dateToApiNaive(newEventEndTime),
             recurrenceId,
             recurrence: rule,
         } as Event);
