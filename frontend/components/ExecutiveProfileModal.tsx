@@ -164,6 +164,8 @@ const ExecutiveProfileModal: React.FC<ExecutiveProfileModalProps> = ({
         compensationInfo: undefined,
         systemAccessLevels: undefined,
       }) as Partial<Executive>;
+      // Empresa travada no autoatendimento — não reenviar (evita falso "mover empresa").
+      delete (payload as Record<string, unknown>).organizationId;
       await executiveService.update(String(currentExecutive.id), payload);
       onClose();
     } catch (err: unknown) {

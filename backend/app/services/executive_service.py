@@ -68,16 +68,26 @@ class ExecutiveService:
     ):
         db_executive = self.get_executive(db, actor, executive_id)
         update_data = executive_data.model_dump(exclude_unset=True, by_alias=False)
-        new_org = update_data.get("organization_id")
-        if new_org is not None:
-            from app.models.executive_model import Executive
+        if "organization_id" in update_data:
+            new_org = update_data.get("organization_id")
+            # Mesma empresa no payload não é movimentação (comum em "Meus dados" com empresa travada).
+            if new_org != db_executive.organization_id:
+                if actor.role == "executive" and actor.executive_id == executive_id:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Não é permitido alterar a empresa do próprio cadastro.",
+                    )
+                if new_org is not None:
+                    from app.models.executive_model import Executive
 
-            probe = Executive(organization_id=new_org)
-            if not executive_in_manager_scope(db, actor, probe):
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Sem permissão para mover executivo para esta empresa.",
-                )
+                    probe = Executive(organization_id=new_org)
+                    if not executive_in_manager_scope(db, actor, probe):
+                        raise HTTPException(
+                            status_code=status.HTTP_403_FORBIDDEN,
+                            detail="Sem permissão para mover executivo para esta empresa.",
+                        )
+                else:
+                    assert_executive_manager(actor)
         return self.repository.update(db, db_executive, update_data)
 
     def delete_executive(self, db: Session, actor: user_models.Usuario, executive_id: int):

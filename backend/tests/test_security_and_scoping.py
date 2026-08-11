@@ -571,3 +571,87 @@ def test_legal_organization_create_rejects_invalid_cep(client, db_session):
     }
     r = client.post("/legal-organizations/", json=payload)
     assert r.status_code == 422
+
+
+def test_executive_self_update_same_org_does_not_403(client, db_session):
+    """Meus dados: payload com organizationId igual ao atual não deve ser tratado como mover empresa."""
+    lo = _seed_legal_org(db_session)
+    org = _seed_company(db_session, lo)
+    ex = Executive(
+        full_name="Self Exec",
+        work_email="selfupd@corp.com",
+        organization_id=org.id,
+        job_title="Diretor",
+    )
+    db_session.add(ex)
+    db_session.flush()
+    db_session.add(
+        user_models.Usuario(
+            name="Self Exec",
+            email="selfupd@corp.com",
+            hashed_password=hash_password("secret123"),
+            is_active=True,
+            role="executive",
+            legal_organization_id=lo.id,
+            organization_id=org.id,
+            executive_id=ex.id,
+            needs_profile_completion=False,
+        )
+    )
+    db_session.commit()
+
+    token = _login(client, "selfupd@corp.com")
+    r = client.put(
+        f"/executives/{ex.id}",
+        json={
+            "fullName": "Self Exec Atualizado",
+            "workEmail": "selfupd@corp.com",
+            "organizationId": org.id,
+            "jobTitle": "CEO",
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["fullName"] == "Self Exec Atualizado"
+    assert r.json()["jobTitle"] == "CEO"
+    assert r.json()["organizationId"] == org.id
+
+
+def test_executive_self_update_cannot_change_org(client, db_session):
+    lo = _seed_legal_org(db_session)
+    org_a = _seed_company(db_session, lo, VALID_CNPJ_B)
+    org_b = _seed_company(db_session, lo, "11444777000161")
+    ex = Executive(
+        full_name="Self Exec",
+        work_email="selfmove@corp.com",
+        organization_id=org_a.id,
+    )
+    db_session.add(ex)
+    db_session.flush()
+    db_session.add(
+        user_models.Usuario(
+            name="Self Exec",
+            email="selfmove@corp.com",
+            hashed_password=hash_password("secret123"),
+            is_active=True,
+            role="executive",
+            legal_organization_id=lo.id,
+            organization_id=org_a.id,
+            executive_id=ex.id,
+            needs_profile_completion=False,
+        )
+    )
+    db_session.commit()
+
+    token = _login(client, "selfmove@corp.com")
+    r = client.put(
+        f"/executives/{ex.id}",
+        json={
+            "fullName": "Self Exec",
+            "workEmail": "selfmove@corp.com",
+            "organizationId": org_b.id,
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 403
+    assert "empresa" in r.json()["detail"].lower()
