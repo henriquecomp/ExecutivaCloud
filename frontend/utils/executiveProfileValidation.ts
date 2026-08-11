@@ -76,3 +76,15 @@ export function composeBankInfo(code: string, agency: string, account: string): 
   const acc = account.trim();
   return `Banco ${label} | Ag ${ag} | Cc ${acc}`.slice(0, 100);
 }
+
+/** Extrai code/agency/account do formato gerado por `composeBankInfo`; senão retorna vazios. */
+export function parseBankInfo(bankInfo?: string | null): {
+  code: string;
+  agency: string;
+  account: string;
+} {
+  const raw = (bankInfo ?? '').trim();
+  const m = raw.match(/^Banco\s+(.+?)\s*\|\s*Ag\s+(.+?)\s*\|\s*Cc\s+(.+)$/i);
+  if (!m) return { code: '', agency: '', account: '' };
+  return { code: m[1].trim(), agency: m[2].trim(), account: m[3].trim() };
+}

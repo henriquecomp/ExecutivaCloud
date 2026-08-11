@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import Modal from './Modal';
 import { SecretaryForm } from './SecretariesView';
-import { departmentService } from '../services/departmentService';
 import { executiveService } from '../services/executiveService';
 import { organizationService } from '../services/organizationService';
 import { secretaryService } from '../services/secretaryService';
 import { fetchMe, mapApiUserToAppUser, updateMeProfile } from '../services/authService';
-import type { Department, Executive, Organization, Secretary, User } from '../types';
+import type { Executive, Organization, Secretary, User } from '../types';
 
 const MENU_LABEL = 'Meus dados Cadastrais';
 
@@ -32,7 +31,6 @@ const SecretaryProfileModal: React.FC<SecretaryProfileModalProps> = ({
 
   const [secretary, setSecretary] = useState<Partial<Secretary> | null>(null);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
   const [executives, setExecutives] = useState<Executive[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -51,13 +49,10 @@ const SecretaryProfileModal: React.FC<SecretaryProfileModalProps> = ({
         if (cancelled) return;
         const orgId =
           currentUser.organizationId ?? sec.organizationId ?? me.organizationId;
-        const [orgs, depts, execs] = await Promise.all([
+        const [orgs, execs] = await Promise.all([
           orgId
             ? organizationService.getOne(String(orgId)).then((o) => [o])
             : organizationService.getAll(),
-          orgId
-            ? departmentService.getByOrg(String(orgId))
-            : departmentService.getAll(),
           executiveService.getAll(0, 2000),
         ]);
         if (cancelled) return;
@@ -67,10 +62,10 @@ const SecretaryProfileModal: React.FC<SecretaryProfileModalProps> = ({
         setAccPhone(me.phone != null ? String(me.phone) : '');
         setSecretary({
           ...sec,
+          workEmail: currentUser.email || sec.workEmail,
           organizationId: sec.organizationId ?? orgIdStr,
         });
         setOrganizations(orgs);
-        setDepartments(depts);
         setExecutives(
           orgIdStr
             ? execs.filter((e) => String(e.organizationId ?? '') === orgIdStr)
@@ -83,7 +78,7 @@ const SecretaryProfileModal: React.FC<SecretaryProfileModalProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, currentUser.role, currentUser.secretaryId, currentUser.organizationId]);
+  }, [isOpen, currentUser.role, currentUser.secretaryId, currentUser.organizationId, currentUser.email]);
 
   const handleSaveAccount = async () => {
     setAccError(null);
@@ -180,11 +175,11 @@ const SecretaryProfileModal: React.FC<SecretaryProfileModalProps> = ({
             <SecretaryForm
               secretary={secretary}
               organizations={organizations}
-              departments={departments}
+              departments={[]}
               executives={executives}
               currentUser={currentUser}
-              profileCompletion={false}
-              workEmailReadOnly={!!currentUser.needsProfileCompletion}
+              profileCompletion
+              workEmailReadOnly
               submitButtonLabel="Salvar cadastro profissional"
               onCancel={onClose}
               onSave={async (payload) => {

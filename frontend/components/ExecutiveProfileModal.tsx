@@ -6,6 +6,12 @@ import { executiveService } from '../services/executiveService';
 import { organizationService } from '../services/organizationService';
 import { fetchMe, mapApiUserToAppUser, updateMeProfile } from '../services/authService';
 import { normalizeExecutivePayload } from '../utils/executivePayload';
+import {
+  composeBankInfo,
+  parseBankInfo,
+  validateExecutiveProfileCompletion,
+  type ExecutiveProfileFieldErrors,
+} from '../utils/executiveProfileValidation';
 import type { Department, Executive, Organization, User } from '../types';
 
 const MENU_LABEL = 'Meus dados Cadastrais';
@@ -36,15 +42,18 @@ const ExecutiveProfileModal: React.FC<ExecutiveProfileModalProps> = ({
   const [executives, setExecutives] = useState<Executive[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [errors, setErrors] = useState<{ fullName?: string; workEmail?: string }>({});
+  const [fieldErrors, setFieldErrors] = useState<ExecutiveProfileFieldErrors>({});
   const [apiError, setApiError] = useState<string | null>(null);
+  const [bankCode, setBankCode] = useState('');
+  const [bankAgency, setBankAgency] = useState('');
+  const [bankAccount, setBankAccount] = useState('');
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     personal: true,
     contact: true,
     professional: true,
     profile: false,
     emergency: false,
-    finance: false,
+    finance: true,
   });
 
   const toggleSection = useCallback((section: string) => {
@@ -58,6 +67,7 @@ const ExecutiveProfileModal: React.FC<ExecutiveProfileModalProps> = ({
     setApiError(null);
     setAccError(null);
     setAccOk(null);
+    setFieldErrors({});
     void (async () => {
       try {
         const [me, ex, orgs, execs] = await Promise.all([
@@ -77,8 +87,13 @@ const ExecutiveProfileModal: React.FC<ExecutiveProfileModalProps> = ({
         setAccPhone(me.phone != null ? String(me.phone) : '');
         setCurrentExecutive({
           ...ex,
+          workEmail: currentUser.email,
           organizationId: ex.organizationId ?? (orgId != null ? String(orgId) : undefined),
         });
+        const parsedBank = parseBankInfo(ex.bankInfo);
+        setBankCode(parsedBank.code);
+        setBankAgency(parsedBank.agency);
+        setBankAccount(parsedBank.account);
         setOrganizations(orgs);
         setDepartments(depts);
         const orgIdStr = orgId != null ? String(orgId) : undefined;
@@ -96,7 +111,7 @@ const ExecutiveProfileModal: React.FC<ExecutiveProfileModalProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, currentUser.role, currentUser.executiveId, currentUser.organizationId]);
+  }, [isOpen, currentUser.role, currentUser.executiveId, currentUser.organizationId, currentUser.email]);
 
   const handleSaveAccount = async () => {
     setAccError(null);
@@ -128,20 +143,26 @@ const ExecutiveProfileModal: React.FC<ExecutiveProfileModalProps> = ({
 
   const handleSaveProfile = async () => {
     setApiError(null);
-    const newErrors: { fullName?: string; workEmail?: string } = {};
-    if (!currentExecutive.fullName?.trim()) newErrors.fullName = 'O nome completo é obrigatório.';
-    if (!currentExecutive.workEmail?.trim()) newErrors.workEmail = 'O e-mail corporativo é obrigatório.';
-    if (Object.keys(newErrors).length) {
-      setErrors(newErrors);
-      return;
-    }
+    const validation = validateExecutiveProfileCompletion(currentExecutive, {
+      code: bankCode,
+      agency: bankAgency,
+      account: bankAccount,
+    });
+    setFieldErrors(validation);
+    if (Object.keys(validation).length > 0) return;
     if (!currentExecutive.id) {
       setApiError('Registro de executivo inválido.');
       return;
     }
     setSaving(true);
     try {
-      const payload = normalizeExecutivePayload(currentExecutive) as Partial<Executive>;
+      const payload = normalizeExecutivePayload({
+        ...currentExecutive,
+        workEmail: currentUser.email,
+        bankInfo: composeBankInfo(bankCode, bankAgency, bankAccount),
+        compensationInfo: undefined,
+        systemAccessLevels: undefined,
+      }) as Partial<Executive>;
       await executiveService.update(String(currentExecutive.id), payload);
       onClose();
     } catch (err: unknown) {
@@ -229,14 +250,21 @@ const ExecutiveProfileModal: React.FC<ExecutiveProfileModalProps> = ({
                 organizations={organizations}
                 departments={departments}
                 executives={executives}
-                errors={errors}
-                setErrors={setErrors}
+                fieldErrors={fieldErrors}
+                setFieldErrors={setFieldErrors}
                 apiError={apiError}
                 setApiError={setApiError}
                 openSections={openSections}
                 toggleSection={toggleSection}
-                workEmailReadOnly={!!currentUser.needsProfileCompletion}
+                profileCompletion
+                loginEmail={currentUser.email}
                 lockOrganization
+                bankCode={bankCode}
+                bankAgency={bankAgency}
+                bankAccount={bankAccount}
+                onBankCodeChange={setBankCode}
+                onBankAgencyChange={setBankAgency}
+                onBankAccountChange={setBankAccount}
               />
             </section>
           </div>
