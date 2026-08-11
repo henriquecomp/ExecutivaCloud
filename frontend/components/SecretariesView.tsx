@@ -9,6 +9,7 @@ import ToolbarPanel from './ui/ToolbarPanel';
 import Pagination from './Pagination';
 import { DataTable, DataTableBody, DataTableEmptyRow, DataTableHead, DataTableRow, DataTableTd, DataTableTh } from './ui/DataTable';
 import { isCompanyAdmin, isLegalOrgAdmin } from '../utils/tenantScope';
+import { relationSelectOptions } from '../utils/emergencyContactRelationOptions';
 import AppDateInput from './ui/AppDateInput';
 // --- Helper Functions ---
 /**
@@ -459,7 +460,7 @@ export const SecretaryForm: React.FC<{
                           id="hireDate"
                           value={hireDate}
                           onChange={(iso) => handleDateCommit(iso, setHireDate, setHireDateError)}
-                          disabled={isSecretaryUser}
+                          disabled={isSecretaryUser && !profileCompletion}
                           className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm disabled:bg-slate-100 disabled:cursor-not-allowed"
                         />
                         {hireDateError && <p className="mt-1 text-xs text-red-600">{hireDateError}</p>}
@@ -569,6 +570,19 @@ export const SecretaryForm: React.FC<{
                                 <label htmlFor="emergencyContactPhone" className="block text-sm font-medium text-slate-700">Telefone</label>
                                 <input type="tel" id="emergencyContactPhone" value={emergencyContactPhone} onChange={e => setEmergencyContactPhone(maskPhone(e.target.value))} placeholder="+55 (XX) XXXXX-XXXX" className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
                             </div>
+                            <div>
+                                <label htmlFor="emergencyContactRelation" className="block text-sm font-medium text-slate-700">Relação (Parentesco)</label>
+                                <select id="emergencyContactRelation" value={emergencyContactRelation} onChange={e => setEmergencyContactRelation(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                                    <option value="">Selecione...</option>
+                                    {relationSelectOptions(emergencyContactRelation).map((opt) => (
+                                        <option key={opt} value={opt}>{opt}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+                        <div>
+                            <label htmlFor="dependentsInfo" className="block text-sm font-medium text-slate-700">Informações de Dependentes</label>
+                            <textarea id="dependentsInfo" value={dependentsInfo} onChange={e => setDependentsInfo(e.target.value)} rows={2} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
                         </div>
                     </div>
                 </fieldset>

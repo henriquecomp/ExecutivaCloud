@@ -6,6 +6,7 @@ import { useCepAutoLookup } from '../hooks/useCepAutoLookup';
 import { maskCEP, maskCPF, maskPhone } from '../utils/brValidators';
 import { BRAZILIAN_BANKS } from '../utils/brazilianBanks';
 import type { ExecutiveProfileFieldErrors } from '../utils/executiveProfileValidation';
+import { relationSelectOptions } from '../utils/emergencyContactRelationOptions';
 import AppDateInput from './ui/AppDateInput';
 
 const READONLY_ADDRESS_CLASS =
@@ -755,12 +756,16 @@ export const ExecutiveProfileForm: React.FC<ExecutiveProfileFormProps> = ({
                 </div>
                 <div className="col-span-2 md:col-span-1">
                    <label className="block text-sm font-medium text-gray-700">Relação (Parentesco)</label>
-                   <input
-                     type="text"
+                   <select
                      className="mt-1 w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
                      value={currentExecutive.emergencyContactRelation || ''}
                      onChange={e => setCurrentExecutive({...currentExecutive, emergencyContactRelation: e.target.value})}
-                   />
+                   >
+                     <option value="">Selecione...</option>
+                     {relationSelectOptions(currentExecutive.emergencyContactRelation).map((opt) => (
+                       <option key={opt} value={opt}>{opt}</option>
+                     ))}
+                   </select>
                 </div>
                  <div className="col-span-2">
                    <label className="block text-sm font-medium text-gray-700">Informações de Dependentes</label>
