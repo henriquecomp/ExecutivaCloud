@@ -28,6 +28,7 @@ import AppTextarea from './ui/AppTextarea';
 import FormActions from './ui/FormActions';
 import ToolbarPanel from './ui/ToolbarPanel';
 import { checkboxClass, radioClass } from './ui/controlTokens';
+import { formatDateTimeBr, formatTimeBr } from '../utils/brDate';
 import { eventService } from '../services/eventService';
 import { eventTypeService } from '../services/eventTypeService';
 import { getApiErrorMessage } from '../utils/apiError';
@@ -694,13 +695,11 @@ const AgendaView: React.FC<AgendaViewProps> = ({ events, setEvents, eventTypes, 
         setEditingEvent(null);
     };
     
-    const formatFullDate = (isoString: string) => {
-        return new Date(isoString).toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const formatEventDate = (isoString: string) => {
+        const formatted = formatDateTimeBr(isoString);
+        return formatted.split(' ')[0] || '';
     };
-    
-    const formatTime = (isoString: string) => {
-        return new Date(isoString).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-    }
+    const formatTime = (isoString: string) => formatTimeBr(isoString);
 
     const formatReminderText = (minutes: number): string => {
         if (minutes <= 0) return '';
@@ -739,7 +738,7 @@ const AgendaView: React.FC<AgendaViewProps> = ({ events, setEvents, eventTypes, 
                     onClick={() => {
                         const rows = filteredEvents.map(ev => ({
                             Título: ev.title,
-                            Início: new Date(ev.startTime).toLocaleString('pt-BR'),
+                            Início: formatDateTimeBr(ev.startTime),
                             Tipo: eventTypes.find(et => et.id === ev.eventTypeId)?.name ?? '',
                             Local: ev.location ?? '',
                             Recorrente: ev.recurrenceId ? 'Sim' : 'Não',
@@ -789,7 +788,7 @@ const AgendaView: React.FC<AgendaViewProps> = ({ events, setEvents, eventTypes, 
                           <div key={event.id} className="flex items-start space-x-4 p-4 rounded-lg bg-slate-50" style={{borderLeft: `4px solid ${eventType?.color || '#a855f7'}`}}>
                               <div className="flex-shrink-0 text-center bg-slate-700 text-white rounded-lg p-3 w-24">
                                   <p className="text-3xl font-bold">{formatTime(event.startTime)}</p>
-                                  <p className="text-sm">{new Date(event.startTime).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}</p>
+                                  <p className="text-sm">{formatEventDate(event.startTime)}</p>
                               </div>
                               <div className="flex-1">
                                   <div className="flex items-center gap-3">
@@ -805,7 +804,7 @@ const AgendaView: React.FC<AgendaViewProps> = ({ events, setEvents, eventTypes, 
                                         <BellIcon className="w-4 h-4" /> Lembrete: {formatReminderText(event.reminderMinutes)}
                                     </p>
                                   )}
-                                  <p className="text-sm text-slate-400 mt-1">{formatFullDate(event.startTime)}</p>
+                                  <p className="text-sm text-slate-400 mt-1">{formatEventDate(event.startTime)}</p>
                               </div>
                               <div className="flex flex-col sm:flex-row items-center gap-1">
                                   <button type="button" onClick={() => handleEditEvent(event)} className={typeMgmtEditIconBtn} aria-label="Editar evento"><EditIcon /></button>
@@ -837,7 +836,7 @@ const AgendaView: React.FC<AgendaViewProps> = ({ events, setEvents, eventTypes, 
                             </div>
                           </div>
                           {eventType && <span className="inline-block text-xs font-semibold px-2 py-1 rounded-full text-white" style={{backgroundColor: eventType.color}}>{eventType.name}</span>}
-                          <p className="text-sm text-slate-600">{formatTime(event.startTime)} — {new Date(event.startTime).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                          <p className="text-sm text-slate-600">{formatTime(event.startTime)} — {formatEventDate(event.startTime)}</p>
                           {event.location && <p className="text-sm text-slate-500">{event.location}</p>}
                         </div>
                       );
@@ -872,7 +871,7 @@ const AgendaView: React.FC<AgendaViewProps> = ({ events, setEvents, eventTypes, 
                               {event.title}
                             </span>
                           </DataTableTd>
-                          <DataTableTd>{formatTime(event.startTime)} — {new Date(event.startTime).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}</DataTableTd>
+                          <DataTableTd>{formatTime(event.startTime)} — {formatEventDate(event.startTime)}</DataTableTd>
                           <DataTableTd className="hidden md:table-cell">
                             {eventType && <span className="text-xs font-semibold px-2 py-1 rounded-full text-white" style={{backgroundColor: eventType.color}}>{eventType.name}</span>}
                           </DataTableTd>

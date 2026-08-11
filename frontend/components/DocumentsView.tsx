@@ -5,6 +5,7 @@ import ConfirmationModal from './ConfirmationModal';
 import ImageModal from './ImageModal';
 import { EditIcon, DeleteIcon, PlusIcon, CogIcon, UploadIcon, PrinterIcon } from './Icons';
 import { downloadCsv, todayStamp } from '../utils/csvDownload';
+import { formatDateTimeBr } from '../utils/brDate';
 import { FormDangerAlert } from './ui/FormDangerAlert';
 import AppButton from './ui/AppButton';
 import AppInput from './ui/AppInput';
@@ -338,9 +339,7 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({ documents, setDocuments, 
         setEditingDoc(null);
     };
 
-    const formatDate = (isoString: string) => {
-        return new Date(isoString).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
-    };
+    const formatDate = (isoString: string) => formatDateTimeBr(isoString).split(' ')[0] || '';
 
     return (
         <div className="space-y-6 animate-fade-in">

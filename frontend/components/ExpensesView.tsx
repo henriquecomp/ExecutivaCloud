@@ -18,6 +18,7 @@ import AppButton from './ui/AppButton';
 import AppInput from './ui/AppInput';
 import AppDateInput from './ui/AppDateInput';
 import AppLabel from './ui/AppLabel';
+import { formatDateBr } from '../utils/brDate';
 import AppSelect from './ui/AppSelect';
 import FormActions from './ui/FormActions';
 import TypeColorFormField from './ui/TypeColorFormField';
@@ -407,7 +408,7 @@ const FinancesView: React.FC<FinancesViewProps> = ({ expenses, expenseCategories
       return { backgroundColor: safeColor, color: luminance > 0.6 ? '#0f172a' : '#ffffff' };
     };
     
-    const formatDate = (dateString: string) => new Date(dateString + 'T00:00:00').toLocaleDateString('pt-BR', { year: 'numeric', month: 'short', day: 'numeric' });
+    const formatDate = (dateString: string) => formatDateBr(dateString);
     const formatCurrency = (amount: number) => amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     
     const renderItems = () => {

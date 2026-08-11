@@ -38,6 +38,7 @@ Before adding a new file under `frontend/components/`, check for an existing bui
 | Button | `ui/AppButton.tsx` (primary, secondary, ghost) |
 | Text field | `ui/AppInput.tsx` |
 | Date (pt-BR dd/mm/aaaa) | `ui/AppDateInput.tsx` — value/API `YYYY-MM-DD`; never native `type="date"` |
+| Time (24h HH:mm) | `ui/AppTimeInput.tsx` — value `HH:mm`; never rely on native `type="time"` locale |
 | Date+time (pt-BR) | `ui/AppDateTimeInput.tsx` — value `YYYY-MM-DDTHH:mm` |
 | Select | `ui/AppSelect.tsx` |
 | Textarea | `ui/AppTextarea.tsx` |

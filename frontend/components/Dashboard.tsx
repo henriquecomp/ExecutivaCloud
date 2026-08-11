@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { Executive, Event, Expense, Organization, Department, ExpenseCategory } from '../types';
 import { CalendarIcon, ExpensesIcon, ClockIcon, EmailIcon, PhoneIcon } from './Icons';
+import { formatDateBr, formatDateTimeBr } from '../utils/brDate';
 
 interface DashboardProps {
   executives: Executive[]; // This is visibleExecutives, so it's already filtered.
@@ -23,21 +24,13 @@ const Dashboard: React.FC<DashboardProps> = ({ events, expenses, selectedExecuti
     .sort((a, b) => new Date(b.expenseDate).getTime() - new Date(a.expenseDate).getTime())
     .slice(0, 5), [expenses, selectedExecutive]);
   
-  const formatDateTime = (isoString: string) => {
-    const date = new Date(isoString);
-    return date.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-  };
+  const formatDateTime = (isoString: string) => formatDateTimeBr(isoString);
 
   const formatCurrency = (amount: number) => {
     return amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   };
   
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const timeZoneOffset = date.getTimezoneOffset() * 60000;
-    const adjustedDate = new Date(date.getTime() + timeZoneOffset);
-    return adjustedDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
-  };
+  const formatDate = (dateString: string) => formatDateBr(dateString);
 
   const getInitials = (name: string) => {
     if (!name) return '?';

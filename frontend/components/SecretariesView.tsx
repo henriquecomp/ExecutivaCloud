@@ -422,6 +422,16 @@ export const SecretaryForm: React.FC<{
                         <label htmlFor="rg" className="block text-sm font-medium text-slate-700">RG</label>
                         <input type="text" id="rg" value={rg} onChange={e => setRg(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
                     </div>
+                    <div>
+                        <label htmlFor="rgIssueDate" className="block text-sm font-medium text-slate-700">Data de Expedição do RG</label>
+                        <AppDateInput
+                          id="rgIssueDate"
+                          value={rgIssueDate}
+                          onChange={(iso) => handleDateCommit(iso, setRgIssueDate, setRgIssueDateError)}
+                          className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                        />
+                        {rgIssueDateError && <p className="mt-1 text-xs text-red-600">{rgIssueDateError}</p>}
+                    </div>
                 </div>
             </CollapsibleSection>
 

@@ -8,6 +8,7 @@ import { downloadCsv, todayStamp } from '../utils/csvDownload';
 import { FormDangerAlert } from './ui/FormDangerAlert';
 import { taskService } from '../services/taskService';
 import { getApiErrorMessage } from '../utils/apiError';
+import { formatDateBr } from '../utils/brDate';
 import {
   DataTable,
   DataTableBody,
@@ -466,12 +467,7 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, executiveId, onRefresh, la
         }
     };
     
-    const formatDate = (dateString: string) => {
-        const date = new Date(dateString);
-        const timeZoneOffset = date.getTimezoneOffset() * 60000;
-        const adjustedDate = new Date(date.getTime() + timeZoneOffset);
-        return adjustedDate.toLocaleDateString('pt-BR', { year: 'numeric', month: 'short', day: 'numeric' });
-    };
+    const formatDate = (dateString: string) => formatDateBr(dateString);
     
     const renderItems = () => {
         if (paginatedTasks.length === 0) {

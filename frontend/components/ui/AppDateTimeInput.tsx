@@ -1,6 +1,7 @@
 import React from 'react';
 import { joinDatetimeLocal, splitDatetimeLocal } from '../../utils/brDate';
 import AppDateInput from './AppDateInput';
+import AppTimeInput from './AppTimeInput';
 
 export interface AppDateTimeInputProps
   extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type' | 'value' | 'onChange'> {
@@ -12,8 +13,8 @@ export interface AppDateTimeInputProps
 }
 
 /**
- * Data + hora com data em máscara pt-BR (dd/mm/aaaa) e hora nativa `type="time"`.
- * Substitui `datetime-local` para não herdar mm/dd/yyyy do locale do navegador.
+ * Data + hora com máscaras pt-BR: data dd/mm/aaaa e hora 24h HH:mm (ex.: 23:59).
+ * Substitui `datetime-local` / `type="time"` para não herdar locale do navegador.
  */
 const AppDateTimeInput: React.FC<AppDateTimeInputProps> = ({
   value,
@@ -48,16 +49,13 @@ const AppDateTimeInput: React.FC<AppDateTimeInputProps> = ({
         }}
         onFocus={onFocus}
       />
-      <input
-        type="time"
-        lang="pt-BR"
+      <AppTimeInput
         disabled={disabled}
         required={required && !!dateIso}
         value={time}
         aria-label="Hora"
-        className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:bg-slate-100"
-        onChange={(e) => {
-          const nextTime = e.target.value;
+        className="w-[5.5rem] rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+        onChange={(nextTime) => {
           if (!dateIso) {
             onChange('');
             return;
