@@ -22,6 +22,8 @@ export interface ExecutiveProfileModalProps {
   onClose: () => void;
   currentUser: User;
   onUserUpdated?: (user: User) => void;
+  /** Chamado após salvar o cadastro profissional com sucesso. */
+  onProfileSaved?: () => void;
 }
 
 const ExecutiveProfileModal: React.FC<ExecutiveProfileModalProps> = ({
@@ -29,6 +31,7 @@ const ExecutiveProfileModal: React.FC<ExecutiveProfileModalProps> = ({
   onClose,
   currentUser,
   onUserUpdated,
+  onProfileSaved,
 }) => {
   const [accFullName, setAccFullName] = useState('');
   const [accEmail, setAccEmail] = useState('');
@@ -167,6 +170,7 @@ const ExecutiveProfileModal: React.FC<ExecutiveProfileModalProps> = ({
       // Empresa travada no autoatendimento — não reenviar (evita falso "mover empresa").
       delete (payload as Record<string, unknown>).organizationId;
       await executiveService.update(String(currentExecutive.id), payload);
+      onProfileSaved?.();
       onClose();
     } catch (err: unknown) {
       const ax = err as { response?: { data?: { detail?: string | Array<{ msg?: string }> } } };

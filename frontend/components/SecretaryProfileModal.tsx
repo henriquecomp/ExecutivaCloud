@@ -15,6 +15,8 @@ export interface SecretaryProfileModalProps {
   onClose: () => void;
   currentUser: User;
   onUserUpdated?: (user: User) => void;
+  /** Chamado após salvar o cadastro profissional com sucesso. */
+  onProfileSaved?: () => void;
 }
 
 const SecretaryProfileModal: React.FC<SecretaryProfileModalProps> = ({
@@ -22,6 +24,7 @@ const SecretaryProfileModal: React.FC<SecretaryProfileModalProps> = ({
   onClose,
   currentUser,
   onUserUpdated,
+  onProfileSaved,
 }) => {
   const [accFullName, setAccFullName] = useState('');
   const [accEmail, setAccEmail] = useState('');
@@ -186,6 +189,7 @@ const SecretaryProfileModal: React.FC<SecretaryProfileModalProps> = ({
               onSave={async (payload) => {
                 try {
                   await secretaryService.update(String(secretary.id), payload as Partial<Secretary>);
+                  onProfileSaved?.();
                   onClose();
                 } catch (e: unknown) {
                   const ax = e as { response?: { data?: { detail?: string } } };

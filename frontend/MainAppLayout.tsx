@@ -314,6 +314,16 @@ const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout, on
     }
   }, [currentUser, executives, secretaries, organizations]);
 
+  const userPhotoUrl = useMemo(() => {
+    if (currentUser.role === 'executive' && currentUser.executiveId) {
+      return executives.find((e) => e.id === currentUser.executiveId)?.photoUrl;
+    }
+    if (currentUser.role === 'secretary' && currentUser.secretaryId) {
+      return secretaries.find((s) => s.id === currentUser.secretaryId)?.photoUrl;
+    }
+    return undefined;
+  }, [currentUser.role, currentUser.executiveId, currentUser.secretaryId, executives, secretaries]);
+
   useEffect(() => {
     if (currentUser.role === 'executive') {
       setSelectedExecutiveId(currentUser.executiveId || null);
@@ -608,6 +618,7 @@ const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout, on
 
             <UserMenu
               user={currentUser}
+              photoUrl={userPhotoUrl}
               onLogout={onLogout}
               onOpenExecutiveProfile={() => setExecutiveProfileOpen(true)}
               onOpenSecretaryProfile={() => setSecretaryProfileOpen(true)}
@@ -622,12 +633,14 @@ const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout, on
         onClose={() => setExecutiveProfileOpen(false)}
         currentUser={currentUser}
         onUserUpdated={onUserUpdated}
+        onProfileSaved={() => void loadCoreData()}
       />
       <SecretaryProfileModal
         isOpen={secretaryProfileOpen}
         onClose={() => setSecretaryProfileOpen(false)}
         currentUser={currentUser}
         onUserUpdated={onUserUpdated}
+        onProfileSaved={() => void loadCoreData()}
       />
 
       <ReportProblemModal

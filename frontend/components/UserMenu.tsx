@@ -7,23 +7,39 @@ const DATA_MENU_LABEL = 'Meus dados Cadastrais';
 interface UserMenuProps {
   user: User;
   onLogout: () => void;
+  /** URL da foto do cadastro profissional (executivo/secretária), se houver. */
+  photoUrl?: string | null;
   /** Executivo: abre o modal unificado (conta + cadastro profissional). */
   onOpenExecutiveProfile?: () => void;
   /** Secretária: abre o modal unificado (conta + cadastro profissional). */
   onOpenSecretaryProfile?: () => void;
 }
 
-const UserMenu: React.FC<UserMenuProps> = ({ user, onLogout, onOpenExecutiveProfile, onOpenSecretaryProfile }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
+function getInitials(name: string) {
+  if (!name) return '?';
+  const names = name.split(' ');
+  const firstInitial = names[0]?.[0] || '';
+  const lastInitial = names.length > 1 ? names[names.length - 1]?.[0] : '';
+  return `${firstInitial}${lastInitial}`.toUpperCase();
+}
 
-  const getInitials = (name: string) => {
-    if (!name) return '?';
-    const names = name.split(' ');
-    const firstInitial = names[0]?.[0] || '';
-    const lastInitial = names.length > 1 ? names[names.length - 1]?.[0] : '';
-    return `${firstInitial}${lastInitial}`.toUpperCase();
-  };
+const UserMenu: React.FC<UserMenuProps> = ({
+  user,
+  onLogout,
+  photoUrl,
+  onOpenExecutiveProfile,
+  onOpenSecretaryProfile,
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [photoFailed, setPhotoFailed] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const trimmedPhoto = (photoUrl ?? '').trim();
+  const showPhoto = Boolean(trimmedPhoto) && !photoFailed;
+  const initials = getInitials(user.fullName);
+
+  useEffect(() => {
+    setPhotoFailed(false);
+  }, [trimmedPhoto]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -49,13 +65,23 @@ const UserMenu: React.FC<UserMenuProps> = ({ user, onLogout, onOpenExecutiveProf
   return (
     <div className="relative" ref={menuRef}>
       <button
+        type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold text-base hover:bg-slate-300 transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+        className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold text-base hover:bg-slate-300 transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 overflow-hidden"
         aria-label="Abrir menu do usuário"
         aria-haspopup="true"
         aria-expanded={isOpen}
       >
-        {getInitials(user.fullName)}
+        {showPhoto ? (
+          <img
+            src={trimmedPhoto}
+            alt={user.fullName}
+            className="w-full h-full object-cover"
+            onError={() => setPhotoFailed(true)}
+          />
+        ) : (
+          initials
+        )}
       </button>
 
       {isOpen && (
@@ -66,9 +92,18 @@ const UserMenu: React.FC<UserMenuProps> = ({ user, onLogout, onOpenExecutiveProf
           }}
         >
           <div className="p-6 text-center border-b border-slate-200">
-            <div className="w-20 h-20 rounded-full bg-indigo-500 text-white flex items-center justify-center text-4xl font-bold mx-auto mb-4">
-              {getInitials(user.fullName)}
-            </div>
+            {showPhoto ? (
+              <img
+                src={trimmedPhoto}
+                alt={user.fullName}
+                className="w-20 h-20 rounded-full object-cover mx-auto mb-4 ring-2 ring-slate-200"
+                onError={() => setPhotoFailed(true)}
+              />
+            ) : (
+              <div className="w-20 h-20 rounded-full bg-indigo-500 text-white flex items-center justify-center text-4xl font-bold mx-auto mb-4">
+                {initials}
+              </div>
+            )}
             <h3 className="font-bold text-slate-800 text-lg">Olá, {user.fullName}!</h3>
             {user.email && <p className="text-xs text-slate-500 mt-1 break-all">{user.email}</p>}
             {user.phone && <p className="text-xs text-slate-500 mt-1">{user.phone}</p>}
@@ -102,6 +137,7 @@ const UserMenu: React.FC<UserMenuProps> = ({ user, onLogout, onOpenExecutiveProf
               </button>
             )}
             <button
+              type="button"
               onClick={onLogout}
               className="w-full flex items-center gap-3 px-4 py-2 text-left text-sm text-slate-700 rounded-md hover:bg-slate-100 hover:text-red-600 transition"
             >
