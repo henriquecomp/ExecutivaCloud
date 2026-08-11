@@ -83,6 +83,29 @@ export function joinDatetimeLocal(dateIso: string, time: string): string {
   return `${dateIso}T${t}`;
 }
 
+/** True se o valor parece datetime-local sem fuso (YYYY-MM-DDTHH:mm). */
+export function isDatetimeLocalValue(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test((value || '').trim());
+}
+
+/**
+ * Interpreta `YYYY-MM-DDTHH:mm` como horário de parede no fuso local do browser.
+ * Evita ambiguidade de `new Date("YYYY-MM-DDTHH:mm")` entre ambientes.
+ */
+export function datetimeLocalToDate(local: string): Date | null {
+  const { dateIso, time } = splitDatetimeLocal(local);
+  if (!dateIso || !isValidTimeHHMM(time || '00:00')) return null;
+  const [y, m, d] = dateIso.split('-').map(Number);
+  const [hh, mm] = (time || '00:00').split(':').map(Number);
+  const dt = new Date(y, m - 1, d, hh, mm, 0, 0);
+  return Number.isNaN(dt.getTime()) ? null : dt;
+}
+
+export function datetimeLocalToUtcIso(local: string): string | null {
+  const dt = datetimeLocalToDate(local);
+  return dt ? dt.toISOString() : null;
+}
+
 /** Apresentação: YYYY-MM-DD → dd/MM/yyyy. */
 export function formatDateBr(isoDate: string): string {
   const datePart = (isoDate || '').trim().slice(0, 10);
@@ -91,14 +114,16 @@ export function formatDateBr(isoDate: string): string {
 
 /**
  * Apresentação de hora 24h HH:mm.
- * Aceita `HH:mm`, `YYYY-MM-DDTHH:mm` ou ISO timestamp.
+ * Aceita `HH:mm`, `YYYY-MM-DDTHH:mm` (parede local) ou ISO com fuso (converte para local).
  */
 export function formatTimeBr(isoOrTime: string): string {
   const trimmed = (isoOrTime || '').trim();
   if (!trimmed) return '';
   if (isValidTimeHHMM(trimmed)) return trimmed;
-  const fromLocal = splitDatetimeLocal(trimmed).time;
-  if (isValidTimeHHMM(fromLocal)) return fromLocal;
+  if (isDatetimeLocalValue(trimmed)) {
+    const fromLocal = splitDatetimeLocal(trimmed).time;
+    return isValidTimeHHMM(fromLocal) ? fromLocal : '';
+  }
   const dt = new Date(trimmed);
   if (Number.isNaN(dt.getTime())) return '';
   const hh = String(dt.getHours()).padStart(2, '0');
@@ -110,8 +135,8 @@ export function formatTimeBr(isoOrTime: string): string {
 export function formatDateTimeBr(isoTimestamp: string): string {
   const trimmed = (isoTimestamp || '').trim();
   if (!trimmed) return '';
-  const local = splitDatetimeLocal(trimmed);
-  if (local.dateIso) {
+  if (isDatetimeLocalValue(trimmed)) {
+    const local = splitDatetimeLocal(trimmed);
     const d = formatDateBr(local.dateIso);
     const t = isValidTimeHHMM(local.time) ? local.time : '00:00';
     return d ? `${d} ${t}` : '';

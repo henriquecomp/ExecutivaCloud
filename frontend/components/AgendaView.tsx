@@ -28,7 +28,7 @@ import AppTextarea from './ui/AppTextarea';
 import FormActions from './ui/FormActions';
 import ToolbarPanel from './ui/ToolbarPanel';
 import { checkboxClass, radioClass } from './ui/controlTokens';
-import { formatDateTimeBr, formatTimeBr } from '../utils/brDate';
+import { datetimeLocalToDate, datetimeLocalToUtcIso, formatDateTimeBr, formatTimeBr } from '../utils/brDate';
 import { eventService } from '../services/eventService';
 import { eventTypeService } from '../services/eventTypeService';
 import { getApiErrorMessage } from '../utils/apiError';
@@ -267,11 +267,13 @@ const EventForm: React.FC<{
     const handleStartTimeChange = (value: string) => {
         setStartTime(value);
         setFormError(null);
-        const startMs = new Date(value).getTime();
-        const endMs = new Date(endTime).getTime();
-        if (!Number.isFinite(startMs)) return;
+        const startDt = datetimeLocalToDate(value);
+        const endDt = datetimeLocalToDate(endTime);
+        if (!startDt) return;
+        const startMs = startDt.getTime();
+        const endMs = endDt?.getTime() ?? NaN;
         if (!endTime || !Number.isFinite(endMs) || endMs <= startMs) {
-            setEndTime(formatDateTimeForInput(new Date(startMs + 3600000).toISOString()));
+            setEndTime(toDatetimeLocalInputValue(new Date(startMs + 3600000)));
         }
     };
 
@@ -290,8 +292,16 @@ const EventForm: React.FC<{
             }
         }
 
-        const startMs = new Date(startTime).getTime();
-        const endMs = new Date(endTime).getTime();
+        const startUtc = datetimeLocalToUtcIso(startTime);
+        const endUtc = datetimeLocalToUtcIso(endTime);
+        const startDt = datetimeLocalToDate(startTime);
+        const endDt = datetimeLocalToDate(endTime);
+        if (!startUtc || !endUtc || !startDt || !endDt) {
+            setFormError('Informe data e hora de início e fim válidas.');
+            return;
+        }
+        const startMs = startDt.getTime();
+        const endMs = endDt.getTime();
         const nowMs = Date.now();
         if (startMs < nowMs) {
             setFormError('A data e hora de início não podem ser no passado.');
@@ -335,8 +345,8 @@ const EventForm: React.FC<{
                         title,
                         description,
                         location,
-                        startTime: new Date(startTime).toISOString(),
-                        endTime: new Date(endTime).toISOString(),
+                        startTime: startUtc,
+                        endTime: endUtc,
                         eventTypeId,
                         reminderMinutes: totalMinutes,
                     },
