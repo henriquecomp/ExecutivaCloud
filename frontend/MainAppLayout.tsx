@@ -35,7 +35,10 @@ import SecretaryProfileModal from './components/SecretaryProfileModal';
 import DocumentsView from './components/DocumentsView';
 import LegalOrganizationsView from './components/LegalOrganizationsView';
 import ReportProblemModal from './components/ReportProblemModal';
+import EventRemindersMenu from './components/EventRemindersMenu';
 import { ExclamationTriangleIcon } from './components/Icons';
+import { getActiveReminders } from './utils/eventReminders';
+import { formatTimeBr } from './utils/brDate';
 import { legalOrganizationService } from './services/legalOrganizationService';
 import { organizationService } from './services/organizationService';
 import { departmentService } from './services/departmentService';
@@ -85,6 +88,9 @@ const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout, on
   const [documentCategories, setDocumentCategories] = useState<DocumentCategory[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [notifiedEventIds, setNotifiedEventIds] = useState<Set<string>>(new Set());
+  const [dismissedReminderIds, setDismissedReminderIds] = useState<Set<string>>(new Set());
+  const [reminderEvents, setReminderEvents] = useState<Event[]>([]);
+  const [reminderNowMs, setReminderNowMs] = useState(() => Date.now());
   const coreLoadGenRef = useRef(0);
 
   const loadCoreData = useCallback(async (isStale?: () => boolean) => {
@@ -263,11 +269,28 @@ const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout, on
     [loadAllSecondaryLists],
   );
 
+  const loadReminderEvents = useCallback(async (executiveId: string | null, isStale?: () => boolean) => {
+    const stale = () => isStale?.() ?? false;
+    if (!executiveId) {
+      if (!stale()) setReminderEvents([]);
+      return;
+    }
+    try {
+      const ev = await eventService.getAll({ executiveId });
+      if (!stale()) setReminderEvents(ev);
+    } catch (error) {
+      if (!stale()) {
+        console.error('Erro ao carregar eventos para lembretes:', error);
+      }
+    }
+  }, []);
+
   const refreshAfterMutation = useCallback(async () => {
     const stale = () => false;
     await loadCoreData(stale);
     await loadViewDataset(currentView, selectedExecutiveId, stale);
-  }, [currentView, selectedExecutiveId, loadCoreData, loadViewDataset]);
+    await loadReminderEvents(selectedExecutiveId, stale);
+  }, [currentView, selectedExecutiveId, loadCoreData, loadViewDataset, loadReminderEvents]);
 
   useEffect(() => {
     let cancelled = false;
@@ -286,6 +309,20 @@ const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout, on
       cancelled = true;
     };
   }, [currentView, selectedExecutiveId, loadViewDataset]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const stale = () => cancelled;
+    void loadReminderEvents(selectedExecutiveId, stale);
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedExecutiveId, loadReminderEvents]);
+
+  useEffect(() => {
+    const id = window.setInterval(() => setReminderNowMs(Date.now()), 30000);
+    return () => window.clearInterval(id);
+  }, []);
 
   const visibleExecutives = useMemo(() => {
     switch (currentUser.role) {
@@ -343,28 +380,28 @@ const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout, on
 
   useEffect(() => {
     const checkReminders = () => {
+      const now = new Date();
+      setReminderNowMs(now.getTime());
+      const active = getActiveReminders(reminderEvents, now).filter(
+        (r) => !dismissedReminderIds.has(r.event.id) && !notifiedEventIds.has(r.event.id),
+      );
+      if (active.length === 0) return;
       if (!('Notification' in window) || Notification.permission !== 'granted') {
         return;
       }
-
-      const now = new Date();
-      events.forEach((event) => {
-        if (event.reminderMinutes && !notifiedEventIds.has(event.id)) {
-          const eventStartTime = new Date(event.startTime);
-          const reminderTime = new Date(eventStartTime.getTime() - event.reminderMinutes * 60 * 1000);
-
-          if (now >= reminderTime && now < eventStartTime) {
-            const executive = executives.find((e) => e.id === event.executiveId);
-            const title = `Lembrete: ${event.title}`;
-            const options = {
-              body: `O evento de ${executive?.fullName || 'um executivo'} começa às ${eventStartTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}.`,
-              icon: '/vite.svg',
-            };
-
-            new Notification(title, options);
-            setNotifiedEventIds((prev) => new Set(prev).add(event.id));
-          }
+      active.forEach((r) => {
+        const executive = executives.find((e) => e.id === r.event.executiveId);
+        const title = `Lembrete: ${r.event.title}`;
+        const options = {
+          body: `O evento de ${executive?.fullName || 'um executivo'} começa às ${formatTimeBr(r.event.startTime)}.`,
+          icon: '/vite.svg',
+        };
+        try {
+          new Notification(title, options);
+        } catch {
+          /* ignore */
         }
+        setNotifiedEventIds((prev) => new Set(prev).add(r.event.id));
       });
     };
 
@@ -372,7 +409,7 @@ const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout, on
     checkReminders();
 
     return () => clearInterval(intervalId);
-  }, [events, executives, notifiedEventIds]);
+  }, [reminderEvents, executives, notifiedEventIds, dismissedReminderIds]);
 
   const selectedExecutive = useMemo(
     () => executives.find((e) => e.id === selectedExecutiveId),
@@ -605,6 +642,29 @@ const MainAppLayout: React.FC<MainAppLayoutProps> = ({ currentUser, onLogout, on
                 })}
               </select>
             </div>
+
+            <EventRemindersMenu
+              events={reminderEvents}
+              executives={executives}
+              dismissedIds={dismissedReminderIds}
+              nowMs={reminderNowMs}
+              onDismiss={(eventId) => {
+                setDismissedReminderIds((prev) => new Set(prev).add(eventId));
+              }}
+              onDismissAll={() => {
+                setDismissedReminderIds((prev) => {
+                  const next = new Set(prev);
+                  getActiveReminders(reminderEvents, new Date(reminderNowMs)).forEach((r) =>
+                    next.add(r.event.id),
+                  );
+                  return next;
+                });
+              }}
+              onOpenEvent={(event) => {
+                if (event.executiveId) setSelectedExecutiveId(event.executiveId);
+                setCurrentView('agenda');
+              }}
+            />
 
             <button
               type="button"
