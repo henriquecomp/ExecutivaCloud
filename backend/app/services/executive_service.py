@@ -1,3 +1,6 @@
+from typing import Optional
+
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 from app.repositories.executive_repository import ExecutiveRepository
@@ -8,6 +11,32 @@ from app.services.executive_scope import (
     executive_in_manager_scope,
     scoped_executives_query,
 )
+
+
+def raise_if_cpf_taken(
+    repository: ExecutiveRepository,
+    db: Session,
+    cpf: Optional[str],
+    *,
+    exclude_id: Optional[int] = None,
+) -> None:
+    if not cpf:
+        return
+    existing = repository.get_by_cpf(db, cpf, exclude_id=exclude_id)
+    if existing is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="CPF já cadastrado.",
+        )
+
+
+def integrity_error_detail(exc: IntegrityError) -> str:
+    msg = str(getattr(exc, "orig", None) or exc).lower()
+    if "cpf" in msg:
+        return "CPF já cadastrado."
+    if "work_email" in msg or "email" in msg:
+        return "Email de trabalho já cadastrado."
+    return "Não foi possível salvar: dados conflitantes ou inválidos."
 
 
 class ExecutiveService:
@@ -46,7 +75,15 @@ class ExecutiveService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Email de trabalho já cadastrado.",
             )
-        return self.repository.create(db, executive_data)
+        raise_if_cpf_taken(self.repository, db, executive_data.cpf)
+        try:
+            return self.repository.create(db, executive_data)
+        except IntegrityError as e:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=integrity_error_detail(e),
+            ) from e
 
     def get_executive(self, db: Session, actor: user_models.Usuario, executive_id: int):
         executive = self.repository.get_by_id(db, executive_id)
@@ -88,7 +125,18 @@ class ExecutiveService:
                         )
                 else:
                     assert_executive_manager(actor)
-        return self.repository.update(db, db_executive, update_data)
+        if "cpf" in update_data:
+            raise_if_cpf_taken(
+                self.repository, db, update_data.get("cpf"), exclude_id=executive_id
+            )
+        try:
+            return self.repository.update(db, db_executive, update_data)
+        except IntegrityError as e:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=integrity_error_detail(e),
+            ) from e
 
     def delete_executive(self, db: Session, actor: user_models.Usuario, executive_id: int):
         db_executive = self.get_executive(db, actor, executive_id)

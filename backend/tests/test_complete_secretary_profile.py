@@ -118,3 +118,26 @@ def test_complete_secretary_profile_rejects_wrong_email(client, db_session):
     )
     assert r.status_code == 400
     assert "e-mail" in r.json()["detail"].lower()
+
+
+def test_complete_secretary_profile_rejects_empty_full_name(client, db_session):
+    org, _sec, _ex, _user = _seed(db_session)
+    token = _login(client)
+    r = client.post(
+        "/auth/complete-profile/secretary",
+        json={
+            "fullName": "   ",
+            "workEmail": "sec@corp.com",
+            "organizationId": org.id,
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 400, r.text
+    assert "nome" in r.json()["detail"].lower()
+    user = (
+        db_session.query(user_models.Usuario)
+        .filter(user_models.Usuario.email == "sec@corp.com")
+        .first()
+    )
+    assert user is not None
+    assert user.needs_profile_completion is True

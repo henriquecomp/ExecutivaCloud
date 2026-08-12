@@ -1,3 +1,5 @@
+from typing import Optional
+
 from sqlalchemy.orm import Session
 from app.models.executive_model import Executive
 from app.schemas.executive_schema import ExecutiveCreate
@@ -12,6 +14,17 @@ class ExecutiveRepository:
 
     def get_by_email(self, db: Session, email: str):
         return db.query(Executive).filter(Executive.work_email == email).first()
+
+    def get_by_cpf(
+        self, db: Session, cpf: str, exclude_id: Optional[int] = None
+    ) -> Optional[Executive]:
+        """Busca por CPF já normalizado (apenas dígitos)."""
+        if not cpf:
+            return None
+        q = db.query(Executive).filter(Executive.cpf == cpf)
+        if exclude_id is not None:
+            q = q.filter(Executive.id != exclude_id)
+        return q.first()
 
     def create(self, db: Session, executive: ExecutiveCreate):
         # by_alias=False garante o uso dos nomes internos como 'street' para o banco

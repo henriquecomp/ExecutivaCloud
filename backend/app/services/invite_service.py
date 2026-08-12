@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Literal, Optional
 
 from fastapi import Depends, HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -15,12 +16,14 @@ from app.models.organization_model import Organization
 from app.models.secretary_model import Secretary
 from app.models.user_invite_token_model import UserInviteToken
 from app.models import user_model as user_models
+from app.repositories.executive_repository import ExecutiveRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas import auth_schema as auth_schemas
 from app.schemas.executive_schema import ExecutiveProfileComplete
 from app.services.auth_service import _user_to_public
 from app.services.email_service import build_set_password_link, send_invite_email
 from app.core.tenant_scope import normalize_user_scope_fields, validate_user_tenant_scope
+from app.services.executive_service import integrity_error_detail, raise_if_cpf_taken
 from app.services.secretary_service import SecretaryService, validated_secretary_executive_ids_for_org
 
 
@@ -378,12 +381,25 @@ class InviteService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Organização inválida para este usuário.",
             )
+        raise_if_cpf_taken(
+            ExecutiveRepository(),
+            self.db,
+            data.get("cpf"),
+            exclude_id=ex.id,
+        )
         for key, value in data.items():
             setattr(ex, key, value)
         user_row.needs_profile_completion = False
         self.db.add(ex)
         self.db.add(user_row)
-        self.db.commit()
+        try:
+            self.db.commit()
+        except IntegrityError as e:
+            self.db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=integrity_error_detail(e),
+            ) from e
         self.db.refresh(user_row)
         return _user_to_public(user_row)
 
@@ -456,6 +472,13 @@ class InviteService:
         user_row.needs_profile_completion = False
         self.db.add(sec)
         self.db.add(user_row)
-        self.db.commit()
+        try:
+            self.db.commit()
+        except IntegrityError as e:
+            self.db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Não foi possível salvar o perfil. Verifique organização e dados informados.",
+            ) from e
         self.db.refresh(user_row)
         return _user_to_public(user_row)

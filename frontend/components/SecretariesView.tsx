@@ -9,8 +9,10 @@ import ToolbarPanel from './ui/ToolbarPanel';
 import Pagination from './Pagination';
 import { DataTable, DataTableBody, DataTableEmptyRow, DataTableHead, DataTableRow, DataTableTd, DataTableTh } from './ui/DataTable';
 import { isCompanyAdmin, isLegalOrgAdmin } from '../utils/tenantScope';
+import { getApiErrorMessage } from '../utils/apiError';
 import { relationSelectOptions } from '../utils/emergencyContactRelationOptions';
 import AppDateInput from './ui/AppDateInput';
+import { FormDangerAlert } from './ui/FormDangerAlert';
 // --- Helper Functions ---
 /**
  * Validates a Brazilian CPF number.
@@ -136,6 +138,7 @@ export const SecretaryForm: React.FC<{
 }) => {
     const [openSections, setOpenSections] = useState<string[]>(['principal', 'org']);
     const toggleSection = (section: string) => setOpenSections(prev => prev.includes(section) ? prev.filter(s => s !== section) : [...prev, section]);
+    const [submitError, setSubmitError] = useState<string | null>(null);
 
     const [fullName, setFullName] = useState(secretary.fullName || '');
     const [jobTitle, setJobTitle] = useState(secretary.jobTitle || '');
@@ -317,7 +320,9 @@ export const SecretaryForm: React.FC<{
         const lockedWorkEmail = profileCompletion
             ? (currentUser.email || workEmail)
             : workEmail;
-        await onSave({
+        setSubmitError(null);
+        try {
+            await onSave({
             ...(secretary.id && /^\d+$/.test(String(secretary.id)) ? { id: secretary.id } : {}),
             executiveIds: validExecutiveIds,
             fullName: normalize(fullName) || '',
@@ -361,7 +366,10 @@ export const SecretaryForm: React.FC<{
             dependentsInfo: normalize(dependentsInfo),
             bankInfo: normalize(bankInfo),
             compensationInfo: normalize(compensationInfo),
-        });
+            });
+        } catch (err: unknown) {
+            setSubmitError(getApiErrorMessage(err, 'Erro ao salvar perfil.'));
+        }
     };
 
     return (
@@ -598,6 +606,7 @@ export const SecretaryForm: React.FC<{
                 </fieldset>
             </CollapsibleSection>
 
+            <FormDangerAlert message={submitError} className="mt-2" />
             <div className="flex justify-end space-x-3 pt-4">
                 {!profileCompletion && (
                     <button type="button" onClick={onCancel} className="px-4 py-2 bg-slate-200 text-slate-800 rounded-md hover:bg-slate-300 transition">Cancelar</button>

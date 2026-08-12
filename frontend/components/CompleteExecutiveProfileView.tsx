@@ -3,6 +3,7 @@ import { completeExecutiveProfile, mapApiUserToAppUser } from '../services/authS
 import { departmentService } from '../services/departmentService';
 import { executiveService } from '../services/executiveService';
 import { organizationService } from '../services/organizationService';
+import { getApiErrorMessage, isDuplicateCpfError } from '../utils/apiError';
 import { normalizeExecutivePayload } from '../utils/executivePayload';
 import {
   composeBankInfo,
@@ -118,15 +119,11 @@ const CompleteExecutiveProfileView: React.FC<CompleteExecutiveProfileViewProps> 
       const apiUser = await completeExecutiveProfile(payload);
       onDone(mapApiUserToAppUser(apiUser));
     } catch (err: unknown) {
-      const ax = err as { response?: { data?: { detail?: string | Array<{ msg?: string }> } } };
-      const d = ax.response?.data?.detail;
-      const msg =
-        typeof d === 'string'
-          ? d
-          : Array.isArray(d)
-            ? d.map((x) => x.msg).filter(Boolean).join(' ')
-            : 'Erro ao salvar perfil.';
+      const msg = getApiErrorMessage(err, 'Erro ao salvar perfil.');
       setApiError(msg);
+      if (isDuplicateCpfError(err)) {
+        setFieldErrors((prev) => ({ ...prev, cpf: 'CPF já cadastrado.' }));
+      }
     } finally {
       setSaving(false);
     }

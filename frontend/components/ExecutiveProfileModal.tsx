@@ -5,6 +5,7 @@ import { departmentService } from '../services/departmentService';
 import { executiveService } from '../services/executiveService';
 import { organizationService } from '../services/organizationService';
 import { fetchMe, mapApiUserToAppUser, updateMeProfile } from '../services/authService';
+import { getApiErrorMessage, isDuplicateCpfError } from '../utils/apiError';
 import { normalizeExecutivePayload } from '../utils/executivePayload';
 import { maskPhone } from '../utils/brValidators';
 import {
@@ -138,8 +139,7 @@ const ExecutiveProfileModal: React.FC<ExecutiveProfileModalProps> = ({
       onUserUpdated?.(mapApiUserToAppUser(me));
       setAccOk('Dados da conta atualizados.');
     } catch (err: unknown) {
-      const ax = err as { response?: { data?: { detail?: string } } };
-      setAccError(typeof ax.response?.data?.detail === 'string' ? ax.response.data.detail : 'Não foi possível salvar.');
+      setAccError(getApiErrorMessage(err, 'Não foi possível salvar.'));
     } finally {
       setAccSaving(false);
     }
@@ -173,15 +173,11 @@ const ExecutiveProfileModal: React.FC<ExecutiveProfileModalProps> = ({
       onProfileSaved?.();
       onClose();
     } catch (err: unknown) {
-      const ax = err as { response?: { data?: { detail?: string | Array<{ msg?: string }> } } };
-      const d = ax.response?.data?.detail;
-      const msg =
-        typeof d === 'string'
-          ? d
-          : Array.isArray(d)
-            ? d.map((x) => x.msg).filter(Boolean).join(' ')
-            : 'Erro ao salvar perfil.';
+      const msg = getApiErrorMessage(err, 'Erro ao salvar perfil.');
       setApiError(msg);
+      if (isDuplicateCpfError(err)) {
+        setFieldErrors((prev) => ({ ...prev, cpf: 'CPF já cadastrado.' }));
+      }
     } finally {
       setSaving(false);
     }

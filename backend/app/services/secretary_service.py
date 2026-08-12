@@ -2,6 +2,7 @@ import json
 from typing import Any, Dict, List, Optional
 
 from fastapi import Depends, HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.database import get_db
@@ -76,7 +77,10 @@ def validated_secretary_executive_ids_for_org(
 def _body_to_parts(body: Dict[str, Any]) -> tuple[str, Optional[int], Optional[str], Optional[str], Optional[str], List[int]]:
     full_name = (body.get("fullName") or body.get("full_name") or "").strip()
     if not full_name:
-        raise ValueError("Nome completo é obrigatório.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Nome completo é obrigatório.",
+        )
     org_id = _parse_org_id(body.get("organizationId"))
     work_email = body.get("workEmail") or body.get("work_email")
     if work_email is not None:
@@ -147,9 +151,16 @@ class SecretaryService:
             profile_json=profile,
         )
         self.db.add(sec)
-        self.db.flush()
-        self._set_executives(sec, exec_ids)
-        self.db.commit()
+        try:
+            self.db.flush()
+            self._set_executives(sec, exec_ids)
+            self.db.commit()
+        except IntegrityError:
+            self.db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Não foi possível salvar a secretária. Verifique organização e dados informados.",
+            )
         self.db.refresh(sec)
         return self.get_secretary(sec.id)
 
@@ -169,7 +180,14 @@ class SecretaryService:
         sec.job_title = job_title
         sec.profile_json = profile
         self._set_executives(sec, exec_ids)
-        self.db.commit()
+        try:
+            self.db.commit()
+        except IntegrityError:
+            self.db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Não foi possível salvar a secretária. Verifique organização e dados informados.",
+            )
         self.db.refresh(sec)
         return self.get_secretary(sec.id)
 
