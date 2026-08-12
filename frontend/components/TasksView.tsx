@@ -226,75 +226,6 @@ const TaskForm: React.FC<{ task: Partial<Task>, onSave: (task: Partial<Task>, re
     );
 };
 
-// Helper to generate recurring tasks
-const generateRecurringTasks = (baseTask: Partial<Task>, rule: RecurrenceRule, recurrenceId: string): Partial<Task>[] => {
-    const newTasks: Partial<Task>[] = [];
-    const { frequency, interval, daysOfWeek, count, endDate } = rule;
-    const { title, description, priority, status, executiveId } = baseTask;
-
-    if (!baseTask.dueDate || !executiveId) return [];
-
-    if (frequency === 'weekly' && (!daysOfWeek || daysOfWeek.length === 0)) {
-        return [];
-    }
-
-    let currentDate = new Date(baseTask.dueDate + 'T00:00:00'); // Use UTC to avoid timezone issues
-    const finalDate = endDate ? new Date(endDate + 'T23:59:59') : null;
-
-    let occurrences = 0;
-    const maxOccurrences = count != null && Number.isFinite(count) && count >= 1 ? count : 100; // Safety limit
-
-    while (occurrences < maxOccurrences && (!finalDate || currentDate <= finalDate)) {
-        if (frequency === 'weekly') {
-            // Iterate through days to find the next valid one
-            while (true) {
-                if (daysOfWeek.includes(currentDate.getUTCDay())) {
-                     if ((!finalDate || currentDate <= finalDate)) {
-                        newTasks.push({
-                            title: title!,
-                            dueDate: currentDate.toISOString().split('T')[0],
-                            priority: priority!,
-                            status: status!,
-                            executiveId: executiveId,
-                            recurrenceId: recurrenceId,
-                            recurrence: rule,
-                            description
-                        });
-                        occurrences++;
-                     }
-                }
-                currentDate.setUTCDate(currentDate.getUTCDate() + 1);
-                // If we've passed a full week, jump by the interval
-                if (currentDate.getUTCDay() === new Date(baseTask.dueDate + 'T00:00:00').getUTCDay()) {
-                     currentDate.setUTCDate(currentDate.getUTCDate() + 7 * (interval -1));
-                     break;
-                }
-            }
-        } else {
-             newTasks.push({
-                title: title!,
-                dueDate: currentDate.toISOString().split('T')[0],
-                priority: priority!,
-                status: status!,
-                executiveId: executiveId,
-                recurrenceId: recurrenceId,
-                recurrence: rule,
-                description
-            });
-            occurrences++;
-
-            switch (frequency) {
-                case 'daily': currentDate.setUTCDate(currentDate.getUTCDate() + interval); break;
-                case 'monthly': currentDate.setUTCMonth(currentDate.getUTCMonth() + interval); break;
-                case 'annually': currentDate.setUTCFullYear(currentDate.getUTCFullYear() + interval); break;
-            }
-        }
-        if (newTasks.length >= maxOccurrences) break;
-    }
-
-    return count != null && Number.isFinite(count) && count >= 1 ? newTasks.slice(0, count) : newTasks;
-};
-
 
 const TasksView: React.FC<TasksViewProps> = ({ tasks, executiveId, onRefresh, layout }) => {
     const [isModalOpen, setModalOpen] = useState(false);
@@ -383,32 +314,26 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, executiveId, onRefresh, la
             return out;
         };
 
-        const toPayload = (task: Partial<Task>) => {
-            const { id: _id, ...rest } = task;
-            const payload = { ...rest } as Partial<Task>;
-            if (payload.recurrence) {
-                payload.recurrence = normalizeRecurrenceForApi(payload.recurrence);
-            }
-            return payload;
-        };
-
         if (recurrenceRule) {
-            const normalizedRule = normalizeRecurrenceForApi(recurrenceRule);
-            const newRecurrenceId = `recur_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-            const newSeries = generateRecurringTasks(fullTaskData, normalizedRule, newRecurrenceId);
-
-            if (newSeries.length === 0) {
-                throw new Error(
-                    'Não foi possível gerar ocorrências com a recorrência e datas informadas. Ajuste o período ou a data final.',
-                );
+            if (!fullTaskData.title || !fullTaskData.dueDate || !fullTaskData.priority || !fullTaskData.status) {
+                throw new Error('Preencha os campos obrigatórios da tarefa para criar a série.');
             }
-
-            await taskService.createBulk(newSeries.map(toPayload));
-
+            const seriesPayload = {
+                title: fullTaskData.title,
+                description: fullTaskData.description,
+                dueDate: fullTaskData.dueDate,
+                priority: fullTaskData.priority,
+                status: fullTaskData.status,
+                executiveId,
+                recurrence: normalizeRecurrenceForApi(recurrenceRule),
+            };
             if (oldRecurrenceId) {
-                await taskService.deleteByRecurrence(oldRecurrenceId);
-            } else if (fullTaskData.id) {
-                await taskService.delete(fullTaskData.id);
+                await taskService.replaceSeries(oldRecurrenceId, seriesPayload);
+            } else {
+                if (fullTaskData.id) {
+                    await taskService.delete(fullTaskData.id);
+                }
+                await taskService.createSeries(seriesPayload);
             }
         } else {
             const singlePayload = {
@@ -418,12 +343,18 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, executiveId, onRefresh, la
             };
 
             if (oldRecurrenceId) {
-                await taskService.create(toPayload(singlePayload));
+                await taskService.create({
+                    ...singlePayload,
+                    id: undefined,
+                });
                 await taskService.deleteByRecurrence(oldRecurrenceId);
             } else if (fullTaskData.id) {
                 await taskService.update(fullTaskData.id, singlePayload);
             } else {
-                await taskService.create(toPayload(singlePayload));
+                await taskService.create({
+                    ...singlePayload,
+                    id: undefined,
+                });
             }
         }
 

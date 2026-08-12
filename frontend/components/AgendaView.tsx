@@ -34,7 +34,6 @@ import { eventTypeService } from '../services/eventTypeService';
 import { getApiErrorMessage } from '../utils/apiError';
 import {
   apiDateTimeToDatetimeLocal,
-  dateToApiNaive,
   datetimeLocalToApi,
   toDatetimeLocalInputValue,
   todayDateInputValue,
@@ -520,67 +519,6 @@ const EventForm: React.FC<{
     );
 };
 
-// Helper to generate recurring events
-const generateRecurringEvents = (baseEvent: Partial<Event>, rule: RecurrenceRule, recurrenceId: string): Event[] => {
-    const newEvents: Event[] = [];
-    if (!baseEvent.startTime || !baseEvent.endTime || !baseEvent.executiveId) return [];
-
-    const baseStartTime = new Date(baseEvent.startTime);
-    const baseEndTime = new Date(baseEvent.endTime);
-    const duration = baseEndTime.getTime() - baseStartTime.getTime();
-    
-    let cursorDate = new Date(baseStartTime);
-    const finalDate = rule.endDate ? new Date(`${rule.endDate}T23:59:59.999`) : null;
-    const maxOccurrences = rule.count || 100; // Safety limit
-    let occurrences = 0;
-
-    const createEventOnDate = (date: Date) => {
-        const newEventStartTime = new Date(date);
-        const newEventEndTime = new Date(newEventStartTime.getTime() + duration);
-        newEvents.push({
-            ...baseEvent,
-            id: `evt_${recurrenceId}_${occurrences}`,
-            startTime: dateToApiNaive(newEventStartTime),
-            endTime: dateToApiNaive(newEventEndTime),
-            recurrenceId,
-            recurrence: rule,
-        } as Event);
-        occurrences++;
-    };
-
-    if (rule.frequency === 'weekly') {
-        if (!rule.daysOfWeek || rule.daysOfWeek.length === 0) return [];
-        let weekStartDate = new Date(cursorDate);
-        weekStartDate.setDate(weekStartDate.getDate() - weekStartDate.getDay()); // Start of the week (Sunday)
-        
-        while (occurrences < maxOccurrences && (!finalDate || weekStartDate <= finalDate)) {
-            for (const day of rule.daysOfWeek) {
-                 let nextOccurrenceDate = new Date(weekStartDate);
-                 nextOccurrenceDate.setDate(nextOccurrenceDate.getDate() + day);
-
-                 if(nextOccurrenceDate >= cursorDate) {
-                     if (occurrences < maxOccurrences && (!finalDate || nextOccurrenceDate <= finalDate)) {
-                        createEventOnDate(nextOccurrenceDate);
-                     }
-                 }
-            }
-            weekStartDate.setDate(weekStartDate.getDate() + (7 * rule.interval));
-        }
-
-    } else {
-         while (occurrences < maxOccurrences && (!finalDate || cursorDate <= finalDate)) {
-             createEventOnDate(cursorDate);
-             switch (rule.frequency) {
-                case 'daily': cursorDate.setDate(cursorDate.getDate() + rule.interval); break;
-                case 'monthly': cursorDate.setMonth(cursorDate.getMonth() + rule.interval); break;
-                case 'annually': cursorDate.setFullYear(cursorDate.getFullYear() + rule.interval); break;
-            }
-         }
-    }
-    
-    return newEvents.slice(0, rule.count);
-};
-
 
 const AgendaView: React.FC<AgendaViewProps> = ({ events, setEvents, eventTypes, setEventTypes, executiveId, onRefresh, layout }) => {
     const [isModalOpen, setModalOpen] = useState(false);
@@ -677,33 +615,58 @@ const AgendaView: React.FC<AgendaViewProps> = ({ events, setEvents, eventTypes, 
             ? events.find((e) => e.id === fullEventData.id)?.recurrenceId
             : undefined;
 
-        const toPayload = (evt: Partial<Event>) => ({
-            ...evt,
-            id: undefined,
-        });
+        const normalizeRecurrence = (rule: RecurrenceRule): RecurrenceRule => {
+            const out: RecurrenceRule = {
+                frequency: rule.frequency,
+                interval: Number.isFinite(rule.interval) && rule.interval >= 1 ? rule.interval : 1,
+            };
+            if (rule.daysOfWeek?.length) {
+                out.daysOfWeek = [...rule.daysOfWeek].sort((a, b) => a - b);
+            }
+            if (rule.endDate) out.endDate = rule.endDate;
+            if (rule.count != null && Number.isFinite(rule.count) && rule.count >= 1) {
+                out.count = rule.count;
+            }
+            return out;
+        };
 
         if (recurrenceRule) {
-            const recurrenceId = oldRecurrenceId || `recur_${new Date().getTime()}`;
-            const series = generateRecurringEvents(fullEventData, recurrenceRule, recurrenceId);
-            if (series.length === 0) {
-                throw new Error('Não foi possível gerar ocorrências com a recorrência informada. Verifique os dias ou o período.');
+            if (!fullEventData.title || !fullEventData.startTime || !fullEventData.endTime) {
+                throw new Error('Preencha título, início e fim para criar a série.');
             }
-
+            const seriesPayload = {
+                title: fullEventData.title,
+                description: fullEventData.description,
+                startTime: fullEventData.startTime,
+                endTime: fullEventData.endTime,
+                location: fullEventData.location,
+                eventTypeId: fullEventData.eventTypeId,
+                executiveId,
+                reminderMinutes: fullEventData.reminderMinutes,
+                recurrence: normalizeRecurrence(recurrenceRule),
+            };
             if (oldRecurrenceId) {
-                await eventService.deleteByRecurrence(oldRecurrenceId);
-            } else if (fullEventData.id) {
-                await eventService.delete(fullEventData.id);
+                await eventService.replaceSeries(oldRecurrenceId, seriesPayload);
+            } else {
+                if (fullEventData.id) {
+                    await eventService.delete(fullEventData.id);
+                }
+                await eventService.createSeries(seriesPayload);
             }
-
-            await eventService.createBulk(series.map(toPayload));
         } else {
+            const singlePayload = {
+                ...fullEventData,
+                recurrenceId: undefined,
+                recurrence: undefined,
+                id: undefined,
+            };
             if (oldRecurrenceId) {
                 await eventService.deleteByRecurrence(oldRecurrenceId);
-                await eventService.create(toPayload(fullEventData));
+                await eventService.create(singlePayload);
             } else if (fullEventData.id) {
                 await eventService.update(fullEventData.id, fullEventData);
             } else {
-                await eventService.create(toPayload(fullEventData));
+                await eventService.create(singlePayload);
             }
         }
 

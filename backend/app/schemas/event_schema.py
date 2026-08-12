@@ -33,6 +33,22 @@ class EventCreate(EventBase):
     pass
 
 
+class EventSeriesCreate(BaseModel):
+    """Um evento-base + regra; o servidor gera recurrenceId e as ocorrências."""
+
+    title: str = Field(..., min_length=1, max_length=255)
+    description: Optional[str] = None
+    start_time: datetime = Field(..., alias="startTime")
+    end_time: datetime = Field(..., alias="endTime")
+    location: Optional[str] = None
+    event_type_id: Optional[int] = Field(None, alias="eventTypeId")
+    executive_id: int = Field(..., alias="executiveId")
+    reminder_minutes: Optional[int] = Field(None, alias="reminderMinutes")
+    recurrence: RecurrenceRule
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
 class EventUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None

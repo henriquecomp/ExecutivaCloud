@@ -1,5 +1,5 @@
 import { api } from "./api";
-import { Task } from "../types";
+import { RecurrenceRule, Task } from "../types";
 
 const mapTask = (item: any): Task => ({
   ...item,
@@ -10,6 +10,15 @@ const mapTask = (item: any): Task => ({
 interface GetTasksParams {
   executiveId?: string;
 }
+
+export type TaskSeriesPayload = Omit<Partial<Task>, "id" | "recurrenceId"> & {
+  title: string;
+  dueDate: string;
+  priority: Task["priority"];
+  status: Task["status"];
+  executiveId: string | number;
+  recurrence: RecurrenceRule;
+};
 
 export const taskService = {
   getAll: async (params?: GetTasksParams) => {
@@ -26,8 +35,22 @@ export const taskService = {
     return mapTask(response.data);
   },
 
-  createBulk: async (data: Partial<Task>[]) => {
-    const response = await api.post<any[]>("/tasks/bulk", data);
+  createSeries: async (data: TaskSeriesPayload) => {
+    const response = await api.post<any[]>("/tasks/series", {
+      ...data,
+      executiveId: Number(data.executiveId),
+    });
+    return response.data.map(mapTask);
+  },
+
+  replaceSeries: async (recurrenceId: string, data: TaskSeriesPayload) => {
+    const response = await api.put<any[]>(
+      `/tasks/series/${encodeURIComponent(recurrenceId)}`,
+      {
+        ...data,
+        executiveId: Number(data.executiveId),
+      },
+    );
     return response.data.map(mapTask);
   },
 

@@ -31,6 +31,20 @@ class TaskCreate(TaskBase):
     pass
 
 
+class TaskSeriesCreate(BaseModel):
+    """Uma tarefa-base + regra; o servidor gera recurrenceId e as ocorrências."""
+
+    title: str = Field(..., min_length=1, max_length=255)
+    description: Optional[str] = None
+    due_date: date = Field(..., alias="dueDate")
+    priority: Literal["Alta", "Média", "Baixa"]
+    status: Literal["A Fazer", "Em Andamento", "Concluído"]
+    executive_id: int = Field(..., alias="executiveId")
+    recurrence: RecurrenceRule
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
 class TaskUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None

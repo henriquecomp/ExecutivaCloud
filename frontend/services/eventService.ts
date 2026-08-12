@@ -1,5 +1,5 @@
 import { api } from "./api";
-import { Event } from "../types";
+import { Event, RecurrenceRule } from "../types";
 
 const mapEvent = (item: any): Event => ({
   ...item,
@@ -11,6 +11,14 @@ const mapEvent = (item: any): Event => ({
 interface GetEventsParams {
   executiveId?: string;
 }
+
+export type EventSeriesPayload = Omit<Partial<Event>, "id" | "recurrenceId"> & {
+  title: string;
+  startTime: string;
+  endTime: string;
+  executiveId: string | number;
+  recurrence: RecurrenceRule;
+};
 
 export const eventService = {
   getAll: async (params?: GetEventsParams) => {
@@ -27,8 +35,24 @@ export const eventService = {
     return mapEvent(response.data);
   },
 
-  createBulk: async (data: Partial<Event>[]) => {
-    const response = await api.post<any[]>("/events/bulk", data);
+  createSeries: async (data: EventSeriesPayload) => {
+    const response = await api.post<any[]>("/events/series", {
+      ...data,
+      executiveId: Number(data.executiveId),
+      eventTypeId: data.eventTypeId != null ? Number(data.eventTypeId) : undefined,
+    });
+    return response.data.map(mapEvent);
+  },
+
+  replaceSeries: async (recurrenceId: string, data: EventSeriesPayload) => {
+    const response = await api.put<any[]>(
+      `/events/series/${encodeURIComponent(recurrenceId)}`,
+      {
+        ...data,
+        executiveId: Number(data.executiveId),
+        eventTypeId: data.eventTypeId != null ? Number(data.eventTypeId) : undefined,
+      },
+    );
     return response.data.map(mapEvent);
   },
 

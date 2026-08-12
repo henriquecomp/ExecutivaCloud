@@ -20,6 +20,29 @@ def get_all_tasks(
     return service.get_all_tasks(skip=skip, limit=limit, executive_id=executive_id)
 
 
+@router.post("/series", response_model=List[schemas.Task], status_code=status.HTTP_201_CREATED)
+def create_task_series(
+    payload: schemas.TaskSeriesCreate,
+    service: TaskService = Depends(TaskService),
+):
+    try:
+        return service.create_series(payload)
+    except ValueError as error:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
+
+
+@router.put("/series/{recurrence_id}", response_model=List[schemas.Task])
+def replace_task_series(
+    recurrence_id: str,
+    payload: schemas.TaskSeriesCreate,
+    service: TaskService = Depends(TaskService),
+):
+    try:
+        return service.replace_series(recurrence_id, payload)
+    except ValueError as error:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
+
+
 @router.get("/{task_id}", response_model=schemas.Task)
 def get_task(
     task_id: int,
@@ -38,17 +61,6 @@ def create_task(
 ):
     try:
         return service.create_task(payload)
-    except ValueError as error:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
-
-
-@router.post("/bulk", response_model=List[schemas.Task], status_code=status.HTTP_201_CREATED)
-def create_tasks_bulk(
-    payloads: List[schemas.TaskCreate],
-    service: TaskService = Depends(TaskService),
-):
-    try:
-        return service.create_many_tasks(payloads)
     except ValueError as error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
 

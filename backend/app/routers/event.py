@@ -19,6 +19,29 @@ def get_all_events(
     return service.get_all_events(skip=skip, limit=limit, executive_id=executive_id)
 
 
+@router.post("/series", response_model=List[schemas.Event], status_code=status.HTTP_201_CREATED)
+def create_event_series(
+    payload: schemas.EventSeriesCreate,
+    service: EventService = Depends(EventService),
+):
+    try:
+        return service.create_series(payload)
+    except ValueError as error:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
+
+
+@router.put("/series/{recurrence_id}", response_model=List[schemas.Event])
+def replace_event_series(
+    recurrence_id: str,
+    payload: schemas.EventSeriesCreate,
+    service: EventService = Depends(EventService),
+):
+    try:
+        return service.replace_series(recurrence_id, payload)
+    except ValueError as error:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
+
+
 @router.get("/{event_id}", response_model=schemas.Event)
 def get_event(
     event_id: int,
@@ -37,17 +60,6 @@ def create_event(
 ):
     try:
         return service.create_event(payload)
-    except ValueError as error:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
-
-
-@router.post("/bulk", response_model=List[schemas.Event], status_code=status.HTTP_201_CREATED)
-def create_events_bulk(
-    payloads: List[schemas.EventCreate],
-    service: EventService = Depends(EventService),
-):
-    try:
-        return service.create_many_events(payloads)
     except ValueError as error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
 

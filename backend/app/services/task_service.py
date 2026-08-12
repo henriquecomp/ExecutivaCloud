@@ -1,3 +1,4 @@
+import uuid
 from datetime import date
 from typing import List, Optional, Union
 
@@ -5,6 +6,7 @@ from fastapi import Depends
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.recurrence import expand_dates
 from app.models import task_model as models
 from app.repositories.task_repository import TaskRepository
 from app.repositories.executive_repository import ExecutiveRepository
@@ -56,13 +58,38 @@ class TaskService:
         self._validate_references(data)
         return self.repository.create(data)
 
-    def create_many_tasks(self, payloads: List[schemas.TaskCreate]) -> List[models.Task]:
-        create_payloads = []
-        for payload in payloads:
-            data = _row_dict_with_json_safe_recurrence(payload)
-            self._validate_references(data)
-            create_payloads.append(data)
-        return self.repository.create_many(create_payloads)
+    def create_series(self, payload: schemas.TaskSeriesCreate) -> List[models.Task]:
+        base = {
+            "title": payload.title,
+            "description": payload.description,
+            "priority": payload.priority,
+            "status": payload.status,
+            "executive_id": payload.executive_id,
+        }
+        self._validate_references(base)
+
+        due_dates = expand_dates(payload.due_date, payload.recurrence)
+        recurrence_id = str(uuid.uuid4())
+        recurrence_json = payload.recurrence.model_dump(
+            by_alias=False, mode="json", exclude_none=True
+        )
+
+        rows = [
+            {
+                **base,
+                "due_date": d,
+                "recurrence_id": recurrence_id,
+                "recurrence": recurrence_json,
+            }
+            for d in due_dates
+        ]
+        return self.repository.create_many(rows)
+
+    def replace_series(
+        self, recurrence_id: str, payload: schemas.TaskSeriesCreate
+    ) -> List[models.Task]:
+        self.repository.delete_by_recurrence(recurrence_id=recurrence_id)
+        return self.create_series(payload)
 
     def update_task(self, task_id: int, payload: schemas.TaskUpdate) -> models.Task:
         db_item = self.repository.get_by_id(task_id)
