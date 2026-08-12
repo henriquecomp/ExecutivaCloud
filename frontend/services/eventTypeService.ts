@@ -1,5 +1,6 @@
 import { api } from "./api";
 import { EventType } from "../types";
+import { sortByNamePt } from "../utils/sortByName";
 
 const mapEventType = (item: any): EventType => ({
   ...item,
@@ -9,7 +10,7 @@ const mapEventType = (item: any): EventType => ({
 export const eventTypeService = {
   getAll: async () => {
     const response = await api.get<any[]>("/event-types/?skip=0&limit=1000");
-    return response.data.map(mapEventType);
+    return sortByNamePt(response.data.map(mapEventType));
   },
 
   create: async (data: Omit<EventType, "id">) => {

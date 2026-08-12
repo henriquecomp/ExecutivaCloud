@@ -1,5 +1,6 @@
 import { api } from "./api";
 import { ContactType } from "../types";
+import { sortByNamePt } from "../utils/sortByName";
 
 const mapContactType = (item: any): ContactType => ({
   ...item,
@@ -10,7 +11,7 @@ const mapContactType = (item: any): ContactType => ({
 export const contactTypeService = {
   getAll: async () => {
     const response = await api.get<any[]>("/contact-types/?skip=0&limit=1000");
-    return response.data.map(mapContactType);
+    return sortByNamePt(response.data.map(mapContactType));
   },
 
   create: async (data: Omit<ContactType, "id">) => {

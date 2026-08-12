@@ -1,5 +1,6 @@
 import { api } from "./api";
 import type { ExpenseCategory } from "../types";
+import { sortByNamePt } from "../utils/sortByName";
 
 const mapCategory = (item: Record<string, unknown>): ExpenseCategory => ({
   id: String(item.id),
@@ -21,7 +22,7 @@ export const expenseCategoryService = {
     const response = await api.get<Record<string, unknown>[]>(
       `/expense-categories/?${search.toString()}`,
     );
-    return response.data.map(mapCategory);
+    return sortByNamePt(response.data.map(mapCategory));
   },
 
   create: async (data: Pick<ExpenseCategory, "name" | "color" | "executiveId">) => {

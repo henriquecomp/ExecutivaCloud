@@ -1,5 +1,6 @@
 import { api } from "./api";
 import { DocumentCategory } from "../types";
+import { sortByNamePt } from "../utils/sortByName";
 
 const mapDocumentCategory = (item: any): DocumentCategory => ({
   ...item,
@@ -10,7 +11,7 @@ const mapDocumentCategory = (item: any): DocumentCategory => ({
 export const documentCategoryService = {
   getAll: async () => {
     const response = await api.get<any[]>("/document-categories/?skip=0&limit=1000");
-    return response.data.map(mapDocumentCategory);
+    return sortByNamePt(response.data.map(mapDocumentCategory));
   },
 
   create: async (data: Omit<DocumentCategory, "id">) => {
